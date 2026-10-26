@@ -1,0 +1,539 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index 39bf6f5..bc2b4c3 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -189,6 +189,14 @@ define_pd_global(bool, CompactStrings, true);
+   product(ccstr, ZeroWasmLinkedReferenceStoreGroupCacheMutationForTest, nullptr, EXPERIMENTAL, \
+           "Test-only grouped store cache mutation incl edges/card/poison") \
+                                                                             \
++  product(bool, UseZeroWasmLinkedReferenceStoreGroupRelocation, false, EXPERIMENTAL, \
++          "Stage-1 structural-only two-phase Object[] store group")       \
++                                                                            \
++  product(intx, ZeroWasmLinkedReferenceStoreGroupRelocationMemoryLimitForTest, 0, EXPERIMENTAL, \
++          "Reserved Stage-1 two-phase store memory limit in pages")      \
++  product(ccstr, ZeroWasmLinkedReferenceStoreGroupRelocationCacheMutationForTest, nullptr, EXPERIMENTAL, \
++          "Reserved Stage-1 cache mutation vocabulary; execution disabled") \
++                                                                            \
+   product(bool, UseZeroWasmReferenceStoreGroupPerf, false, EXPERIMENTAL,    \
+           "Run the measurement-only grouped Object[] store loop module")  \
+   \
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 13983d5..24b2e85 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -330,7 +330,8 @@ JRT_END
+ #ifdef __EMSCRIPTEN__
+ #define DO_BACKEDGE_CHECKS(skip, branch_pc)                                    \
+   if (UseZeroWasmJIT && !zero_ref_array_collision                             \
+-      && !zero_reference_store_group_collision && (skip) < 0                 \
++      && !zero_reference_store_group_collision                               \
++      && !zero_reference_store_group_relocation_collision && (skip) < 0     \
+       && --ZeroWasmCompiler::_osr_countdown <= 0) {                            \
+     DECACHE_TOS();                                                             \
+     if (ZeroWasmCompiler::maybe_run_osr(METHOD, locals, &pc, &topOfStack, istate)) { \
+@@ -560,12 +561,21 @@ void BytecodeInterpreter::run(interpreterState istate) {
+           || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
+           || UseZeroWasmLinkedReferenceStoreGroup
+           || UseZeroWasmBaseline || UseZeroWasmJIT);
++  const bool zero_reference_store_group_relocation_collision =
++      UseZeroWasmLinkedReferenceStoreGroupRelocation
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++          || UseZeroWasmLinkedReferenceStoreGroup
++          || UseZeroWasmReferenceStoreGroupPerf
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
+   // Zero's browser runtime is single-threaded. Keep this process-local so a
+   // same-frame retry or a later fixture call cannot emit another collision
+   // marker; the gate requires exactly one bounded diagnostic per launch.
+   static bool zero_ref_array_collision_reported = false;
+   static bool zero_reference_store_group_collision_reported = false;
+   static bool zero_reference_store_group_perf_collision_reported = false;
++  static bool zero_reference_store_group_relocation_collision_reported = false;
+ #endif
+ 
+ #ifdef ASSERT
+@@ -870,11 +880,31 @@ void BytecodeInterpreter::run(interpreterState istate) {
+                   "measurement-only=1 production-cache=0");
+     zero_reference_store_group_perf_collision_reported = true;
+   }
++  if (zero_reference_store_group_relocation_collision
++      && pc == METHOD->code_base() && ZeroWasmLinkedGroupVerbose
++      && !zero_reference_store_group_relocation_collision_reported) {
++    tty->print_cr("[zbr4] RELOCATION_STAGE1_REJECT reason=flag-collision "
++                  "group=%d int-load=%d int-store=%d benchmark=%d "
++                  "ref-load=%d ref-store=%d reference-store-group=%d "
++                  "group-perf=%d relocation=%d baseline=%d jit=%d",
++                  UseZeroWasmLinkedGroup ? 1 : 0,
++                  UseZeroWasmLinkedIntArray ? 1 : 0,
++                  UseZeroWasmLinkedIntArrayStore ? 1 : 0,
++                  UseZeroWasmLinkedBenchmark ? 1 : 0,
++                  UseZeroWasmLinkedRefArrayLoad ? 1 : 0,
++                  UseZeroWasmLinkedRefArrayStore ? 1 : 0,
++                  UseZeroWasmLinkedReferenceStoreGroup ? 1 : 0,
++                  UseZeroWasmReferenceStoreGroupPerf ? 1 : 0,
++                  UseZeroWasmLinkedReferenceStoreGroupRelocation ? 1 : 0,
++                  UseZeroWasmBaseline ? 1 : 0, UseZeroWasmJIT ? 1 : 0);
++    zero_reference_store_group_relocation_collision_reported = true;
++  }
+   if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+       || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
+       || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
+       || UseZeroWasmLinkedReferenceStoreGroup
+-      || UseZeroWasmReferenceStoreGroupPerf)
++      || UseZeroWasmReferenceStoreGroupPerf
++      || UseZeroWasmLinkedReferenceStoreGroupRelocation)
+       // The two incompatible fixture-specific array ABIs fail closed as a
+       // pair. Do not call maybe_run and then retry at the same entry forever;
+       // the real interpreter must own the frame when either incompatible
+@@ -887,6 +917,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+       && !zero_ref_array_collision
+       && !zero_reference_store_group_collision
+       && !zero_reference_store_group_perf_collision
++      && !zero_reference_store_group_relocation_collision
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -906,6 +937,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // this loop at the exact bytecode and stack state supplied by the adapter.
+   if (UseZeroWasmBaseline && !zero_ref_array_collision
+       && !zero_reference_store_group_collision
++      && !zero_reference_store_group_relocation_collision
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result baseline =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -934,6 +966,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // remaining tests are loads the interpreter has already made.
+   if (UseZeroWasmJIT && !zero_ref_array_collision
+       && !zero_reference_store_group_collision
++      && !zero_reference_store_group_relocation_collision
+       && pc == METHOD->code_base()
+       && (uintx)METHOD->code_size() >= ZeroWasmJITMinBytecodes) {
+     ZeroWasmCompiler::maybe_run(METHOD, locals, METHOD->code_base(), &pc, &topOfStack, istate);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 12a61ec..660eba4 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -312,6 +312,8 @@ static THREAD_LOCAL int _linked_ref_array_store_slot = -1;
+ static THREAD_LOCAL bool _linked_ref_array_store_collision_reported = false;
+ static THREAD_LOCAL int _linked_reference_store_group_module_id = -1;
+ static THREAD_LOCAL int _linked_reference_store_group_slot = -1;
++static THREAD_LOCAL int _linked_reference_store_group_relocation_module_id = -1;
++static THREAD_LOCAL int _linked_reference_store_group_relocation_slot = -1;
+ static THREAD_LOCAL int _reference_store_group_perf_module_id = -1;
+ static THREAD_LOCAL bool _linked_ref_array_store_card_probe_pending = false;
+ static THREAD_LOCAL jint _linked_ref_array_store_card_probe_index = -1;
+@@ -1072,6 +1074,187 @@ static void emit_reference_store_group_commit(
+   body.u8(0x0b);
+ }
+ 
++enum ReferenceStoreGroupRelocationFunction {
++  ReferenceStoreGroupRelocationDispatcher = 0,
++  ReferenceStoreGroupRelocationPhase0 = 1,
++  ReferenceStoreGroupRelocationPhase1 = 2,
++  ReferenceStoreGroupRelocationLeaf = 3,
++  ReferenceStoreGroupRelocationRelay = 4,
++  ReferenceStoreGroupRelocationCommit = 5
++};
++
++static const char* const kReferenceStoreGroupRelocationClassContract =
++    "ZeroReferenceStoreGroupRelocationFixture#"
++    "groupedReferenceStoreAcrossRelocation([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;"
++    "@probe-bci8;phase1@bci0";
++static const char* const kReferenceStoreGroupRelocationProbeContract =
++    "ZeroReferenceStoreGroupRelocationProbe#forceYoungRelocation()V@bci8";
++static const char* const kReferenceStoreGroupRelocationRootMaps =
++    "orchestrator-bci8:oops=0,2,3;token=4:int;depth=0|"
++    "phase1-bci0:oops=0,2,3;token=4:int;depth=0";
++static const char* const kReferenceStoreGroupRelocationPhaseAbi =
++    "dispatcher9->i64;phase0:i32->i32;phase1:3i32->void";
++static const char* const kReferenceStoreGroupRelocationPhaseEdges =
++    "dispatcher->phase0,dispatcher->phase1,phase0->relay,"
++    "phase1->relay,phase1->commit,relay->leaf";
++
++// C3b Stage 1 defines, but never installs or invokes, this isolated dispatcher
++// ABI: (phase,array,index,original,kept,token,limitPages,cardBase,assignable)
++// -> packed i64. Phase 0 has no memory side effects. Phase 1 performs every
++// fallible guard before its first private call; only commit writes memory.
++static void emit_reference_store_group_relocation_dispatcher(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout) {
++  body.u8(1);
++  body.uleb(2); body.u8(0x7f); // locals 9=element address, 10=card address
++
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // phase == 0
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x20); body.uleb(3);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelocationPhase0);
++  body.u8(0xad);
++  linked_i64_const(body, linked_status(LINKED_RETURN, 0));
++  body.u8(0x84);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(1); body.u8(0x47); // phase != 1
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(3);
++  body.u8(0x20); body.uleb(4); body.u8(0x47); // original != kept
++  body.u8(0x20); body.uleb(5); body.u8(0x45); body.u8(0x72); // token == 0
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(1); body.u8(0x45); // null array
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(6); body.u8(0x45); body.u8(0x45);
++  body.u8(0x04); body.u8(0x7e); // test override forces pre-call miss
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.length_offset + 4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, 6);
++  body.u8(0x56); // header end > effective bytes
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x4f); // unsigned index >= length
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset + layout.element_size); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, 6);
++  body.u8(0x56); // widened element end
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(8); body.u8(0x45); // assignability predicate
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(7); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(0xffffffffLL); body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e); // widened card address overflow
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(7); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c); body.u8(0x42); body.sleb64(1); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, 6);
++  body.u8(0x56); // widened card end
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0xa7); body.u8(0x21); body.uleb(9);
++
++  body.u8(0x20); body.uleb(7); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c); body.u8(0xa7); body.u8(0x21); body.uleb(10);
++
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  linked_i64_const(body, linked_status(LINKED_RETURN, 0)); body.u8(0x84);
++  body.u8(0x20); body.uleb(9);
++  body.u8(0x20); body.uleb(4);
++  body.u8(0x20); body.uleb(10);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelocationPhase1);
++
++  for (int i = 0; i < 10; i++) body.u8(0x0b);
++  body.u8(0x0b); // phase selector
++  body.u8(0x0b); // function
++}
++
++static void emit_reference_store_group_relocation_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x0b);
++}
++
++static void emit_reference_store_group_relocation_relay(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelocationLeaf);
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_relocation_phase0(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelocationRelay);
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_relocation_phase1(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelocationRelay);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelocationCommit);
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_relocation_commit(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout) {
++  emit_reference_store_group_commit(body, layout);
++}
++
+ // Benchmark-only bodies. They are emitted only in the opt-in benchmark
+ // module, so the production ten-export module remains byte-for-byte stable.
+ // Each wrapper performs its complete N-iteration loop in Wasm; the host makes
+@@ -1450,6 +1633,60 @@ static int build_reference_store_group_module(
+   return module.length();
+ }
+ 
++// Structural-only C3b module. It has no table or element section and exports
++// only the dispatcher; all phase members remain private direct-call targets.
++static int build_reference_store_group_relocation_module(
++    WasmBuf& module, const LinkedRefArrayStoreLayout& layout) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(3);
++  linked_type(types, 9);      // dispatcher -> packed i64
++  linked_i32_type(types, 1);  // phase0/leaf/relay identity
++  linked_void_type(types, 3); // phase1/commit(element,value,card)
++  module.section(1, types);
++
++  WasmBuf imports;
++  imports.uleb(1);
++  imports.string("env"); imports.string("memory");
++  imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++  module.section(2, imports);
++
++  WasmBuf functions;
++  functions.uleb(6);
++  functions.uleb(0); // dispatcher
++  functions.uleb(1); // phase0
++  functions.uleb(2); // phase1
++  functions.uleb(1); // leaf
++  functions.uleb(1); // relay
++  functions.uleb(2); // commit
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(1);
++  emit_linked_export(exports, "groupedReferenceStoreAcrossRelocation",
++                     ReferenceStoreGroupRelocationDispatcher);
++  module.section(7, exports);
++
++  WasmBuf bodies[6];
++  emit_reference_store_group_relocation_dispatcher(bodies[0], layout);
++  emit_reference_store_group_relocation_phase0(bodies[1]);
++  emit_reference_store_group_relocation_phase1(bodies[2]);
++  emit_reference_store_group_relocation_leaf(bodies[3]);
++  emit_reference_store_group_relocation_relay(bodies[4]);
++  emit_reference_store_group_relocation_commit(bodies[5], layout);
++  WasmBuf code;
++  code.uleb(6);
++  for (int i = 0; i < 6; i++) {
++    code.uleb((unsigned)bodies[i].length());
++    code.raw(bodies[i].data(), bodies[i].length());
++  }
++  module.section(10, code);
++  return module.length();
++}
++
+ enum ReferenceStoreGroupPerfFunction {
+   ReferenceStoreGroupPerfInline = 0,
+   ReferenceStoreGroupPerfDirect = 1,
+@@ -4034,6 +4271,128 @@ EM_JS(int, zbb_reference_store_group_install,
+                  group_edges);
+ });
+ 
++// C3b Stage-1 cache installer. No production path calls this function yet;
++// it exists so the isolated namespace, immutable owned slot, root-map/phase
++// ABI identity, and future mutation vocabulary are represented structurally.
++// No installer invocation or continuation activation exists in Stage 1.
++EM_JS(int, zbb_reference_store_group_relocation_install_stage1,
++      (const unsigned char* bytes, int length, const char* key, int out_slot,
++       const char* class_contract, const char* probe_contract,
++       const char* root_maps, const char* phase_abi, const char* phase_edges,
++       const char* mutation_vocabulary), {
++  globalThis.__mcwebZeroReferenceStoreGroupRelocationCache ||= Object.create(null);
++  HEAP32[out_slot >> 2] = -1;
++  const metadata = UTF8ToString(key);
++  const classContract = UTF8ToString(class_contract);
++  const probeContract = UTF8ToString(probe_contract);
++  const rootMaps = UTF8ToString(root_maps);
++  const phaseAbi = UTF8ToString(phase_abi);
++  const phaseEdges = UTF8ToString(phase_edges);
++  const mutationVocabulary = UTF8ToString(mutation_vocabulary);
++  const expectedVocabulary =
++      "compiler,digest,bytes,memory,metadata,slot,card-layout,phase-abi,phase-edges,root-map,poison";
++  if (mutationVocabulary !== expectedVocabulary) return -1;
++  const importedMemory = wasmMemory;
++  const memoryBuffer = importedMemory && importedMemory.buffer;
++  const memoryPages = memoryBuffer && memoryBuffer.byteLength / 65536;
++  if (!(importedMemory instanceof WebAssembly.Memory)
++      || !(typeof SharedArrayBuffer !== "undefined"
++           && memoryBuffer instanceof SharedArrayBuffer)
++      || !Number.isInteger(memoryPages) || memoryPages < 0
++      || memoryPages > 65536) return -1;
++
++  const binary = HEAPU8.slice(bytes, bytes + length);
++  let digestA = 0x811c9dc5;
++  let digestB = 0x9e3779b9;
++  for (let i = 0; i < binary.length; i++) {
++    digestA = Math.imul(digestA ^ binary[i], 0x01000193) >>> 0;
++    digestB = Math.imul(digestB ^ ((binary[i] + i) & 0xff), 0x85ebca6b) >>> 0;
++  }
++  const digest = digestA.toString(16).padStart(8, "0")
++      + digestB.toString(16).padStart(8, "0");
++  const cache = globalThis.__mcwebZeroReferenceStoreGroupRelocationCache;
++  const sameBytes = (left, right) => left instanceof Uint8Array
++      && left.length === right.length
++      && left.every((value, index) => value === right[index]);
++  const cached = cache[metadata];
++  if (cached) {
++    let exportMatches = false;
++    try {
++      exportMatches = Number.isInteger(cached.ownedSlot)
++          && getWasmTableEntry(cached.ownedSlot) === cached.export;
++    } catch (error) {
++      exportMatches = false;
++    }
++    const valid = cached.compiler === "zero-baseline-abi-v1"
++        && cached.digest === digest && cached.bytes === length
++        && sameBytes(cached.binary, binary) && cached.memory === importedMemory
++        && cached.memoryPages === memoryPages && cached.metadata === metadata
++        && cached.classContract === classContract
++        && cached.probeContract === probeContract
++        && cached.rootMaps === rootMaps && cached.phaseAbi === phaseAbi
++        && cached.phaseEdges === phaseEdges
++        && cached.mutationVocabulary === mutationVocabulary
++        && cached.slot === cached.ownedSlot && cached.slot >= 0
++        && cached.instance && exportMatches;
++    if (valid) {
++      HEAP32[out_slot >> 2] = cached.ownedSlot;
++      return cached.id;
++    }
++    const ownedSlot = cached.ownedSlot;
++    if (!Number.isInteger(ownedSlot) || ownedSlot < 0) return -1;
++    try {
++      removeFunction(ownedSlot);
++    } catch (error) {
++      return -1;
++    }
++    let callableAfter = true;
++    try {
++      callableAfter = typeof getWasmTableEntry(ownedSlot) === "function";
++    } catch (error) {
++      callableAfter = false;
++    }
++    if (callableAfter) return -1;
++    delete cache[metadata];
++  }
++
++  let ownedSlot = -1;
++  try {
++    const module = new WebAssembly.Module(binary);
++    const instance = new WebAssembly.Instance(module, {env: {memory: importedMemory}});
++    const exported = instance.exports.groupedReferenceStoreAcrossRelocation;
++    if (typeof exported !== "function"
++        || Object.keys(instance.exports).length !== 1) return -1;
++    ownedSlot = addFunction(exported, "jiiiiiiiii");
++    if (!Number.isInteger(ownedSlot) || ownedSlot < 0
++        || getWasmTableEntry(ownedSlot) !== exported) {
++      if (Number.isInteger(ownedSlot) && ownedSlot >= 0) removeFunction(ownedSlot);
++      return -1;
++    }
++    const id = (cache.__nextId = (cache.__nextId || 0) + 1);
++    Object.defineProperty(cache, metadata, {
++      configurable: true,
++      enumerable: true,
++      writable: false,
++      value: Object.freeze({
++        id, compiler: "zero-baseline-abi-v1", digest, bytes: length,
++        binary, memory: importedMemory, memoryPages, metadata, classContract,
++        probeContract, rootMaps, phaseAbi, phaseEdges, mutationVocabulary,
++        instance, export: exported,
++        slot: ownedSlot, ownedSlot
++      })
++    });
++    HEAP32[out_slot >> 2] = ownedSlot;
++    return id;
++  } catch (error) {
++    if (Number.isInteger(ownedSlot) && ownedSlot >= 0) {
++      try { removeFunction(ownedSlot); } catch (ignored) {}
++    }
++    delete cache[metadata];
++    HEAP32[out_slot >> 2] = -1;
++    return -1;
++  }
++});
++
+ EM_JS(int, zbb_reference_store_group_cache_mutation,
+       (const unsigned char* bytes, int length, const char* key, int out_slot,
+        int dump_bytes, const char* card_layout, const char* group_edges,
+@@ -8509,9 +8868,34 @@ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+           || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
+           || UseZeroWasmLinkedReferenceStoreGroup
+           || UseZeroWasmBaseline || UseZeroWasmJIT);
++  const bool reference_store_group_relocation_collision =
++      UseZeroWasmLinkedReferenceStoreGroupRelocation
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++          || UseZeroWasmLinkedReferenceStoreGroup
++          || UseZeroWasmReferenceStoreGroupPerf
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
+   if (ref_array_collision || ref_array_store_collision
+       || reference_store_group_collision
+-      || reference_store_group_perf_collision) return NotRun;
++      || reference_store_group_perf_collision
++      || reference_store_group_relocation_collision) return NotRun;
++  // C3b Stage 1 is deliberately structural only. Its module/cache namespace
++  // exists for source and binary-oracle validation, but no Java activation is
++  // armed or executed and the ordinary interpreter owns both phase methods.
++  if (UseZeroWasmLinkedReferenceStoreGroupRelocation) {
++    (void)&build_reference_store_group_relocation_module;
++    (void)&zbb_reference_store_group_relocation_install_stage1;
++    (void)kReferenceStoreGroupRelocationClassContract;
++    (void)kReferenceStoreGroupRelocationProbeContract;
++    (void)kReferenceStoreGroupRelocationRootMaps;
++    (void)kReferenceStoreGroupRelocationPhaseAbi;
++    (void)kReferenceStoreGroupRelocationPhaseEdges;
++    guarantee(_linked_reference_store_group_relocation_module_id == -1
++              && _linked_reference_store_group_relocation_slot == -1,
++              "C3b Stage-1 must not install or arm a relocation module");
++    return NotRun;
++  }
+   if (UseZeroWasmReferenceStoreGroupPerf) {
+     Result card_probe = run_linked_ref_array_store_card_probe_setup(
+         method, locals, code_base, pc, tos, istate);

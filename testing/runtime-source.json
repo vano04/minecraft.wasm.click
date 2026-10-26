@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "kind": "in-repository-runtime-source",
+  "sourceRoot": "runtime",
+  "deploymentBaseRevision": "9881da1274bb1c924fcb6211cbf312f6df82561d",
+  "upstream": {
+    "repository": "https://github.com/vano04/mcweb-experimental",
+    "baseRevision": "f5862293f19eeaf1bc9d8fee77a44b3c488adca4",
+    "sourcePatch": {
+      "path": "testing/patches/regressions-20261022.patch",
+      "bytes": 905730,
+      "sha256": "41edbfd4fb8fd619bb0d793193be4f71b0d1895ded90d3fb726da8a95237455a"
+    },
+    "sourceTreeSha256": "7ee89eb850b124ea3851fbb804cc4468790fd2f5daf3b20ad5dbe2e230eb9632",
+    "provenance": "testing/source-provenance.json"
+  },
+  "selectedSourceFiles": 521,
+  "selectedSourceBytes": 6201524,
+  "runtimeCodeChangedDuringIntegration": true,
+  "publicDependencies": {
+    "openjdk": {
+      "repository": "https://github.com/openjdk/jdk.git",
+      "tag": "jdk-25-ga",
+      "commit": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "patches": "runtime/OpenJDK/patches/0001, then 0003 through 0026 in setup.sh order"
+    },
+    "libffi": {
+      "repository": "https://github.com/libffi/libffi.git",
+      "commit": "c575818ce67cb471467c580a01ae8f7b6538a6e2",
+      "patch": "runtime/OpenJDK/patches/0002-libffi-wasm32-unaligned-64bit.patch"
+    },
+    "emscripten": {
+      "repository": "https://github.com/emscripten-core/emsdk.git",
+      "version": "6.0.10",
+      "emscriptenCommit": "d6c521a7f05449857c76bd99e396895583cf2083"
+    },
+    "naga": {
+      "version": "30.0.1",
+      "lock": "runtime/tools/naga-wasm/Cargo.lock"
+    }
+  },
+  "sourceOnly": true,
+  "generatedOutputsIncluded": false,
+  "mojangCodeOrAssetsIncluded": false,
+  "runtimeSourceExtras": [
+    ".gitignore",
+    "README.md"
+  ],
+  "dependencyNotices": [
+    {
+      "path": "licenses/OpenJDK-LICENSE",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 19274,
+      "sha256": "4b9abebc4338048a7c2dc184e9f800deb349366bdf28eb23c2677a77b4c87726",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK-LICENSE.txt"
+    },
+    {
+      "path": "licenses/OpenJDK-ADDITIONAL_LICENSE_INFO",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 2114,
+      "sha256": "a69bce275ba7a3570af6579cb0f55682cd75fedfcd49e0e8e9022270c447c916",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK-ADDITIONAL_LICENSE_INFO.txt"
+    },
+    {
+      "path": "licenses/OpenJDK-ASSEMBLY_EXCEPTION",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 1514,
+      "sha256": "75292f03bf23d3db7c985aecc191029b93883200721ed23ed34a2e601463df33",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK-ASSEMBLY_EXCEPTION.txt"
+    },
+    {
+      "path": "licenses/libffi-LICENSE",
+      "upstreamRevision": "c575818ce67cb471467c580a01ae8f7b6538a6e2",
+      "bytes": 1132,
+      "sha256": "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c",
+      "component": "libffi",
+      "publicPath": "/notices/libffi-LICENSE.txt",
+      "upstreamPath": "LICENSE",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/aes.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/aes.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 1444,
+      "sha256": "45c6d4da48325edfbff3dcf71c704e504c057904435ed23c6d57046d551eb69d"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/c-libutl.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/c-libutl.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 1556,
+      "sha256": "bef40679922d6fdfb7e4ddb223ad6722300f6054ba737bbf6188d60fcec517f9"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/cldr.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/cldr.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 8790,
+      "sha256": "472e341c36efc1136860ed7a6461a2af4a53ae95d55d1126726340f5ba62b06a"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/icu.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/icu.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 4147,
+      "sha256": "be23ad20a8231d2241b37fcf401548febd8597de8373f89268882020cb7c8818"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/public_suffix.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/public_suffix.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 17783,
+      "sha256": "861de1e4992a7d28f1de25c73cd50d26a94779ebd749c0643fecfa56442c3429"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/siphash.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/siphash.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 8256,
+      "sha256": "5a792b5a74ad2a5f3d6a7ad8b7a841116e58a772c18bc6e392320a365b222c76"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/unicode.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/unicode.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 15098,
+      "sha256": "5194d6760f2e7eccc07804196cc619f84e730fa9d10c0529b71416186f4d12dc"
+    },
+    {
+      "path": "licenses/OpenJDK/java.base/zlib.md",
+      "component": "OpenJDK",
+      "publicPath": "/notices/OpenJDK/java.base/zlib.md.txt",
+      "upstreamRevision": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "bytes": 1010,
+      "sha256": "809b62ba648e02302f7d9ea6b6886c10d5253ac86ad528038a50c73eada5fce2"
+    },
+    {
+      "path": "licenses/Emscripten/LICENSE",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/LICENSE.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 5093,
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
+      "upstreamPath": "LICENSE",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/Emscripten/AUTHORS",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/AUTHORS.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 29191,
+      "sha256": "b865d6074c7f13366cad82990ba58bbe0a3f3eccf5fa47e50aa02693de4e895e",
+      "upstreamPath": "AUTHORS",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/Emscripten/musl-COPYRIGHT",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/musl-COPYRIGHT.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 6196,
+      "sha256": "b870108ec5e7790e9f9919064f1b9421d62d5f9b0e6c230c6adf7ea2da62e97b",
+      "upstreamPath": "system/lib/libc/musl/COPYRIGHT",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/Emscripten/libcxx-LICENSE",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/libcxx-LICENSE.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 16703,
+      "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+      "upstreamPath": "system/lib/libcxx/LICENSE.TXT",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/Emscripten/libcxxabi-LICENSE",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/libcxxabi-LICENSE.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 16706,
+      "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+      "upstreamPath": "system/lib/libcxxabi/LICENSE.TXT",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/Emscripten/libunwind-LICENSE",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/libunwind-LICENSE.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 16706,
+      "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+      "upstreamPath": "system/lib/libunwind/LICENSE.TXT",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/Emscripten/compiler-rt-LICENSE",
+      "component": "Emscripten",
+      "publicPath": "/notices/Emscripten/compiler-rt-LICENSE.txt",
+      "upstreamRevision": "d6c521a7f05449857c76bd99e396895583cf2083",
+      "bytes": 16708,
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+      "upstreamPath": "system/lib/compiler-rt/LICENSE.TXT",
+      "provenance": "GitHub file content at exact upstreamRevision"
+    },
+    {
+      "path": "licenses/aes-js-LICENSE.txt",
+      "component": "aes-js 3.1.2 (MIT)",
+      "bytes": 1081,
+      "sha256": "f355888c279a510c9c36210feea122aee628c79a989d89ca7e86ec4b54f699aa",
+      "publicPath": "/notices/aes-js-LICENSE.txt",
+      "upstreamRevision": "3.1.2",
+      "upstreamRepository": "https://github.com/ricmoo/aes-js"
+    },
+    {
+      "path": "licenses/qrcodegen-LICENSE.txt",
+      "component": "Project Nayuki QR Code generator (MIT)",
+      "bytes": 1191,
+      "sha256": "34237932f0911d033dcb65c27d30c0e3f3a6d51af426255f080a23d957231ac0",
+      "publicPath": "/notices/qrcodegen-LICENSE.txt",
+      "upstreamRepository": "https://github.com/nayuki/QR-Code-generator",
+      "upstreamSource": "https://www.nayuki.io/res/qr-code-generator-library/qrcodegen.js",
+      "sourceSha256": "2511bc17f40a3c41d4a0578995db956b38997334d3d20113a5d4dc5c49c69480"
+    }
+  ],
+  "projectNotice": {
+    "path": "LICENSE",
+    "component": "minecraft.wasm.click project code",
+    "publicPath": "/notices/minecraft.wasm.click-GPL-3.0.txt",
+    "bytes": 35149,
+    "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+  }
+}

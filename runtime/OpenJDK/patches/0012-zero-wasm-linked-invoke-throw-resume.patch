@@ -1,0 +1,515 @@
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index c4253d2..f32e8f1 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -3046,6 +3046,9 @@ void BytecodeInterpreter::run(interpreterState istate) {
+         && BCI() == 2) {
+       tty->print_cr("[zbg] INTERPRETER_HANDLER safeDiv throw-bci=2");
+     }
++    if (ZeroWasmLinkedGroupVerbose && METHOD->name()->equals("throwCaller")) {
++      tty->print_cr("[zbg] INTERPRETER_HANDLER throwCaller throw-bci=%d", BCI());
++    }
+ 
+     HandleMarkCleaner __hmc(THREAD);
+     Handle except_oop(THREAD, THREAD->pending_exception());
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 8e13cf7..4c7945e 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -233,7 +233,9 @@ enum LinkedFunction {
+   LinkedStoreChild = 4,
+   LinkedStoreChildCaller = 5,
+   LinkedGoodValue = 6,
+-  LinkedDispatch = 7
++  LinkedDispatch = 7,
++  LinkedThrowLeaf = 8,
++  LinkedThrowCaller = 9
+ };
+ 
+ struct LinkedOopLayout {
+@@ -248,6 +250,7 @@ static const int LINKED_RETURN = 0;
+ static const int LINKED_DEOPT = 1;
+ static const int LINKED_EXCEPTION = 2;
+ static const int LINKED_REEXECUTE = 3;
++static const int LINKED_INVOKE_REEXECUTE = 4;
+ 
+ static jlong linked_status(int status, int bci) {
+   return ((jlong)(uint16_t)status << 48) | ((jlong)(uint16_t)bci << 32);
+@@ -398,6 +401,37 @@ static void emit_linked_dispatch(WasmBuf& body, int resume_bci,
+   body.u8(0x0b);
+ }
+ 
++static void emit_linked_throw_leaf(WasmBuf& body, int resume_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x45);                       // x == 0: real interpreter throws
++  body.u8(0x04); body.u8(0x7e);
++  linked_i64_const(body, linked_status(LINKED_INVOKE_REEXECUTE, resume_bci));
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(0);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
++static void emit_linked_throw_caller(WasmBuf& body, int resume_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(LinkedThrowLeaf); // direct caller -> leaf
++  body.u8(0x1a);                            // discard leaf status/value
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x45);
++  body.u8(0x04); body.u8(0x7e);
++  linked_i64_const(body, linked_status(LINKED_INVOKE_REEXECUTE, resume_bci));
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x6a);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
+ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+   body.string(name);
+   body.u8(0x00);
+@@ -406,18 +440,19 @@ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+ 
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+-                               int dispatch_bci) {
++                               int dispatch_bci, int throw_invoke_bci) {
+   static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
+                                          0x01, 0x00, 0x00, 0x00};
+   module.raw(magic, sizeof(magic));
+ 
+   WasmBuf types;
+-  types.uleb(oop_layout == nullptr ? 2 : 4);
++  types.uleb(oop_layout == nullptr ? 2 : 5);
+   linked_type(types, 1);               // leaf/caller -> i64
+   linked_type(types, 2);               // virtual/safeDiv -> i64
+   if (oop_layout != nullptr) {
+     linked_type(types, 1);              // Good.value -> i64
+     linked_type(types, 3);              // dispatch(receiver,x,expected Klass)
++    linked_type(types, 1);              // throwLeaf/throwCaller -> i64
+   }
+   module.section(1, types);
+ 
+@@ -430,7 +465,7 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+   }
+ 
+   WasmBuf functions;
+-  int function_count = oop_layout == nullptr ? 4 : 8;
++  int function_count = oop_layout == nullptr ? 4 : 10;
+   functions.uleb((unsigned)function_count);
+   functions.uleb(0); functions.uleb(0);
+   functions.uleb(1); functions.uleb(1);
+@@ -438,6 +473,7 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     functions.uleb(1); functions.uleb(1);
+     functions.uleb(2);
+     functions.uleb(3);
++    functions.uleb(4); functions.uleb(4);
+   }
+   module.section(3, functions);
+ 
+@@ -452,6 +488,8 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     emit_linked_export(exports, "storeChildCaller", LinkedStoreChildCaller);
+     emit_linked_export(exports, "goodValue", LinkedGoodValue);
+     emit_linked_export(exports, "dispatch", LinkedDispatch);
++    emit_linked_export(exports, "throwLeaf", LinkedThrowLeaf);
++    emit_linked_export(exports, "throwCaller", LinkedThrowCaller);
+   }
+   module.section(7, exports);
+ 
+@@ -492,6 +530,14 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     emit_linked_dispatch(body, dispatch_bci, oopDesc::klass_offset_in_bytes());
+     code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
+     emitted_code_bodies++;
++    body = WasmBuf();
++    emit_linked_throw_leaf(body, throw_invoke_bci);
++    code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++    emitted_code_bodies++;
++    body = WasmBuf();
++    emit_linked_throw_caller(body, throw_invoke_bci);
++    code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++    emitted_code_bodies++;
+   }
+   if (emitted_code_bodies != expected_code_bodies) return 0;
+   module.section(10, code);
+@@ -1031,6 +1077,14 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+       slots.push(addFunction(instance.exports.goodValue, "ji"));
+       slots.push(addFunction(instance.exports.dispatch, "jiii"));
+     }
++    if (slot_count === 10) {
++      slots.push(addFunction(instance.exports.storeChild, "jii"));
++      slots.push(addFunction(instance.exports.storeChildCaller, "jii"));
++      slots.push(addFunction(instance.exports.goodValue, "ji"));
++      slots.push(addFunction(instance.exports.dispatch, "jiii"));
++      slots.push(addFunction(instance.exports.throwLeaf, "ji"));
++      slots.push(addFunction(instance.exports.throwCaller, "ji"));
++    }
+     const id = globalThis.__mcwebZeroLinkedGroupCache.__nextId || 1;
+     globalThis.__mcwebZeroLinkedGroupCache.__nextId = id + 1;
+     globalThis.__mcwebZeroLinkedGroupCache[metadata] = { id, instance, slots };
+@@ -1060,7 +1114,7 @@ static THREAD_LOCAL uint64_t _deopt = 0;
+ static THREAD_LOCAL uint64_t _exception_resume = 0;
+ 
+ static THREAD_LOCAL int _linked_module_id = -1;
+-static THREAD_LOCAL int _linked_table_slots[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
++static THREAD_LOCAL int _linked_table_slots[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+ static THREAD_LOCAL uint64_t _linked_calls = 0;
+ static THREAD_LOCAL uint64_t _linked_returned = 0;
+ static THREAD_LOCAL uint64_t _linked_deopt = 0;
+@@ -1069,6 +1123,7 @@ static THREAD_LOCAL uint64_t _linked_caller_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_store_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_alloc_bails = 0;
+ static THREAD_LOCAL uint64_t _linked_alloc_interpreter_entries = 0;
++static THREAD_LOCAL uint64_t _linked_throw_leaf_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ 
+@@ -1202,9 +1257,13 @@ enum LinkedMethodKind {
+   LinkedAllocCallerMethod,
+   LinkedInitCallerMethod,
+   LinkedFailCallerMethod,
+-  LinkedDispatchMethod
++  LinkedDispatchMethod,
++  LinkedThrowCallerMethod
+ };
+ 
++static Method* linked_group_method(Method* seed, const char* name,
++                                   const char* signature);
++
+ static int first_opcode(Method* method, unsigned char opcode) {
+   const unsigned char* code = (const unsigned char*)method->code_base();
+   for (int i = 0; i < method->code_size(); i++) {
+@@ -1234,6 +1293,155 @@ static bool linked_safe_div_shape(Method* method, int* fault_bci,
+   return *handler_bci > *fault_bci && *handler_bci < method->code_size();
+ }
+ 
++static bool linked_throw_leaf_shape(Method* method) {
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if (method->code_size() != 14 || code[0] != 0x1a || code[1] != 0x9a
++      || (int16_t)((code[2] << 8) | code[3]) != 11
++      || code[4] != 0xbb || code[7] != 0x59 || code[8] != 0xb7
++      || code[11] != 0xbf || code[12] != 0x1a || code[13] != 0xac) {
++    return false;
++  }
++  ConstantPool* constants = method->constants();
++  // `new` retains the class-file big-endian CP operand; invokespecial is a
++  // rewritten method-entry operand and is native-endian in this Zero stream.
++  int new_index = Bytes::get_Java_u2((address)(code + 5));
++  int init_index = Bytes::get_native_u2((address)(code + 9));
++  if (new_index <= 0 || new_index >= constants->length()
++      || init_index <= 0 || init_index >= constants->length()) return false;
++  if (!constants->tag_at(new_index).is_klass()
++      && !constants->tag_at(new_index).is_unresolved_klass()) return false;
++  Symbol* new_owner = constants->klass_name_at(new_index);
++  Symbol* init_owner = constants->klass_ref_at_noresolve(
++      init_index, Bytecodes::_invokespecial);
++  Symbol* init_name = constants->name_ref_at(init_index,
++                                              Bytecodes::_invokespecial);
++  Symbol* init_signature = constants->signature_ref_at(
++      init_index, Bytecodes::_invokespecial);
++  return new_owner != nullptr && init_owner != nullptr && init_name != nullptr
++      && init_signature != nullptr
++      && new_owner->equals("java/lang/IllegalStateException")
++      && init_owner->equals("java/lang/IllegalStateException")
++      && init_name->equals("<init>") && init_signature->equals("()V");
++}
++
++static bool linked_throw_caller_shape(Method* method, int* invoke_bci,
++                                      int* handler_bci) {
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if (method->code_size() != 11 || code[0] != 0x1a || code[1] != 0xb8
++      || code[4] != 0x04 || code[5] != 0x60 || code[6] != 0xac
++      || code[7] != 0x4c || code[8] != 0x10 || code[9] != 77
++      || code[10] != 0xac || !method->has_exception_handler()) return false;
++  ExceptionTable et(method);
++  if (et.length() != 1) return false;
++  int catch_index = et.catch_type_index(0);
++  Symbol* catch_name = catch_index == 0 ? nullptr
++      : method->constants()->klass_name_at(catch_index);
++  if (catch_name == nullptr
++      || !catch_name->equals("java/lang/IllegalStateException")) return false;
++  *invoke_bci = 1;
++  if (!(et.start_pc(0) <= *invoke_bci && *invoke_bci < et.end_pc(0))) {
++    return false;
++  }
++  *handler_bci = et.handler_pc(0);
++  return *handler_bci > *invoke_bci && *handler_bci < method->code_size();
++}
++
++// Diagnostic-only E2 classifier trace.  This deliberately reports the raw
++// rewritten method bytes and metadata predicates without changing acceptance.
++static void linked_throw_classify_diagnostic(Method* method) {
++  if (!ZeroWasmLinkedGroupVerbose || method == nullptr
++      || !method->name()->equals("throwCaller")) return;
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  tty->print("[zbg] THROW_CLASSIFY bytes=");
++  for (int i = 0; i < method->code_size(); i++) {
++    tty->print(i == 0 ? "%02x" : ",%02x", code[i]);
++  }
++  tty->print_cr(" size=%d static=%d result=%d exception=%d", method->code_size(),
++                method->is_static() ? 1 : 0, (int)method->result_type(),
++                method->has_exception_handler() ? 1 : 0);
++  int invoke_bci = -1;
++  int handler_bci = -1;
++  bool shape = linked_throw_caller_shape(method, &invoke_bci, &handler_bci);
++  bool target = false;
++  int cp_index = method->code_size() >= 4
++      ? Bytes::get_native_u2((address)(code + 2)) : -1;
++  int entry_count = method->constants()->resolved_method_entries_length();
++  const char* owner = "<unavailable>";
++  const char* name = "<unavailable>";
++  const char* signature = "<unavailable>";
++  if (cp_index >= 0 && cp_index < entry_count) {
++    Symbol* owner_symbol = method->constants()->klass_ref_at_noresolve(
++        cp_index, Bytecodes::_invokestatic);
++    Symbol* name_symbol = method->constants()->name_ref_at(
++        cp_index, Bytecodes::_invokestatic);
++    Symbol* signature_symbol = method->constants()->signature_ref_at(
++        cp_index, Bytecodes::_invokestatic);
++    owner = owner_symbol == nullptr ? "<null>" : owner_symbol->as_C_string();
++    name = name_symbol == nullptr ? "<null>" : name_symbol->as_C_string();
++    signature = signature_symbol == nullptr ? "<null>"
++        : signature_symbol->as_C_string();
++    target = invokestatic_target_is(method, 1, "ZeroBaselineFixture",
++                                    "throwLeaf", "(I)I");
++  }
++  Method* leaf = linked_group_method(method, "throwLeaf", "(I)I");
++  bool leaf_shape = leaf != nullptr && linked_throw_leaf_shape(leaf);
++  tty->print_cr("[zbg] THROW_CLASSIFY shape=%d invoke-bci=%d handler-bci=%d "
++                "cp-index=%d resolved-entries=%d owner=%s name=%s sig=%s "
++                "target=%d leaf=%p leaf-size=%d leaf-shape=%d",
++                shape ? 1 : 0, invoke_bci, handler_bci, cp_index, entry_count,
++                owner, name, signature, target ? 1 : 0, (void*)leaf,
++                leaf == nullptr ? -1 : leaf->code_size(), leaf_shape ? 1 : 0);
++  if (leaf != nullptr) {
++    const unsigned char* leaf_code = (const unsigned char*)leaf->code_base();
++    tty->print("[zbg] THROW_CLASSIFY leaf-bytes=");
++    for (int i = 0; i < leaf->code_size(); i++) {
++      tty->print(i == 0 ? "%02x" : ",%02x", leaf_code[i]);
++    }
++    int new_index = leaf->code_size() >= 7
++        ? Bytes::get_Java_u2((address)(leaf_code + 5)) : -1;
++    int init_index = leaf->code_size() >= 11
++        ? Bytes::get_native_u2((address)(leaf_code + 9)) : -1;
++    tty->print_cr(" new-index=%d init-index=%d cp-length=%d", new_index,
++                  init_index, leaf->constants()->length());
++    if (new_index > 0 && new_index < leaf->constants()->length()) {
++      Symbol* owner_symbol = (leaf->constants()->tag_at(new_index).is_klass()
++          || leaf->constants()->tag_at(new_index).is_unresolved_klass())
++          ? leaf->constants()->klass_name_at(new_index) : nullptr;
++      tty->print_cr("[zbg] THROW_CLASSIFY leaf-new-owner=%s",
++                    owner_symbol == nullptr ? "<null>"
++                        : owner_symbol->as_C_string());
++    }
++    if (init_index > 0 && init_index < leaf->constants()->length()) {
++      Symbol* owner_symbol = leaf->constants()->klass_ref_at_noresolve(
++          init_index, Bytecodes::_invokespecial);
++      Symbol* name_symbol = leaf->constants()->name_ref_at(
++          init_index, Bytecodes::_invokespecial);
++      Symbol* signature_symbol = leaf->constants()->signature_ref_at(
++          init_index, Bytecodes::_invokespecial);
++      tty->print_cr("[zbg] THROW_CLASSIFY leaf-init-owner=%s name=%s sig=%s",
++                    owner_symbol == nullptr ? "<null>"
++                        : owner_symbol->as_C_string(),
++                    name_symbol == nullptr ? "<null>"
++                        : name_symbol->as_C_string(),
++                    signature_symbol == nullptr ? "<null>"
++                        : signature_symbol->as_C_string());
++    }
++  }
++  if (method->has_exception_handler()) {
++    ExceptionTable et(method);
++    for (int i = 0; i < et.length(); i++) {
++      int catch_index = et.catch_type_index(i);
++      Symbol* catch_name = catch_index == 0 ? nullptr
++          : method->constants()->klass_name_at(catch_index);
++      tty->print_cr("[zbg] THROW_CLASSIFY exception[%d] from=%d to=%d "
++                    "handler=%d catch-index=%d catch=%s",
++                    i, et.start_pc(i), et.end_pc(i), et.handler_pc(i),
++                    catch_index, catch_name == nullptr ? "<null>"
++                        : catch_name->as_C_string());
++    }
++  }
++}
++
+ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* virtual_bci,
+                                              int* safe_div_bci,
+@@ -1241,7 +1449,9 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* return_bci,
+                                              int* alloc_bci,
+                                              int* init_bci,
+-                                             int* dispatch_bci) {
++                                             int* dispatch_bci,
++                                             int* throw_invoke_bci,
++                                             int* throw_handler_bci) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -1288,6 +1498,19 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     *return_bci = first_opcode(method, 0xac);
+     return LinkedSafeDivMethod;
+   }
++  if (static_int(method, "throwCaller", "(I)I")) {
++    linked_throw_classify_diagnostic(method);
++    bool shape = linked_throw_caller_shape(method, throw_invoke_bci,
++                                           throw_handler_bci);
++    bool target = shape && invokestatic_target_is(method, *throw_invoke_bci,
++                                                  "ZeroBaselineFixture",
++                                                  "throwLeaf", "(I)I");
++    Method* leaf = linked_group_method(method, "throwLeaf", "(I)I");
++    if (shape && target && leaf != nullptr && linked_throw_leaf_shape(leaf)) {
++      *return_bci = first_opcode(method, 0xac);
++      return LinkedThrowCallerMethod;
++    }
++  }
+   if (static_int(method, "storeChild",
+                  "(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")
+       && linked_store_child_code_is(method)) {
+@@ -1426,11 +1649,23 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+ }
+ 
+ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci,
+-                                 int dispatch_bci,
++                                 int dispatch_bci, int throw_invoke_bci,
+                                  const LinkedOopLayout* oop_layout) {
+   if (ZeroWasmBaselineJarHash == nullptr
+       || ZeroWasmBaselineClassHash == nullptr
+       || ZeroWasmBaselineDependencyHashes == nullptr) return false;
++  // The module is a fixed superset and may be installed while any eligible
++  // member is the current seed. Derive the throw resume BCI from the actual
++  // resolved group method instead of depending on throwCaller being first.
++  if (throw_invoke_bci < 0) {
++    Method* throw_method = linked_group_method(seed, "throwCaller", "(I)I");
++    int derived_handler_bci = -1;
++    if (throw_method == nullptr
++        || !linked_throw_caller_shape(throw_method, &throw_invoke_bci,
++                                      &derived_handler_bci)) {
++      return false;
++    }
++  }
+   if (virtual_bci < 0 || safe_div_bci < 0) {
+     if (!linked_group_resume_bcis(seed, &virtual_bci, &safe_div_bci)) return false;
+   }
+@@ -1446,10 +1681,11 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "allocCaller(LZeroBaselineFixture$Box;I)I|"
+       "initCaller(Z)I|failCaller()I|"
+       "dispatch(LZeroBaselineFixture$Base;I)I;"
+-      "virtual-bci=%d;safe-div-bci=%d;dispatch-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
++      "throwLeaf(I)I|throwCaller(I)I;virtual-bci=%d;safe-div-bci=%d;"
++      "dispatch-bci=%d;throw-invoke-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+       "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;"
+       "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+-      virtual_bci, safe_div_bci, dispatch_bci, ZeroWasmBaselineJarHash,
++      virtual_bci, safe_div_bci, dispatch_bci, throw_invoke_bci, ZeroWasmBaselineJarHash,
+       ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
+       oop_layout == nullptr ? "none" : "raw32-serial-card",
+       oop_layout == nullptr ? 0 : oop_layout->child_offset,
+@@ -1460,11 +1696,11 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+   if (written <= 0 || written >= (int)sizeof(key)) return false;
+   WasmBuf module;
+   int length = build_linked_module(module, virtual_bci, safe_div_bci, oop_layout,
+-                                   dispatch_bci);
++                                   dispatch_bci, throw_invoke_bci);
+   if (length <= 0) return false;
+   _linked_module_id = zbb_linked_install(module.data(), length, key,
+                                            (int)(intptr_t)_linked_table_slots,
+-                                           oop_layout == nullptr ? 4 : 8,
++                                           oop_layout == nullptr ? 4 : 10,
+                                            ZeroWasmLinkedGroupVerbose ? 1 : 0);
+   if (_linked_module_id < 0) return false;
+   if (ZeroWasmLinkedGroupVerbose) {
+@@ -1486,13 +1722,17 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int alloc_bci = -1;
+   int init_bci = -1;
+   int dispatch_bci = -1;
++  int throw_invoke_bci = -1;
++  int throw_handler_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci,
+                                                 &safe_div_handler_bci,
+                                                 &return_bci,
+                                                 &alloc_bci, &init_bci,
+-                                                &dispatch_bci);
++                                                &dispatch_bci,
++                                                &throw_invoke_bci,
++                                                &throw_handler_bci);
+   LinkedOopLayout oop_layout;
+   const LinkedOopLayout* install_oop_layout = nullptr;
+   if (kind != LinkedNoMethod) {
+@@ -1529,12 +1769,18 @@ static ZeroWasmBaseline::Result run_linked_group(
+       tty->print_cr("[zbg] INTERPRETER_ALLOC_LEAF count=%llu",
+                     (unsigned long long)_linked_alloc_interpreter_entries);
+     }
++    if (ZeroWasmLinkedGroupVerbose
++        && method->name()->equals("throwLeaf")) {
++      _linked_throw_leaf_interpreter_entries++;
++      tty->print_cr("[zbg] INTERPRETER_THROW_LEAF count=%llu",
++                    (unsigned long long)_linked_throw_leaf_interpreter_entries);
++    }
+     return ZeroWasmBaseline::NotRun;
+   }
+   if (return_bci < 0) return ZeroWasmBaseline::NotRun;
+   if (_linked_module_id < 0
+       && !install_linked_group(method, virtual_bci, safe_div_bci, dispatch_bci,
+-                               install_oop_layout)) {
++                               throw_invoke_bci, install_oop_layout)) {
+     return ZeroWasmBaseline::NotRun;
+   }
+   if ((kind == LinkedStoreChildMethod || kind == LinkedStoreChildCallerMethod)
+@@ -1598,6 +1844,49 @@ static ZeroWasmBaseline::Result run_linked_group(
+       }
+       return ZeroWasmBaseline::DeoptResume;
+     }
++    case LinkedThrowCallerMethod: {
++      jint x = (jint)locals[0];
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] GROUP_ATTEMPT throwCaller invoke-bci=%d handler-bci=%d",
++                      throw_invoke_bci, throw_handler_bci);
++      }
++      result = decode_linked_status(linked_table_call1(
++          _linked_table_slots[LinkedThrowCaller], x));
++      if (result.status == LINKED_RETURN && result.bci == 0) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, result.value);
++        if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] DIRECT_CALL throwCaller->throwLeaf runtime=1 result=%d",
++                        result.value);
++        }
++        _linked_returned++;
++        return ZeroWasmBaseline::Returned;
++      }
++      if (result.status == LINKED_INVOKE_REEXECUTE
++          && result.bci == throw_invoke_bci) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, x);
++        if (!linked_prepare_state(istate, tos, pc,
++                                  code_base + throw_invoke_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] INVOKE_REEXECUTE throwCaller resume-bci=%d "
++                        "handler-bci=%d depth=1 pending=0", throw_invoke_bci,
++                        throw_handler_bci);
++        }
++        _linked_deopt++;
++        return ZeroWasmBaseline::InvokeResume;
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
+     case LinkedSafeDivMethod: {
+       jint x = (jint)locals[0];
+       jint y = (jint)locals[-1];
+

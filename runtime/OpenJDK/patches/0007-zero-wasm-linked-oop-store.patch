@@ -1,0 +1,556 @@
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index d5e30d9..c952ec4 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -13,12 +13,18 @@
+ 
+ #include "interpreter/zero/bytecodeInterpreter.hpp"
+ #include "interpreter/bytecodes.hpp"
++#include "classfile/systemDictionary.hpp"
++#include "classfile/symbolTable.hpp"
+ #include "jvm_io.h"
+ #include "memory/resourceArea.hpp"
++#include "gc/shared/barrierSet.hpp"
++#include "gc/shared/cardTable.hpp"
++#include "gc/shared/cardTableBarrierSet.hpp"
+ #include "oops/constantPool.inline.hpp"
+ #include "oops/instanceKlass.inline.hpp"
+ #include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
++#include "runtime/fieldDescriptor.inline.hpp"
+ #include "runtime/globals.hpp"
+ #include "utilities/ostream.hpp"
+ 
+@@ -34,7 +40,9 @@ enum FixtureMethod {
+   LeafMethod,
+   CallerMethod,
+   VirtualMethod,
+-  SafeDivMethod
++  SafeDivMethod,
++  StoreChildMethod,
++  StoreChildCallerMethod
+ };
+ 
+ enum ModuleFunction {
+@@ -219,7 +227,17 @@ enum LinkedFunction {
+   LinkedLeaf = 0,
+   LinkedCaller = 1,
+   LinkedVirtual = 2,
+-  LinkedSafeDiv = 3
++  LinkedSafeDiv = 3,
++  LinkedStoreChild = 4,
++  LinkedStoreChildCaller = 5
++};
++
++struct LinkedOopLayout {
++  int child_offset;
++  int tag_offset;
++  int card_base;
++  int card_shift;
++  int dirty_card;
+ };
+ 
+ static const int LINKED_RETURN = 0;
+@@ -294,13 +312,51 @@ static void emit_linked_safe_div(WasmBuf& body, int resume_bci) {
+   body.u8(0x0b);
+ }
+ 
++// The object lane is deliberately a raw linear-memory operation. It has no
++// calls, allocation, or safepoint, so the two real oops remain rooted in the
++// Zero locals for the entire boundary. The field and card-table constants are
++// supplied only after VM metadata and the active SerialGC layout pass checks.
++static void emit_linked_store_child(WasmBuf& body,
++                                    const LinkedOopLayout& layout) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);          // box oop address
++  body.u8(0x20); body.uleb(1);          // child oop address
++  body.u8(0x36); body.uleb(2); body.uleb((unsigned)layout.child_offset);
++
++  // SerialGC's post-write card mark: byte_map_base + ((field_address) >>
++  // card_shift) = dirty_card. byte_map_base is the VM's biased card base.
++  body.u8(0x41); body.sleb((int)layout.card_base);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(layout.child_offset);
++  body.u8(0x6a);                       // field address
++  body.u8(0x41); body.sleb(layout.card_shift);
++  body.u8(0x76);                       // i32.shr_u
++  body.u8(0x6a);                       // card address
++  body.u8(0x41); body.sleb(layout.dirty_card);
++  body.u8(0x3a); body.uleb(0); body.uleb(0); // i32.store8
++
++  body.u8(0x20); body.uleb(1);          // child oop address
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.tag_offset);
++  linked_extend_i32(body);              // return child.tag as packed i64
++  body.u8(0x0b);
++}
++
++static void emit_linked_store_child_caller(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x10); body.uleb(LinkedStoreChild); // direct group call
++  body.u8(0x0b);
++}
++
+ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+   body.string(name);
+   body.u8(0x00);
+   body.uleb((unsigned)index);
+ }
+ 
+-static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci) {
++static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
++                               const LinkedOopLayout* oop_layout) {
+   static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
+                                          0x01, 0x00, 0x00, 0x00};
+   module.raw(magic, sizeof(magic));
+@@ -311,34 +367,67 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+   linked_type(types, 2);               // virtual/safeDiv -> i64
+   module.section(1, types);
+ 
++  if (oop_layout != nullptr) {
++    WasmBuf imports;
++    imports.uleb(1);
++    imports.string("env"); imports.string("memory");
++    imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++    module.section(2, imports);
++  }
++
+   WasmBuf functions;
+-  functions.uleb(4);
++  int function_count = oop_layout == nullptr ? 4 : 6;
++  functions.uleb((unsigned)function_count);
+   functions.uleb(0); functions.uleb(0);
+   functions.uleb(1); functions.uleb(1);
++  if (oop_layout != nullptr) {
++    functions.uleb(1); functions.uleb(1);
++  }
+   module.section(3, functions);
+ 
+   WasmBuf exports;
+-  exports.uleb(4);
++  exports.uleb((unsigned)function_count);
+   emit_linked_export(exports, "leaf", LinkedLeaf);
+   emit_linked_export(exports, "caller", LinkedCaller);
+   emit_linked_export(exports, "virtualValue", LinkedVirtual);
+   emit_linked_export(exports, "safeDiv", LinkedSafeDiv);
++  if (oop_layout != nullptr) {
++    emit_linked_export(exports, "storeChild", LinkedStoreChild);
++    emit_linked_export(exports, "storeChildCaller", LinkedStoreChildCaller);
++  }
+   module.section(7, exports);
+ 
+   WasmBuf code;
+   WasmBuf body;
+-  code.uleb(4);
++  const int expected_code_bodies = function_count;
++  int emitted_code_bodies = 0;
++  code.uleb((unsigned)expected_code_bodies);
+   emit_linked_leaf(body);
+   code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  emitted_code_bodies++;
+   body = WasmBuf();
+   emit_linked_caller(body);
+   code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  emitted_code_bodies++;
+   body = WasmBuf();
+   emit_linked_virtual(body, virtual_bci);
+   code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  emitted_code_bodies++;
+   body = WasmBuf();
+   emit_linked_safe_div(body, safe_div_bci);
+   code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  emitted_code_bodies++;
++  if (oop_layout != nullptr) {
++    body = WasmBuf();
++    emit_linked_store_child(body, *oop_layout);
++    code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++    emitted_code_bodies++;
++    body = WasmBuf();
++    emit_linked_store_child_caller(body);
++    code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++    emitted_code_bodies++;
++  }
++  if (emitted_code_bodies != expected_code_bodies) return 0;
+   module.section(10, code);
+   return module.length();
+ }
+@@ -424,6 +513,25 @@ static bool caller_target_is(Method* method) {
+       && name->equals("leaf") && signature->equals("(I)I");
+ }
+ 
++static bool static_target_is(Method* method, const char* expected_name,
++                             const char* expected_signature) {
++  const unsigned char* code = method->code_base();
++  if (method->code_size() != 6 || code[0] != 0x2a || code[1] != 0x2b
++      || code[2] != (unsigned char)Bytecodes::_invokestatic
++      || code[5] != 0xac) return false;
++  int index = Bytes::get_native_u2((address)(code + 3));
++  ConstantPool* constants = method->constants();
++  if (index < 0 || index >= constants->resolved_method_entries_length()) {
++    return false;
++  }
++  Symbol* owner = constants->klass_ref_at_noresolve(index, Bytecodes::_invokestatic);
++  Symbol* name = constants->name_ref_at(index, Bytecodes::_invokestatic);
++  Symbol* signature = constants->signature_ref_at(index, Bytecodes::_invokestatic);
++  return owner != nullptr && name != nullptr && signature != nullptr
++      && owner->equals("ZeroBaselineFixture")
++      && name->equals(expected_name) && signature->equals(expected_signature);
++}
++
+ static bool virtual_code_is(Method* method) {
+   // The constant-pool index varies with javac's pool layout; the invoke
+   // opcode, count, zero byte, and return shape are the verified contract.
+@@ -432,6 +540,119 @@ static bool virtual_code_is(Method* method) {
+       && b[2] == 0xb9 && b[5] == 0x02 && b[6] == 0x00 && b[7] == 0xac;
+ }
+ 
++static bool linked_ref_put_opcode(unsigned char opcode) {
++  return opcode == (unsigned char)Bytecodes::_putfield
++      || opcode == (unsigned char)Bytecodes::_nofast_putfield
++      || opcode == (unsigned char)Bytecodes::_fast_aputfield;
++}
++
++static bool linked_ref_get_opcode(unsigned char opcode) {
++  return opcode == (unsigned char)Bytecodes::_getfield
++      || opcode == (unsigned char)Bytecodes::_nofast_getfield
++      || opcode == (unsigned char)Bytecodes::_fast_agetfield;
++}
++
++static bool linked_store_child_code_is(Method* method) {
++  const unsigned char* code = method->code_base();
++  return method->code_size() == 10 && code[0] == 0x2a && code[1] == 0x2b
++      && linked_ref_put_opcode(code[2]) && code[5] == 0x2b
++      && linked_ref_get_opcode(code[6]) && code[9] == 0xac;
++}
++
++static bool linked_oop_layout_for_class(InstanceKlass* box_klass,
++                                        LinkedOopLayout* layout) {
++  if (box_klass == nullptr || layout == nullptr || !UseSerialGC
++      || UseCompressedOops || UseCompressedClassPointers
++      || UseCompactObjectHeaders || sizeof(void*) != 4 || sizeof(oop) != 4
++      || oopDesc::header_size() * HeapWordSize != 8
++      || oopDesc::mark_offset_in_bytes() != 0
++      || oopDesc::klass_offset_in_bytes() != 4) {
++    return false;
++  }
++
++  BarrierSet* barrier = BarrierSet::barrier_set();
++  if (barrier == nullptr || !barrier->is_a(BarrierSet::CardTableBarrierSet)) {
++    return false;
++  }
++  CardTableBarrierSet* card_barrier =
++      static_cast<CardTableBarrierSet*>(barrier);
++  CardTable* card_table = card_barrier->card_table();
++  address card_base = card_table == nullptr ? nullptr
++      : card_table->byte_map_base();
++  if (card_base == nullptr) return false;
++
++  Symbol* child_name = SymbolTable::probe("child", 5);
++  const char* child_signature_text = "LZeroBaselineFixture$Box;";
++  Symbol* child_signature = SymbolTable::probe(
++      child_signature_text, (int)strlen(child_signature_text));
++  Symbol* tag_name = SymbolTable::probe("tag", 3);
++  Symbol* int_signature = SymbolTable::probe("I", 1);
++  if (child_name == nullptr || child_signature == nullptr || tag_name == nullptr
++      || int_signature == nullptr) return false;
++
++  fieldDescriptor child_field;
++  fieldDescriptor tag_field;
++  if (box_klass->find_field(child_name, child_signature, false, &child_field)
++          == nullptr
++      || box_klass->find_field(tag_name, int_signature, false, &tag_field)
++          == nullptr
++      || child_field.field_holder() != box_klass
++      || tag_field.field_holder() != box_klass
++      || child_field.field_type() != T_OBJECT
++      || tag_field.field_type() != T_INT
++      || child_field.is_volatile() || tag_field.is_volatile()) {
++    return false;
++  }
++
++  int card_shift = CardTable::card_shift();
++  int dirty_card = (int)CardTable::dirty_card_val();
++  uintptr_t card_address = (uintptr_t)card_base;
++  if (child_field.offset() <= 0 || tag_field.offset() <= 0
++      || (child_field.offset() & 3) != 0 || (tag_field.offset() & 3) != 0
++      || card_shift < 0 || card_shift >= 32 || dirty_card < 0
++      || dirty_card > 255 || card_address > UINT32_MAX) {
++    return false;
++  }
++
++  layout->child_offset = child_field.offset();
++  layout->tag_offset = tag_field.offset();
++  layout->card_base = (int)(uint32_t)card_address;
++  layout->card_shift = card_shift;
++  layout->dirty_card = dirty_card;
++  return true;
++}
++
++static bool linked_oop_layout_for(oop box, LinkedOopLayout* layout) {
++  if (box == nullptr || !box->klass()->is_instance_klass()) return false;
++  return linked_oop_layout_for_class(InstanceKlass::cast(box->klass()), layout);
++}
++
++// Install-time metadata is resolved from the already-loaded fixture Box class,
++// not from whichever supported method happens to execute first.  If the
++// class/fields or collector layout are not available, the complete linked
++// group stays out of the VM and every method remains interpreted.
++static bool linked_oop_layout_for_fixture(Method* seed,
++                                          LinkedOopLayout* layout) {
++  if (seed == nullptr || layout == nullptr) return false;
++  const char* box_name_text = "ZeroBaselineFixture$Box";
++  Symbol* box_name = SymbolTable::probe(box_name_text, (int)strlen(box_name_text));
++  if (box_name == nullptr) return false;
++  InstanceKlass* holder = seed->method_holder();
++  Thread* current = Thread::current();
++  Handle loader(current, holder->class_loader());
++  InstanceKlass* box_klass = SystemDictionary::find_instance_klass(
++      current, box_name, loader);
++  return linked_oop_layout_for_class(box_klass, layout);
++}
++
++static CardTable::CardValue* linked_card_for(const LinkedOopLayout& layout,
++                                             oop box) {
++  uintptr_t field_address = (uintptr_t)box + (uintptr_t)layout.child_offset;
++  uintptr_t card_address = (uintptr_t)(uint32_t)layout.card_base
++      + (field_address >> layout.card_shift);
++  return (CardTable::CardValue*)card_address;
++}
++
+ static FixtureMethod verify(Method* method) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return NoMethod;
+@@ -500,34 +721,50 @@ EM_JS(int, zbb_install, (const unsigned char* bytes, int length, const char* key
+ });
+ 
+ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+-                                const char* key, int out_slots), {
++                                const char* key, int out_slots, int slot_count,
++                                int dump_bytes), {
+   globalThis.__mcwebZeroLinkedGroupCache ||= Object.create(null);
+   const metadata = UTF8ToString(key);
+   const cached = globalThis.__mcwebZeroLinkedGroupCache[metadata];
+   if (cached) {
+-    HEAP32[(out_slots >> 2) + 0] = cached.slots[0];
+-    HEAP32[(out_slots >> 2) + 1] = cached.slots[1];
+-    HEAP32[(out_slots >> 2) + 2] = cached.slots[2];
+-    HEAP32[(out_slots >> 2) + 3] = cached.slots[3];
++    for (let i = 0; i < slot_count; i++) {
++      HEAP32[(out_slots >> 2) + i] = cached.slots[i];
++    }
+     return cached.id;
+   }
+   try {
+     const binary = HEAPU8.slice(bytes, bytes + length);
++    if (dump_bytes) {
++      try {
++        const fs = typeof require === "function" ? require("fs") : null;
++        if (fs && typeof Buffer !== "undefined") {
++          fs.writeFileSync("/private/tmp/mcweb-zero-linked-group.wasm",
++                           Buffer.from(binary));
++        }
++      } catch (dumpError) {
++        if (typeof err === "function") err("[zbg] dump failed: " + dumpError);
++      }
++    }
+     if (!WebAssembly.validate(binary)) return -1;
+-    const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {});
++    const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
++      env: { memory: wasmMemory }
++    });
+     const slots = [
+       addFunction(instance.exports.leaf, "ji"),
+       addFunction(instance.exports.caller, "ji"),
+       addFunction(instance.exports.virtualValue, "jii"),
+       addFunction(instance.exports.safeDiv, "jii")
+     ];
++    if (slot_count === 6) {
++      slots.push(addFunction(instance.exports.storeChild, "jii"));
++      slots.push(addFunction(instance.exports.storeChildCaller, "jii"));
++    }
+     const id = globalThis.__mcwebZeroLinkedGroupCache.__nextId || 1;
+     globalThis.__mcwebZeroLinkedGroupCache.__nextId = id + 1;
+     globalThis.__mcwebZeroLinkedGroupCache[metadata] = { id, instance, slots };
+-    HEAP32[(out_slots >> 2) + 0] = slots[0];
+-    HEAP32[(out_slots >> 2) + 1] = slots[1];
+-    HEAP32[(out_slots >> 2) + 2] = slots[2];
+-    HEAP32[(out_slots >> 2) + 3] = slots[3];
++    for (let i = 0; i < slot_count; i++) {
++      HEAP32[(out_slots >> 2) + i] = slots[i];
++    }
+     if (typeof err === "function") {
+       err("[zbg] JS_INSTALL linked-group direct-calls=caller->leaf status=i64 bytes=" + length);
+     }
+@@ -551,13 +788,15 @@ static THREAD_LOCAL uint64_t _deopt = 0;
+ static THREAD_LOCAL uint64_t _exception_resume = 0;
+ 
+ static THREAD_LOCAL int _linked_module_id = -1;
+-static THREAD_LOCAL int _linked_table_slots[4] = {-1, -1, -1, -1};
++static THREAD_LOCAL int _linked_table_slots[6] = {-1, -1, -1, -1, -1, -1};
+ static THREAD_LOCAL uint64_t _linked_calls = 0;
+ static THREAD_LOCAL uint64_t _linked_returned = 0;
+ static THREAD_LOCAL uint64_t _linked_deopt = 0;
+ static THREAD_LOCAL uint64_t _linked_exception = 0;
+ static THREAD_LOCAL uint64_t _linked_caller_entries = 0;
++static THREAD_LOCAL uint64_t _linked_store_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
++static THREAD_LOCAL bool _linked_oop_module = false;
+ 
+ typedef jint (*ZbbOneArg)(jint);
+ typedef jint (*ZbbTwoArg)(jint, jint);
+@@ -677,7 +916,9 @@ enum LinkedMethodKind {
+   LinkedLeafMethod,
+   LinkedCallerMethod,
+   LinkedVirtualMethod,
+-  LinkedSafeDivMethod
++  LinkedSafeDivMethod,
++  LinkedStoreChildMethod,
++  LinkedStoreChildCallerMethod
+ };
+ 
+ static int first_opcode(Method* method, unsigned char opcode) {
+@@ -736,6 +977,19 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     *return_bci = first_opcode(method, 0xac);
+     return LinkedSafeDivMethod;
+   }
++  if (static_int(method, "storeChild",
++                 "(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")
++      && linked_store_child_code_is(method)) {
++    *return_bci = first_opcode(method, 0xac);
++    return LinkedStoreChildMethod;
++  }
++  if (static_int(method, "storeChildCaller",
++                 "(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")
++      && static_target_is(method, "storeChild",
++                          "(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")) {
++    *return_bci = first_opcode(method, 0xac);
++    return LinkedStoreChildCallerMethod;
++  }
+   return LinkedNoMethod;
+ }
+ 
+@@ -824,7 +1078,8 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+   return !istate->thread()->has_pending_exception();
+ }
+ 
+-static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci) {
++static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci,
++                                 const LinkedOopLayout* oop_layout) {
+   if (ZeroWasmBaselineJarHash == nullptr
+       || ZeroWasmBaselineClassHash == nullptr
+       || ZeroWasmBaselineDependencyHashes == nullptr) return false;
+@@ -837,20 +1092,33 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "abi=zero-linked-group-v1;compiler=zero-baseline-abi-v2;"
+       "class=ZeroBaselineFixture;group=leaf(I)I|caller(I)I|"
+       "virtualValue(LZeroBaselineFixture$Shape;I)I|safeDiv(II)I;"
++      "storeChild(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I|"
++      "storeChildCaller(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I;"
+       "virtual-bci=%d;safe-div-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+-      "features=wasm32-i32-i64-linear-memory-status",
++      "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;"
++      "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+       virtual_bci, safe_div_bci, ZeroWasmBaselineJarHash,
+-      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes);
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
++      oop_layout == nullptr ? "none" : "raw32-serial-card",
++      oop_layout == nullptr ? 0 : oop_layout->child_offset,
++      oop_layout == nullptr ? 0 : oop_layout->tag_offset,
++      oop_layout == nullptr ? 0 : oop_layout->card_base,
++      oop_layout == nullptr ? 0 : oop_layout->card_shift,
++      oop_layout == nullptr ? 0 : oop_layout->dirty_card);
+   if (written <= 0 || written >= (int)sizeof(key)) return false;
+   WasmBuf module;
+-  int length = build_linked_module(module, virtual_bci, safe_div_bci);
++  int length = build_linked_module(module, virtual_bci, safe_div_bci, oop_layout);
++  if (length <= 0) return false;
+   _linked_module_id = zbb_linked_install(module.data(), length, key,
+-                                           (int)(intptr_t)_linked_table_slots);
++                                           (int)(intptr_t)_linked_table_slots,
++                                           oop_layout == nullptr ? 4 : 6,
++                                           ZeroWasmLinkedGroupVerbose ? 1 : 0);
+   if (_linked_module_id < 0) return false;
+   if (ZeroWasmLinkedGroupVerbose) {
+     tty->print_cr("[zbg] module direct-call caller->leaf wasm-call=1 status=i64 bytes=%d",
+                   length);
+   }
++  _linked_oop_module = oop_layout != nullptr;
+   return true;
+ }
+ 
+@@ -864,6 +1132,17 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci, &return_bci);
++  LinkedOopLayout oop_layout;
++  const LinkedOopLayout* install_oop_layout = nullptr;
++  if (kind != LinkedNoMethod) {
++    // Always install the deterministic six-function superset.  In
++    // particular, caller/leaf cannot consume a four-function module before
++    // the later storeChild entry has a chance to resolve field metadata.
++    if (!linked_oop_layout_for_fixture(method, &oop_layout)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    install_oop_layout = &oop_layout;
++  }
+   if (ZeroWasmLinkedGroupVerbose && fixture_class(method)
+       && _linked_entry_diagnostics < 16) {
+     tty->print_cr("[zbg] ENTRY method=%s kind=%d locals0=%d locals-1=%d",
+@@ -874,7 +1153,13 @@ static ZeroWasmBaseline::Result run_linked_group(
+   }
+   if (kind == LinkedNoMethod || return_bci < 0) return ZeroWasmBaseline::NotRun;
+   if (_linked_module_id < 0
+-      && !install_linked_group(method, virtual_bci, safe_div_bci)) {
++      && !install_linked_group(method, virtual_bci, safe_div_bci,
++                               install_oop_layout)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  if ((kind == LinkedStoreChildMethod || kind == LinkedStoreChildCallerMethod)
++      && (!_linked_oop_module || _linked_table_slots[LinkedStoreChild] < 0
++          || _linked_table_slots[LinkedStoreChildCaller] < 0)) {
+     return ZeroWasmBaseline::NotRun;
+   }
+ 
+@@ -974,6 +1259,41 @@ static ZeroWasmBaseline::Result run_linked_group(
+       }
+       return ZeroWasmBaseline::NotRun;
+     }
++    case LinkedStoreChildMethod:
++    case LinkedStoreChildCallerMethod: {
++      oop box = cast_to_oop((void*)locals[0]);
++      oop child = cast_to_oop((void*)locals[-1]);
++      if (box == nullptr || child == nullptr) return ZeroWasmBaseline::NotRun;
++      LinkedOopLayout actual_layout;
++      if (!linked_oop_layout_for(box, &actual_layout)
++          || actual_layout.child_offset != oop_layout.child_offset
++          || actual_layout.tag_offset != oop_layout.tag_offset
++          || actual_layout.card_base != oop_layout.card_base
++          || actual_layout.card_shift != oop_layout.card_shift
++          || actual_layout.dirty_card != oop_layout.dirty_card) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      CardTable::CardValue* card = linked_card_for(oop_layout, box);
++      int card_before = (int)*card;
++      result = decode_linked_status(linked_table_call2(
++          _linked_table_slots[kind == LinkedStoreChildMethod
++                                  ? LinkedStoreChild : LinkedStoreChildCaller],
++          (jint)(intptr_t)box, (jint)(intptr_t)child));
++      int card_after = (int)*card;
++      if (kind == LinkedStoreChildCallerMethod && _linked_store_entries == 0
++          && ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] DIRECT_CALL storeChildCaller->storeChild runtime=1");
++      }
++      if (_linked_store_entries == 0 && ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] OOP_STORE box=real-oop child=real-oop field-offset=%d "
++                      "card-before=%d card-after=%d card-dirty=%d "
++                      "card-shift=%d",
++                      oop_layout.child_offset, card_before, card_after,
++                      oop_layout.dirty_card, oop_layout.card_shift);
++      }
++      _linked_store_entries++;
++      break;
++    }
+     default:
+       return ZeroWasmBaseline::NotRun;
+   }
+

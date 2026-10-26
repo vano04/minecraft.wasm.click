@@ -1,0 +1,784 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index 61afa97..1faa715 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -158,6 +158,9 @@ define_pd_global(bool, CompactStrings, true);
+   product(bool, UseZeroWasmLinkedIntArray, false, EXPERIMENTAL,              \
+           "Run the opt-in OSS fixture linked int[] load through Zero state") \
+                                                                             \
++  product(bool, UseZeroWasmLinkedIntArrayStore, false, EXPERIMENTAL,         \
++          "Run the opt-in OSS fixture linked int[] store through Zero state")\
++                                                                            \
+   product(intx, ZeroWasmLinkedArrayMemoryLimitForTest, 0, EXPERIMENTAL,     \
+           "Test-only Wasm int[] memory limit in pages; zero uses active memory") \
+                                                                             \
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 0e6fe48..d9d0591 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -34,6 +34,7 @@
+ #include "interpreter/zero/zeroWasmBaseline.hpp"
+ 
+ extern uint64_t zbb_linked_array_resume_sequence();
++extern uint64_t zbb_linked_array_store_resume_sequence();
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/zeroWasmCompiler.hpp"
+ #include "jvm_io.h"
+@@ -789,7 +790,14 @@ void BytecodeInterpreter::run(interpreterState istate) {
+ run:
+ 
+ #ifdef __EMSCRIPTEN__
+-  if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray || UseZeroWasmLinkedBenchmark)
++  if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++      || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark)
++      // The two incompatible fixture-specific array ABIs fail closed as a
++      // pair. Do not call maybe_run and then retry at the same entry forever;
++      // the real interpreter must own the frame when either incompatible
++      // array-store combination is enabled.
++      && !(UseZeroWasmLinkedIntArrayStore
++           && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray))
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -1692,6 +1700,15 @@ void BytecodeInterpreter::run(interpreterState istate) {
+       }
+ 
+       CASE(_iastore):
++          if (ZeroWasmLinkedGroupVerbose
++              && METHOD->method_holder()->name()->equals("ZeroBaselineFixture")
++              && METHOD->name()->equals("intArrayStore")
++              && METHOD->signature()->equals("([III)I")) {
++            tty->print_cr("[zbg] INTERPRETER_IASTORE seq=%llu bci=%d",
++                          (unsigned long long)
++                              zbb_linked_array_store_resume_sequence(),
++                          BCI());
++          }
+           ARRAY_STOREFROM32(T_INT, jint,   "%d",   STACK_INT, 0);
+       CASE(_fastore):
+           ARRAY_STOREFROM32(T_FLOAT, jfloat, "%f",   STACK_FLOAT, 0);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 6f0ecba..ef0555f 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -274,6 +274,14 @@ struct LinkedIntArrayLayout {
+   int base_offset;
+ };
+ 
++// Separate cold store-module identity and callable slot.  These are declared
++// before the installer helper because the helper is emitted above the other
++// per-thread linked-group state.
++static THREAD_LOCAL int _linked_array_store_module_id = -1;
++static THREAD_LOCAL int _linked_array_store_slot = -1;
++static THREAD_LOCAL bool _linked_array_store_collision_reported = false;
++static THREAD_LOCAL bool _linked_array_store_exception_reported = false;
++
+ static const int LINKED_RETURN = 0;
+ static const int LINKED_DEOPT = 1;
+ static const int LINKED_EXCEPTION = 2;
+@@ -483,19 +491,24 @@ static void emit_linked_active_memory_bytes(WasmBuf& body) {
+   body.u8(0x42); body.sleb64(65536); body.u8(0x7e);
+ }
+ 
+-static void emit_linked_effective_memory_bytes(WasmBuf& body) {
+-  body.u8(0x20); body.uleb(2); body.u8(0x45);
++static constexpr int kArrayStoreValueLocal = 2;
++static constexpr int kArrayStoreMemoryLimitLocal = 3;
++static_assert(kArrayStoreValueLocal != kArrayStoreMemoryLimitLocal,
++              "store value and memory-limit ABI locals must remain distinct");
++
++static void emit_linked_effective_memory_bytes(WasmBuf& body, int limit_local) {
++  body.u8(0x20); body.uleb((unsigned)limit_local); body.u8(0x45);
+   body.u8(0x04); body.u8(0x7e);
+   emit_linked_active_memory_bytes(body);
+   body.u8(0x05);
+   emit_linked_active_memory_bytes(body);
+-  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x20); body.uleb((unsigned)limit_local); body.u8(0xad);
+   body.u8(0x42); body.sleb64(65536); body.u8(0x7e);
+   body.u8(0x54); // active bytes < override bytes
+   body.u8(0x04); body.u8(0x7e);
+   emit_linked_active_memory_bytes(body);
+   body.u8(0x05);
+-  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x20); body.uleb((unsigned)limit_local); body.u8(0xad);
+   body.u8(0x42); body.sleb64(65536); body.u8(0x7e);
+   body.u8(0x0b);
+   body.u8(0x0b);
+@@ -514,7 +527,7 @@ static void emit_linked_int_array_load(WasmBuf& body,
+   body.u8(0x20); body.uleb(0); body.u8(0xad);
+   body.u8(0x42); body.sleb64(layout.length_offset); body.u8(0x7c);
+   body.u8(0x42); body.sleb64(4); body.u8(0x7c);
+-  emit_linked_effective_memory_bytes(body);
++  emit_linked_effective_memory_bytes(body, 2);
+   body.u8(0x58); // i64.le_u
+   body.u8(0x04); body.u8(0x7e);
+ 
+@@ -530,7 +543,7 @@ static void emit_linked_int_array_load(WasmBuf& body,
+   body.u8(0x42); body.sleb64(4); body.u8(0x7e);
+   body.u8(0x7c); // array address + index * sizeof(jint)
+   body.u8(0x42); body.sleb64(layout.base_offset + 4); body.u8(0x7c);
+-  emit_linked_effective_memory_bytes(body);
++  emit_linked_effective_memory_bytes(body, 2);
+   body.u8(0x58);
+   body.u8(0x04); body.u8(0x7e);
+ 
+@@ -555,6 +568,61 @@ static void emit_linked_int_array_load(WasmBuf& body,
+   body.u8(0x0b); // function end
+ }
+ 
++static void emit_linked_int_array_store(WasmBuf& body,
++                                        const LinkedIntArrayLayout& layout,
++                                        int iastore_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // null
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, iastore_bci);
++  body.u8(0x05);
++
++  // Header and element end checks use widened arithmetic before the store.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.length_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x58);
++  body.u8(0x04); body.u8(0x7e);
++
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x4b); // unsigned index >= length
++  body.u8(0x04); body.u8(0x7e);
++
++  // Check array + base + index*4 + 4 <= effective memory end.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset + 4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x58);
++  body.u8(0x04); body.u8(0x7e);
++
++  // Recompute the checked address and perform exactly one aligned i32.store.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0xa7); // i32.wrap_i64 after all end checks
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x36); body.uleb(2); body.uleb(0);
++  linked_i64_const(body, linked_status(LINKED_RETURN, 0));
++  body.u8(0x20); body.uleb(2); body.u8(0xad); body.u8(0x84); // i64.or value
++  body.u8(0x05);
++  emit_linked_array_status(body, iastore_bci);
++  body.u8(0x0b);
++  body.u8(0x05);
++  emit_linked_array_status(body, iastore_bci);
++  body.u8(0x0b);
++  body.u8(0x05);
++  emit_linked_array_status(body, iastore_bci);
++  body.u8(0x0b);
++  body.u8(0x0b); // outer null guard
++  body.u8(0x0b); // function end
++}
++
+ // Benchmark-only bodies. They are emitted only in the opt-in benchmark
+ // module, so the production ten-export module remains byte-for-byte stable.
+ // Each wrapper performs its complete N-iteration loop in Wasm; the host makes
+@@ -760,6 +828,46 @@ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+   body.uleb((unsigned)index);
+ }
+ 
++// The opt-in store lane is deliberately a separate module.  It needs only
++// the imported linear memory and the verified int[] layout; it must not pull
++// in the Box/card-table/general-group metadata just to perform an i32.store.
++static int build_linked_array_store_module(
++    WasmBuf& module, const LinkedIntArrayLayout& layout, int iastore_bci) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(1);
++  linked_type(types, 4);
++  module.section(1, types);
++
++  WasmBuf imports;
++  imports.uleb(1);
++  imports.string("env"); imports.string("memory");
++  imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++  module.section(2, imports);
++
++  WasmBuf functions;
++  functions.uleb(1);
++  functions.uleb(0);
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(1);
++  emit_linked_export(exports, "intArrayStore", 0);
++  module.section(7, exports);
++
++  WasmBuf code;
++  WasmBuf body;
++  emit_linked_int_array_store(body, layout, iastore_bci);
++  code.uleb(1);
++  code.uleb((unsigned)body.length());
++  code.raw(body.data(), body.length());
++  module.section(10, code);
++  return module.length();
++}
++
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+                                int dispatch_bci, int throw_invoke_bci,
+@@ -1631,6 +1739,123 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+   }
+ });
+ 
++EM_JS(int, zbb_array_store_install, (const unsigned char* bytes, int length,
++                                     const char* key, int out_slot,
++                                     int dump_bytes), {
++  globalThis.__mcwebZeroArrayStoreCache ||= Object.create(null);
++  const metadata = UTF8ToString(key);
++  const cached = globalThis.__mcwebZeroArrayStoreCache[metadata];
++  if (cached) {
++    HEAP32[out_slot >> 2] = cached.slot;
++    if (typeof err === "function") {
++      const sameInstance = cached.instance
++          === globalThis.__mcwebZeroArrayStoreCache.__lastInstance;
++      err("[zbg] JS_CACHE_HIT array-store id=" + cached.id
++          + " slot=" + cached.slot + " instance-reused="
++          + (sameInstance ? "1" : "0"));
++    }
++    return cached.id;
++  }
++  try {
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    if (dump_bytes) {
++      try {
++        const fs = typeof require === "function" ? require("fs") : null;
++        if (fs && typeof Buffer !== "undefined") {
++          fs.writeFileSync("/private/tmp/mcweb-zero-linked-array-store.wasm",
++                           Buffer.from(binary));
++        }
++      } catch (dumpError) {
++        if (typeof err === "function") err("[zbg] store dump failed: " + dumpError);
++      }
++    }
++    if (!WebAssembly.validate(binary)) {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] store install reject=validate");
++      return -1;
++    }
++    const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
++      env: { memory: wasmMemory }
++    });
++    if (typeof instance.exports.intArrayStore !== "function") {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] store install reject=missing-export");
++      return -1;
++    }
++    const slot = addFunction(instance.exports.intArrayStore, "jiiii");
++    if (slot < 0) return -1;
++    const id = globalThis.__mcwebZeroArrayStoreCache.__nextId || 1;
++    globalThis.__mcwebZeroArrayStoreCache.__nextId = id + 1;
++    globalThis.__mcwebZeroArrayStoreCache[metadata] = {
++      id, metadata, bytes: length, instance, slot
++    };
++    globalThis.__mcwebZeroArrayStoreCache.__lastInstance = instance;
++    HEAP32[out_slot >> 2] = slot;
++    if (typeof err === "function") {
++      err("[zbg] JS_INSTALL array-store exports=1 slot=" + slot +
++          " bytes=" + length);
++    }
++    return id;
++  } catch (error) {
++    if (typeof console !== "undefined") console.error(
++        "[zbg] store install reject=exception " + error);
++    return -1;
++  }
++});
++
++static bool install_linked_array_store(const LinkedIntArrayLayout& layout,
++                                       int iastore_bci) {
++  if (ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr
++      || _linked_array_store_module_id >= 0) {
++    return _linked_array_store_module_id >= 0;
++  }
++  char key[2048];
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-int-array-store-v1;compiler=%s;class=ZeroBaselineFixture;"
++      "method=intArrayStore([III)I;store-bci=%d;jar=%s;classHash=%s;"
++      "dependencies=%s;features=wasm32-i32-i64-linear-memory-status;"
++      "array-mode=int-store-only;exports=1;slot=separate;length-offset=%d;"
++      "base-offset=%d;memory-mode=active-min-override;"
++      "memory-limit-pages=%lld",
++      kCompilerVersion, iastore_bci, ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
++      layout.length_offset, layout.base_offset,
++      (long long)ZeroWasmLinkedArrayMemoryLimitForTest);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++
++  WasmBuf module;
++  int length = build_linked_array_store_module(module, layout, iastore_bci);
++  if (length <= 0) return false;
++  _linked_array_store_module_id = zbb_array_store_install(
++      module.data(), length, key, (int)(intptr_t)&_linked_array_store_slot,
++      ZeroWasmLinkedGroupVerbose ? 1 : 0);
++  if (_linked_array_store_module_id >= 0 && ZeroWasmLinkedGroupVerbose) {
++    int cached_slot = -1;
++    int cached_id = zbb_array_store_install(
++        module.data(), length, key, (int)(intptr_t)&cached_slot, 0);
++    if (cached_id != _linked_array_store_module_id
++        || cached_slot != _linked_array_store_slot) {
++      tty->print_cr("[zbg] ARRAY_STORE_CACHE_REJECT first-id=%d hit-id=%d "
++                    "first-slot=%d hit-slot=%d",
++                    _linked_array_store_module_id, cached_id,
++                    _linked_array_store_slot, cached_slot);
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] ARRAY_STORE_MODULE_KEY abi=intArrayStore:([III)I->"
++                  "(i32,i32,i32,i32)->i64 exports=1 slot=%d length-offset=%d "
++                  "base-offset=%d bytes=%d",
++                  _linked_array_store_slot, layout.length_offset,
++                  layout.base_offset, length);
++  }
++  return _linked_array_store_module_id >= 0
++      && _linked_array_store_slot >= 0;
++}
++
+ EM_JS(int, zbb_benchmark_install, (const unsigned char* bytes, int length,
+                                    const char* key, int out_slots,
+                                    int dump_bytes), {
+@@ -1715,6 +1940,8 @@ static THREAD_LOCAL uint64_t _linked_alloc_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_throw_leaf_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_array_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_array_resume_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_array_store_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_array_store_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ static THREAD_LOCAL int _benchmark_module_id = -1;
+@@ -1760,6 +1987,19 @@ static jlong linked_table_call3(int slot, jint first, jint second, jint third) {
+   return ((ZbgThreeArg)(intptr_t)slot)(first, second, third);
+ }
+ 
++static jlong linked_table_call4(int slot, jint first, jint second, jint third,
++                                jint fourth) {
++  _linked_calls++;
++  return ((ZbgFourArg)(intptr_t)slot)(first, second, third, fourth);
++}
++
++static jlong linked_array_store_call(jint array, jint index, jint value,
++                                     jint memory_limit_pages) {
++  _linked_calls++;
++  return ((ZbgFourArg)(intptr_t)_linked_array_store_slot)(
++      array, index, value, memory_limit_pages);
++}
++
+ static jlong benchmark_table_call2(int slot, jint first, jint second) {
+   _benchmark_table_calls++;
+   return ((ZbgTwoArg)(intptr_t)slot)(first, second);
+@@ -1897,6 +2137,7 @@ enum LinkedMethodKind {
+   LinkedDispatchMethod,
+   LinkedThrowCallerMethod,
+   LinkedIntArrayLoadMethod,
++  LinkedIntArrayStoreMethod,
+   LinkedBenchPrimCandidateMethod,
+   LinkedBenchPrimReferenceMethod,
+   LinkedBenchDispatchCandidateMethod,
+@@ -2013,6 +2254,36 @@ static bool linked_int_array_load_shape(Method* method, int* iaload_bci,
+   return *iaload_bci == 2 && *return_bci == 3;
+ }
+ 
++static bool linked_int_array_store_code_shape(Method* method, int* iastore_bci,
++                                              int* return_bci) {
++  if (method == nullptr || method->code_size() != 6
++      || iastore_bci == nullptr || return_bci == nullptr) {
++    return false;
++  }
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if ((code[0] != (unsigned char)Bytecodes::_aload_0
++          && code[0] != (unsigned char)Bytecodes::_fast_aload_0)
++      || code[1] != (unsigned char)Bytecodes::_iload_1
++      || code[2] != (unsigned char)Bytecodes::_iload_2
++      || code[3] != (unsigned char)Bytecodes::_iastore
++      || code[4] != (unsigned char)Bytecodes::_iload_2
++      || code[5] != (unsigned char)Bytecodes::_ireturn) {
++    return false;
++  }
++  *iastore_bci = first_opcode(method, (unsigned char)Bytecodes::_iastore);
++  *return_bci = first_opcode(method, (unsigned char)Bytecodes::_ireturn);
++  return *iastore_bci == 3 && *return_bci == 5;
++}
++
++static bool linked_int_array_store_shape(Method* method, int* iastore_bci,
++                                         int* return_bci) {
++  // The linked store has no exception continuation. Keep a method with any
++  // exception table in the real interpreter, even when the holder, descriptor
++  // and exact six-byte body otherwise match the narrow production shape.
++  return method != nullptr && !method->has_exception_handler()
++      && linked_int_array_store_code_shape(method, iastore_bci, return_bci);
++}
++
+ // Diagnostic-only E2 classifier trace.  This deliberately reports the raw
+ // rewritten method bytes and metadata predicates without changing acceptance.
+ static void linked_throw_classify_diagnostic(Method* method) {
+@@ -2140,7 +2411,8 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* dispatch_bci,
+                                              int* throw_invoke_bci,
+                                              int* throw_handler_bci,
+-                                             int* int_array_bci) {
++                                             int* int_array_bci,
++                                             int* int_array_store_bci) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -2254,6 +2526,29 @@ static LinkedMethodKind verify_linked_method(Method* method,
+       && linked_int_array_load_shape(method, int_array_bci, return_bci)) {
+     return LinkedIntArrayLoadMethod;
+   }
++  if (UseZeroWasmLinkedIntArrayStore
++      && static_int(method, "intArrayStore", "([III)I")
++      && method->size_of_parameters() == 3) {
++    int diagnostic_iastore_bci = -1;
++    int diagnostic_return_bci = -1;
++    bool code_shape = linked_int_array_store_code_shape(
++        method, &diagnostic_iastore_bci, &diagnostic_return_bci);
++    bool accepted = linked_int_array_store_shape(
++        method, int_array_store_bci, return_bci);
++    if (ZeroWasmLinkedGroupVerbose && code_shape
++        && method->has_exception_handler() && !accepted
++        && !_linked_array_store_exception_reported) {
++      tty->print_cr("[zbg] STORE_CLASSIFY holder=%s method=intArrayStore "
++                    "descriptor=([III)I static=%d params=%d code-size=%d "
++                    "code-shape=1 exception-table=1 accepted=0 "
++                    "reject=exception-table",
++                    method->method_holder()->name()->as_C_string(),
++                    method->is_static() ? 1 : 0,
++                    method->size_of_parameters(), method->code_size());
++      _linked_array_store_exception_reported = true;
++    }
++    if (accepted) return LinkedIntArrayStoreMethod;
++  }
+   if (static_int(method, "storeChild",
+                  "(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")
+       && linked_store_child_code_is(method)) {
+@@ -2414,7 +2709,7 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+   if (virtual_bci < 0 || safe_div_bci < 0) {
+     if (!linked_group_resume_bcis(seed, &virtual_bci, &safe_div_bci)) return false;
+   }
+-  char key[2048];
++  char key[4096];
+   int written = jio_snprintf(
+       key, sizeof(key),
+       "abi=zero-linked-group-v1;compiler=zero-baseline-abi-v2;"
+@@ -2430,14 +2725,15 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "dispatch-bci=%d;throw-invoke-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+       "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;array-mode=%s;"
+       "array-memory-limit-pages=%lld;"
+-      "array-abi=intArrayLoad:([II)I->(i32,i32,i32)->i64;"
++      "array-abi=%s;"
+       "array-exports=11;array-slot=10;array-memory-mode=active-min-override;"
+       "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+       virtual_bci, safe_div_bci, dispatch_bci, throw_invoke_bci, ZeroWasmBaselineJarHash,
+       ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
+       oop_layout == nullptr ? "none" : "raw32-serial-card",
+-      array_layout == nullptr ? "off" : "on",
++      array_layout == nullptr ? "off" : "int-load",
+       (long long)ZeroWasmLinkedArrayMemoryLimitForTest,
++      "intArrayLoad:([II)I->(i32,i32,i32)->i64",
+       oop_layout == nullptr ? 0 : oop_layout->child_offset,
+       oop_layout == nullptr ? 0 : oop_layout->tag_offset,
+       oop_layout == nullptr ? 0 : oop_layout->card_base,
+@@ -2449,6 +2745,11 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+                                    dispatch_bci, throw_invoke_bci, false,
+                                    array_layout, array_bci);
+   if (length <= 0) return false;
++  if (ZeroWasmLinkedGroupVerbose && oop_layout != nullptr
++      && array_layout != nullptr) {
++    tty->print_cr("[zbg] CARD_BASE live=%u context=group-store-child "
++                  "expected-occurrences=1", (unsigned)(uint32_t)oop_layout->card_base);
++  }
+   _linked_module_id = zbb_linked_install(module.data(), length, key,
+                                            (int)(intptr_t)_linked_table_slots,
+                                            array_layout != nullptr ? 11
+@@ -2457,9 +2758,10 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+   if (_linked_module_id < 0) return false;
+   if (ZeroWasmLinkedGroupVerbose) {
+     if (array_layout != nullptr) {
+-      tty->print_cr("[zbg] ARRAY_MODULE_KEY abi=intArrayLoad:([II)I->(i32,i32,i32)->i64 "
++      tty->print_cr("[zbg] ARRAY_MODULE_KEY abi=%s "
+                     "exports=11 slot=10 length-offset=%d base-offset=%d "
+                     "memory-mode=active-min-override limit-pages=%lld bytes=%d",
++                    "intArrayLoad:([II)I->(i32,i32,i32)->i64",
+                     array_layout->length_offset, array_layout->base_offset,
+                     (long long)ZeroWasmLinkedArrayMemoryLimitForTest, length);
+     }
+@@ -2550,6 +2852,10 @@ static bool install_benchmark_module(Method* seed) {
+     }
+     return false;
+   }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] CARD_BASE live=%u context=benchmark-store "
++                  "expected-occurrences=2", (unsigned)(uint32_t)layout.card_base);
++  }
+   char key[2048];
+   int written = jio_snprintf(
+       key, sizeof(key),
+@@ -2606,11 +2912,13 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+   int unused_throw_invoke_bci = -1;
+   int unused_throw_handler_bci = -1;
+   int unused_int_array_bci = -1;
++  int unused_int_array_store_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(
+       method, &unused_virtual_bci, &unused_safe_div_bci,
+       &unused_safe_div_handler_bci, &return_bci, &unused_alloc_bci,
+       &unused_init_bci, &unused_dispatch_bci, &unused_throw_invoke_bci,
+-      &unused_throw_handler_bci, &unused_int_array_bci);
++      &unused_throw_handler_bci, &unused_int_array_bci,
++      &unused_int_array_store_bci);
+   bool primitive = kind == LinkedBenchPrimCandidateMethod
+       || kind == LinkedBenchPrimReferenceMethod;
+   bool dispatch = kind == LinkedBenchDispatchCandidateMethod
+@@ -2786,8 +3094,22 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+ static ZeroWasmBaseline::Result run_linked_group(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+-  if (!(UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray) || istate == nullptr
++  if (!(UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++        || UseZeroWasmLinkedIntArrayStore) || istate == nullptr
+       || istate->thread()->has_pending_exception()) return ZeroWasmBaseline::NotRun;
++  // The fixture-specific int[] ABI is deliberately separate from the
++  // six-function object/card-table group.  A group+store combination must
++  // stay in the interpreter too; otherwise the group path could install the
++  // store slot alongside Box/card/general metadata and silently broaden the
++  // acceptance surface.  The load+store pair is likewise incompatible.
++  if (UseZeroWasmLinkedIntArrayStore
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray)) {
++    if (ZeroWasmLinkedGroupVerbose && !_linked_array_store_collision_reported) {
++      tty->print_cr("[zbg] ARRAY_STORE_REJECT reason=group-or-load-store-flags-collide");
++      _linked_array_store_collision_reported = true;
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
+   int virtual_bci = -1;
+   int safe_div_bci = -1;
+   int safe_div_handler_bci = -1;
+@@ -2797,6 +3119,7 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int throw_invoke_bci = -1;
+   int throw_handler_bci = -1;
+   int int_array_bci = -1;
++  int int_array_store_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci,
+@@ -2806,20 +3129,45 @@ static ZeroWasmBaseline::Result run_linked_group(
+                                                 &dispatch_bci,
+                                                 &throw_invoke_bci,
+                                                 &throw_handler_bci,
+-                                                &int_array_bci);
+-  if (!UseZeroWasmLinkedGroup && kind != LinkedIntArrayLoadMethod) {
++                                                &int_array_bci,
++                                                &int_array_store_bci);
++  if (!UseZeroWasmLinkedGroup && kind != LinkedIntArrayLoadMethod
++      && kind != LinkedIntArrayStoreMethod) {
+     return ZeroWasmBaseline::NotRun;
+   }
++  // The shared object/card group never owns the store ABI.  A store method is
++  // accepted only by the dedicated one-function module below; if the group
++  // flag is active, fail closed and leave the bytecode in the interpreter.
++  if (UseZeroWasmLinkedGroup && kind == LinkedIntArrayStoreMethod) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  const bool array_store_only = kind == LinkedIntArrayStoreMethod
++      && !UseZeroWasmLinkedGroup;
+   LinkedOopLayout oop_layout;
+   LinkedIntArrayLayout int_array_layout;
+   const LinkedOopLayout* install_oop_layout = nullptr;
+   const LinkedIntArrayLayout* install_array_layout = nullptr;
+-  if (kind != LinkedNoMethod) {
++  if (array_store_only) {
++    if (!linked_int_array_layout_for_fixture(&int_array_layout)) {
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] ARRAY_STORE_REJECT stage=array-layout serial=%d "
++                      "compressed-oops=%d compressed-class=%d compact-headers=%d "
++                      "ptr=%d oop=%d int-array-klass=%p",
++                      UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
++                      UseCompressedClassPointers ? 1 : 0,
++                      UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                      (int)sizeof(oop), (void*)Universe::intArrayKlass());
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++    install_array_layout = &int_array_layout;
++  } else if (kind != LinkedNoMethod) {
+     // Always install the deterministic six-function superset.  In
+     // particular, caller/leaf cannot consume a four-function module before
+     // the later storeChild entry has a chance to resolve field metadata.
+     if (!linked_oop_layout_for_fixture(method, &oop_layout)) {
+-      if (ZeroWasmLinkedGroupVerbose && kind == LinkedIntArrayLoadMethod) {
++      if (ZeroWasmLinkedGroupVerbose && (kind == LinkedIntArrayLoadMethod
++                                         || kind == LinkedIntArrayStoreMethod)) {
+         tty->print_cr("[zbg] ARRAY_REJECT stage=box-layout serial=%d compressed-oops=%d "
+                       "compressed-class=%d compact-headers=%d ptr=%d oop=%d",
+                       UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
+@@ -2880,11 +3228,24 @@ static ZeroWasmBaseline::Result run_linked_group(
+     return ZeroWasmBaseline::NotRun;
+   }
+   if (return_bci < 0) return ZeroWasmBaseline::NotRun;
+-  if (_linked_module_id < 0
++  if (array_store_only) {
++    if (_linked_array_store_module_id < 0
++        && (!install_array_layout
++            || !install_linked_array_store(*install_array_layout,
++                                            int_array_store_bci))) {
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] ARRAY_STORE_REJECT stage=module-install store-bci=%d",
++                      int_array_store_bci);
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++  } else if (_linked_module_id < 0
+       && !install_linked_group(method, virtual_bci, safe_div_bci, dispatch_bci,
+                                throw_invoke_bci, install_oop_layout,
+-                               install_array_layout, int_array_bci)) {
+-    if (ZeroWasmLinkedGroupVerbose && kind == LinkedIntArrayLoadMethod) {
++                               install_array_layout,
++                               int_array_bci)) {
++    if (ZeroWasmLinkedGroupVerbose && (kind == LinkedIntArrayLoadMethod
++                                       || kind == LinkedIntArrayStoreMethod)) {
+       tty->print_cr("[zbg] ARRAY_REJECT stage=module-install array-bci=%d",
+                     int_array_bci);
+     }
+@@ -2990,6 +3351,103 @@ static ZeroWasmBaseline::Result run_linked_group(
+       _linked_deopt++;
+       return ZeroWasmBaseline::OpcodeResume;
+     }
++    case LinkedIntArrayStoreMethod: {
++      const uint64_t store_sequence = ++_linked_array_store_sequence;
++      _linked_array_store_resume_sequence = store_sequence;
++      oop array = cast_to_oop((void*)locals[0]);
++      jint index = (jint)locals[-1];
++      jint value = (jint)locals[-2];
++      jlong memory_limit_pages = (jlong)ZeroWasmLinkedArrayMemoryLimitForTest;
++      if (memory_limit_pages < 0 || memory_limit_pages > INT_MAX) {
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] ARRAY_STORE_REJECT reason=invalid-memory-limit pages=%lld",
++                        (long long)memory_limit_pages);
++        }
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (array != nullptr && array->klass() != Universe::intArrayKlass()) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if ((array_store_only ? _linked_array_store_slot
++                            : _linked_table_slots[10]) < 0
++          || !install_array_layout) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] STORE_ENTER seq=%llu method=intArrayStore static=1 params=3 "
++                      "raw32=1 exact-klass=intArrayKlass length-offset=%d "
++                      "base-offset=%d limit-pages=%lld slot=%d",
++                      (unsigned long long)store_sequence,
++                      install_array_layout->length_offset,
++                      install_array_layout->base_offset,
++                      (long long)memory_limit_pages,
++                      array_store_only ? _linked_array_store_slot
++                                       : _linked_table_slots[10]);
++        tty->print_cr("[zbg] STORE_ADAPTER seq=%llu oop=%p index=%d value=%d length=%d",
++                      (unsigned long long)store_sequence, (void*)array, index, value,
++                      array == nullptr ? -1 : typeArrayOop(array)->length());
++        tty->print_cr("[zbg] STORE_TABLE_CALL seq=%llu slot=%d oop=%p index=%d value=%d "
++                      "limit-pages=%lld",
++                      (unsigned long long)store_sequence,
++                      array_store_only ? _linked_array_store_slot
++                                       : _linked_table_slots[10],
++                      (void*)array, index, value, (long long)memory_limit_pages);
++      }
++      result = decode_linked_status(array_store_only
++          ? linked_array_store_call((jint)(intptr_t)array, index, value,
++                                    (jint)memory_limit_pages)
++          : linked_table_call4(_linked_table_slots[10],
++                               (jint)(intptr_t)array, index, value,
++                               (jint)memory_limit_pages));
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] STORE_STATUS seq=%llu status=%d bci=%d value=%d "
++                      "expected-bci=%d limit-pages=%lld",
++                      (unsigned long long)store_sequence, result.status,
++                      result.bci, result.value, int_array_store_bci,
++                      (long long)memory_limit_pages);
++      }
++      if (result.status == LINKED_RETURN && result.bci == 0) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, result.value);
++        if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] STORE_EXIT seq=%llu status=RETURN bci=0",
++                        (unsigned long long)store_sequence);
++          tty->print_cr("[zbg] DIRECT_STORE intArrayStore runtime=1 seq=%llu result=%d",
++                        (unsigned long long)store_sequence, result.value);
++        }
++        _linked_returned++;
++        return ZeroWasmBaseline::Returned;
++      }
++      if (result.status != LINKED_REEXECUTE || result.bci != int_array_store_bci) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (!linked_validate_pre_push(istate, *tos, 3)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      push_oop(tos, array);
++      push_int(tos, index);
++      push_int(tos, value);
++      if (!linked_prepare_state(istate, tos, pc, code_base + int_array_store_bci, 3)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        const char* reason = array == nullptr ? "null"
++            : ((uint32_t)index >= (uint32_t)typeArrayOop(array)->length()
++               ? "bounds" : "memory");
++        tty->print_cr("[zbg] STORE_EXIT seq=%llu status=REEXECUTE bci=%d reason=%s",
++                      (unsigned long long)store_sequence, int_array_store_bci, reason);
++        tty->print_cr("[zbg] STORE_OPCODE_REEXECUTE seq=%llu reason=%s resume-bci=%d "
++                      "depth=3 pending=0", (unsigned long long)store_sequence,
++                      reason, int_array_store_bci);
++      }
++      _linked_deopt++;
++      return ZeroWasmBaseline::OpcodeResume;
++    }
+     case LinkedLeafMethod:
+       result = decode_linked_status(linked_table_call1(
+           _linked_table_slots[LinkedLeaf], (jint)locals[0]));
+@@ -3338,6 +3796,10 @@ uint64_t zbb_linked_array_resume_sequence() {
+   return _linked_array_resume_sequence;
+ }
+ 
++uint64_t zbb_linked_array_store_resume_sequence() {
++  return _linked_array_store_resume_sequence;
++}
++
+ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -3346,7 +3808,8 @@ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+                                              tos, istate);
+     if (benchmark != NotRun) return benchmark;
+   }
+-  if (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray) {
++  if (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++      || UseZeroWasmLinkedIntArrayStore) {
+     return run_linked_group(method, locals, code_base, pc, tos, istate);
+   }
+   if (!UseZeroWasmBaseline || !fixture_class(method)) return NotRun;
+

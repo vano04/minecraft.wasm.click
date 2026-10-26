@@ -1,0 +1,20 @@
+{
+  "name": "minecraft-wasm-click",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node server/app.mjs",
+    "stage": "node tools/stage-public.mjs",
+    "build:runtime": "node tools/build-runtime.mjs",
+    "verify:source": "node tools/verify-runtime-source.mjs",
+    "audit": "node tools/audit-public-site.mjs",
+    "test": "node tools/check-release.mjs",
+    "check": "node tools/check-release.mjs",
+    "test:server": "node --test server/*.test.mjs",
+    "test:runtime": "npm test --prefix runtime"
+  },
+  "dependencies": { "ws": "8.22.0" }
+}

@@ -1,0 +1,1188 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index 0ab33f8..b5f7d47 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -156,7 +156,10 @@ define_pd_global(bool, CompactStrings, true);
+           "Run the opt-in OSS fixture linked group through Zero state")      \
+                                                                             \
+   product(bool, ZeroWasmLinkedGroupVerbose, false, EXPERIMENTAL,             \
+-          "Report linked-group ABI and real Zero resume state")
++          "Report linked-group ABI and real Zero resume state")             \
++                                                                            \
++  product(bool, UseZeroWasmLinkedBenchmark, false, EXPERIMENTAL,             \
++          "Run the opt-in OSS linked-group Wasm hot-path benchmark lane")
+ 
+ // end of ARCH_FLAGS
+ 
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index f32e8f1..5b34582 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -787,7 +787,8 @@ void BytecodeInterpreter::run(interpreterState istate) {
+ run:
+ 
+ #ifdef __EMSCRIPTEN__
+-  if (UseZeroWasmLinkedGroup && pc == METHOD->code_base()) {
++  if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedBenchmark)
++      && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+                                      &pc, &topOfStack, istate);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 4c7945e..197b4dd 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -27,6 +27,7 @@
+ #include "oops/resolvedMethodEntry.hpp"
+ #include "runtime/fieldDescriptor.inline.hpp"
+ #include "runtime/globals.hpp"
++#include "runtime/os.hpp"
+ #include "utilities/ostream.hpp"
+ 
+ #include <emscripten.h>
+@@ -66,7 +67,7 @@ static_assert(sizeof(intptr_t) == 4, "fixture adapter requires wasm32 slots");
+ static_assert(sizeof(void*) == 4, "fixture adapter requires wasm32 function pointers");
+ 
+ class WasmBuf {
+-  unsigned char _bytes[1024];
++  unsigned char _bytes[4096];
+   int _length;
+ 
+  public:
+@@ -235,7 +236,25 @@ enum LinkedFunction {
+   LinkedGoodValue = 6,
+   LinkedDispatch = 7,
+   LinkedThrowLeaf = 8,
+-  LinkedThrowCaller = 9
++  LinkedThrowCaller = 9,
++  LinkedBenchPrimCandidate = 10,
++  LinkedBenchPrimReference = 11,
++  LinkedBenchDispatchCandidate = 12,
++  LinkedBenchDispatchReference = 13,
++  LinkedRefLeaf = 14,
++  LinkedRefCaller = 15,
++  LinkedRefGoodValue = 16,
++  LinkedRefStoreChild = 17,
++  LinkedRefStoreChildCaller = 18,
++  LinkedRefSafeDiv = 19,
++  LinkedRefThrowLeaf = 20,
++  LinkedRefThrowCaller = 21,
++  LinkedBenchStoreCandidate = 22,
++  LinkedBenchStoreReference = 23,
++  LinkedBenchDivCandidate = 24,
++  LinkedBenchDivReference = 25,
++  LinkedBenchThrowCandidate = 26,
++  LinkedBenchThrowReference = 27
+ };
+ 
+ struct LinkedOopLayout {
+@@ -243,6 +262,7 @@ struct LinkedOopLayout {
+   int tag_offset;
+   int card_base;
+   int card_shift;
++  int clean_card;
+   int dirty_card;
+ };
+ 
+@@ -264,6 +284,16 @@ static void linked_type(WasmBuf& b, int params) {
+   b.u8(0x7e);                         // i64 packed result
+ }
+ 
++static void linked_counted_type(WasmBuf& b, int params, int* count) {
++  linked_type(b, params);
++  (*count)++;
++}
++
++static void linked_counted_function_type(WasmBuf& b, int type, int* count) {
++  b.uleb((unsigned)type);
++  (*count)++;
++}
++
+ static void linked_i64_const(WasmBuf& b, jlong value) {
+   b.u8(0x42);
+   b.sleb64((int64_t)value);
+@@ -360,11 +390,11 @@ static void emit_linked_store_child(WasmBuf& body,
+   body.u8(0x0b);
+ }
+ 
+-static void emit_linked_store_child_caller(WasmBuf& body) {
++static void emit_linked_store_child_caller(WasmBuf& body, int target_index) {
+   empty_locals(body);
+   body.u8(0x20); body.uleb(0);
+   body.u8(0x20); body.uleb(1);
+-  body.u8(0x10); body.uleb(LinkedStoreChild); // direct group call
++  body.u8(0x10); body.uleb(target_index); // direct group call
+   body.u8(0x0b);
+ }
+ 
+@@ -432,6 +462,205 @@ static void emit_linked_throw_caller(WasmBuf& body, int resume_bci) {
+   body.u8(0x0b);
+ }
+ 
++// Benchmark-only bodies. They are emitted only in the opt-in benchmark
++// module, so the production ten-export module remains byte-for-byte stable.
++// Each wrapper performs its complete N-iteration loop in Wasm; the host makes
++// one typed table call for the outer invocation.
++static void emit_bench_prim(WasmBuf& body, int caller_index) {
++  // Parameters are n and base; locals are the i64 accumulator and iteration.
++  body.u8(2);
++  body.uleb(1); body.u8(0x7e);
++  body.uleb(1); body.u8(0x7f);
++  linked_i64_const(body, 0);
++  body.u8(0x21); body.uleb(2);        // local.set accumulator
++  body.u8(0x41); body.sleb(0);
++  body.u8(0x21); body.uleb(3);        // local.set iteration
++  body.u8(0x02); body.u8(0x40);       // block
++  body.u8(0x03); body.u8(0x40);       // loop
++  body.u8(0x20); body.uleb(3);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x4f);                      // iteration >= n
++  body.u8(0x0d); body.uleb(1);         // break block
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x20); body.uleb(3);
++  body.u8(0x6a);                      // base + iteration
++  body.u8(0x10); body.uleb((unsigned)caller_index);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x7c);                      // i64.add to accumulator
++  body.u8(0x21); body.uleb(2);
++  body.u8(0x20); body.uleb(3);
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x6a);                      // iteration++
++  body.u8(0x21); body.uleb(3);
++  body.u8(0x0c); body.uleb(0);
++  body.u8(0x0b); body.u8(0x0b);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x0b);
++}
++
++static void emit_bench_dispatch(WasmBuf& body, int target_index,
++                                int klass_offset) {
++  // Parameters are n, receiver A, receiver B, expected Klass. Both real Good
++  // oops are selected by iteration parity; x is 7 + iteration.
++  body.u8(2);
++  body.uleb(1); body.u8(0x7e);
++  body.uleb(1); body.u8(0x7f);
++  linked_i64_const(body, 0);
++  body.u8(0x21); body.uleb(4);        // accumulator
++  body.u8(0x41); body.sleb(0);
++  body.u8(0x21); body.uleb(5);        // iteration
++  body.u8(0x02); body.u8(0x40);
++  body.u8(0x03); body.u8(0x40);
++  body.u8(0x20); body.uleb(5);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x4f);
++  body.u8(0x0d); body.uleb(1);
++  // Select receiver A/B from the same iteration value for both paired lanes.
++  body.u8(0x20); body.uleb(5);
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x71);
++  body.u8(0x04); body.u8(0x7f);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x0b);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)klass_offset);
++  body.u8(0x20); body.uleb(3);        // expected Klass
++  body.u8(0x46);
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x41); body.sleb(7);
++  body.u8(0x20); body.uleb(5);
++  body.u8(0x6a);
++  body.u8(0x10); body.uleb((unsigned)target_index);
++  body.u8(0x05);
++  linked_i64_const(body, 0);         // valid Good guard is required by host
++  body.u8(0x0b);
++  body.u8(0x20); body.uleb(4);
++  body.u8(0x7c);                      // i64.add to accumulator
++  body.u8(0x21); body.uleb(4);
++  body.u8(0x20); body.uleb(5);
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x6a);
++  body.u8(0x21); body.uleb(5);
++  body.u8(0x0c); body.uleb(0);
++  body.u8(0x0b); body.u8(0x0b);
++  body.u8(0x20); body.uleb(4);
++  body.u8(0x0b);
++}
++
++static void emit_linked_ref_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(3);
++  body.u8(0x6a);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++}
++
++static void emit_linked_ref_caller(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(LinkedRefLeaf);
++  linked_i64_const(body, 2);
++  body.u8(0x7e);
++  body.u8(0x0b);
++}
++
++static void emit_linked_ref_good_value(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(11);
++  body.u8(0x6a);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++}
++
++static void emit_linked_ref_store_child(WasmBuf& body,
++                                        const LinkedOopLayout& layout) {
++  emit_linked_store_child(body, layout);
++}
++
++static void emit_linked_ref_store_caller(WasmBuf& body) {
++  emit_linked_store_child_caller(body, LinkedRefStoreChild);
++}
++
++static void emit_linked_ref_safe_div(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x6d);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++}
++
++static void emit_linked_ref_throw_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x6a);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++}
++
++static void emit_linked_ref_throw_caller(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(LinkedRefThrowLeaf);
++  body.u8(0x0b);
++}
++
++static void emit_bench_store(WasmBuf& body, int caller_index) {
++  body.u8(2);
++  body.uleb(1); body.u8(0x7e);
++  body.uleb(1); body.u8(0x7f);
++  linked_i64_const(body, 0); body.u8(0x21); body.uleb(4);
++  body.u8(0x41); body.sleb(0); body.u8(0x21); body.uleb(5);
++  body.u8(0x02); body.u8(0x40); body.u8(0x03); body.u8(0x40);
++  body.u8(0x20); body.uleb(5); body.u8(0x20); body.uleb(0);
++  body.u8(0x4f); body.u8(0x0d); body.uleb(1);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x20); body.uleb(5); body.u8(0x41); body.sleb(1); body.u8(0x71);
++  body.u8(0x04); body.u8(0x7f); body.u8(0x20); body.uleb(3);
++  body.u8(0x05); body.u8(0x20); body.uleb(2); body.u8(0x0b);
++  body.u8(0x10); body.uleb((unsigned)caller_index);
++  body.u8(0x20); body.uleb(4); body.u8(0x7c); body.u8(0x21); body.uleb(4);
++  body.u8(0x20); body.uleb(5); body.u8(0x41); body.sleb(1); body.u8(0x6a);
++  body.u8(0x21); body.uleb(5); body.u8(0x0c); body.uleb(0);
++  body.u8(0x0b); body.u8(0x0b); body.u8(0x20); body.uleb(4); body.u8(0x0b);
++}
++
++static void emit_bench_div(WasmBuf& body, int target_index) {
++  body.u8(2);
++  body.uleb(1); body.u8(0x7e); body.uleb(1); body.u8(0x7f);
++  linked_i64_const(body, 0); body.u8(0x21); body.uleb(2);
++  body.u8(0x41); body.sleb(0); body.u8(0x21); body.uleb(3);
++  body.u8(0x02); body.u8(0x40); body.u8(0x03); body.u8(0x40);
++  body.u8(0x20); body.uleb(3); body.u8(0x20); body.uleb(0);
++  body.u8(0x4f); body.u8(0x0d); body.uleb(1);
++  body.u8(0x20); body.uleb(1); body.u8(0x20); body.uleb(3); body.u8(0x6a);
++  body.u8(0x41); body.sleb(3); body.u8(0x10); body.uleb((unsigned)target_index);
++  body.u8(0x20); body.uleb(2); body.u8(0x7c); body.u8(0x21); body.uleb(2);
++  body.u8(0x20); body.uleb(3); body.u8(0x41); body.sleb(1); body.u8(0x6a);
++  body.u8(0x21); body.uleb(3); body.u8(0x0c); body.uleb(0);
++  body.u8(0x0b); body.u8(0x0b); body.u8(0x20); body.uleb(2); body.u8(0x0b);
++}
++
++static void emit_bench_throw(WasmBuf& body, int target_index) {
++  body.u8(2);
++  body.uleb(1); body.u8(0x7e); body.uleb(1); body.u8(0x7f);
++  linked_i64_const(body, 0); body.u8(0x21); body.uleb(2);
++  body.u8(0x41); body.sleb(0); body.u8(0x21); body.uleb(3);
++  body.u8(0x02); body.u8(0x40); body.u8(0x03); body.u8(0x40);
++  body.u8(0x20); body.uleb(3); body.u8(0x20); body.uleb(0);
++  body.u8(0x4f); body.u8(0x0d); body.uleb(1);
++  body.u8(0x20); body.uleb(1); body.u8(0x20); body.uleb(3); body.u8(0x6a);
++  body.u8(0x10); body.uleb((unsigned)target_index);
++  body.u8(0x20); body.uleb(2); body.u8(0x7c); body.u8(0x21); body.uleb(2);
++  body.u8(0x20); body.uleb(3); body.u8(0x41); body.sleb(1); body.u8(0x6a);
++  body.u8(0x21); body.uleb(3); body.u8(0x0c); body.uleb(0);
++  body.u8(0x0b); body.u8(0x0b); body.u8(0x20); body.uleb(2); body.u8(0x0b);
++}
++
+ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+   body.string(name);
+   body.u8(0x00);
+@@ -440,20 +669,31 @@ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+ 
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+-                               int dispatch_bci, int throw_invoke_bci) {
++                               int dispatch_bci, int throw_invoke_bci,
++                               bool benchmark_mode = false) {
+   static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
+                                          0x01, 0x00, 0x00, 0x00};
+   module.raw(magic, sizeof(magic));
+ 
+   WasmBuf types;
+-  types.uleb(oop_layout == nullptr ? 2 : 5);
+-  linked_type(types, 1);               // leaf/caller -> i64
+-  linked_type(types, 2);               // virtual/safeDiv -> i64
++  if (benchmark_mode && oop_layout == nullptr) return 0;
++  const int expected_type_count = oop_layout == nullptr ? 2
++      : (benchmark_mode ? 8 : 5);
++  int emitted_type_count = 0;
++  types.uleb((unsigned)expected_type_count);
++  linked_counted_type(types, 1, &emitted_type_count); // leaf/caller -> i64
++  linked_counted_type(types, 2, &emitted_type_count); // virtual/safeDiv -> i64
+   if (oop_layout != nullptr) {
+-    linked_type(types, 1);              // Good.value -> i64
+-    linked_type(types, 3);              // dispatch(receiver,x,expected Klass)
+-    linked_type(types, 1);              // throwLeaf/throwCaller -> i64
++    linked_counted_type(types, 1, &emitted_type_count); // Good.value -> i64
++    linked_counted_type(types, 3, &emitted_type_count); // dispatch(receiver,x,expected Klass)
++    linked_counted_type(types, 1, &emitted_type_count); // throwLeaf/throwCaller -> i64
++    if (benchmark_mode) {
++      linked_counted_type(types, 2, &emitted_type_count); // primitive wrappers
++      linked_counted_type(types, 3, &emitted_type_count); // retained dispatch ABI
++      linked_counted_type(types, 4, &emitted_type_count); // four-argument dispatch wrappers
++    }
+   }
++  if (emitted_type_count != expected_type_count) return 0;
+   module.section(1, types);
+ 
+   if (oop_layout != nullptr) {
+@@ -465,32 +705,75 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+   }
+ 
+   WasmBuf functions;
+-  int function_count = oop_layout == nullptr ? 4 : 10;
++  int function_count = oop_layout == nullptr ? 4
++      : (benchmark_mode ? 28 : 10);
++  int emitted_function_count = 0;
+   functions.uleb((unsigned)function_count);
+-  functions.uleb(0); functions.uleb(0);
+-  functions.uleb(1); functions.uleb(1);
++  linked_counted_function_type(functions, 0, &emitted_function_count);
++  linked_counted_function_type(functions, 0, &emitted_function_count);
++  linked_counted_function_type(functions, 1, &emitted_function_count);
++  linked_counted_function_type(functions, 1, &emitted_function_count);
+   if (oop_layout != nullptr) {
+-    functions.uleb(1); functions.uleb(1);
+-    functions.uleb(2);
+-    functions.uleb(3);
+-    functions.uleb(4); functions.uleb(4);
++    linked_counted_function_type(functions, 1, &emitted_function_count);
++    linked_counted_function_type(functions, 1, &emitted_function_count);
++    linked_counted_function_type(functions, 2, &emitted_function_count);
++    linked_counted_function_type(functions, 3, &emitted_function_count);
++    linked_counted_function_type(functions, 4, &emitted_function_count);
++    linked_counted_function_type(functions, 4, &emitted_function_count);
++    if (benchmark_mode) {
++      linked_counted_function_type(functions, 5, &emitted_function_count);
++      linked_counted_function_type(functions, 5, &emitted_function_count);
++      linked_counted_function_type(functions, 7, &emitted_function_count);
++      linked_counted_function_type(functions, 7, &emitted_function_count);
++      linked_counted_function_type(functions, 0, &emitted_function_count);
++      linked_counted_function_type(functions, 0, &emitted_function_count);
++      linked_counted_function_type(functions, 2, &emitted_function_count);
++      linked_counted_function_type(functions, 1, &emitted_function_count);
++      linked_counted_function_type(functions, 1, &emitted_function_count);
++      linked_counted_function_type(functions, 1, &emitted_function_count);
++      linked_counted_function_type(functions, 4, &emitted_function_count);
++      linked_counted_function_type(functions, 4, &emitted_function_count);
++      linked_counted_function_type(functions, 7, &emitted_function_count);
++      linked_counted_function_type(functions, 7, &emitted_function_count);
++      linked_counted_function_type(functions, 5, &emitted_function_count);
++      linked_counted_function_type(functions, 5, &emitted_function_count);
++      linked_counted_function_type(functions, 5, &emitted_function_count);
++      linked_counted_function_type(functions, 5, &emitted_function_count);
++    }
+   }
++  if (emitted_function_count != function_count) return 0;
+   module.section(3, functions);
+ 
+   WasmBuf exports;
+-  exports.uleb((unsigned)function_count);
+-  emit_linked_export(exports, "leaf", LinkedLeaf);
+-  emit_linked_export(exports, "caller", LinkedCaller);
+-  emit_linked_export(exports, "virtualValue", LinkedVirtual);
+-  emit_linked_export(exports, "safeDiv", LinkedSafeDiv);
++  int export_count = oop_layout == nullptr ? 4
++      : (benchmark_mode ? 20 : 10);
++  int emitted_export_count = 0;
++  exports.uleb((unsigned)export_count);
++  emit_linked_export(exports, "leaf", LinkedLeaf); emitted_export_count++;
++  emit_linked_export(exports, "caller", LinkedCaller); emitted_export_count++;
++  emit_linked_export(exports, "virtualValue", LinkedVirtual); emitted_export_count++;
++  emit_linked_export(exports, "safeDiv", LinkedSafeDiv); emitted_export_count++;
+   if (oop_layout != nullptr) {
+-    emit_linked_export(exports, "storeChild", LinkedStoreChild);
+-    emit_linked_export(exports, "storeChildCaller", LinkedStoreChildCaller);
+-    emit_linked_export(exports, "goodValue", LinkedGoodValue);
+-    emit_linked_export(exports, "dispatch", LinkedDispatch);
+-    emit_linked_export(exports, "throwLeaf", LinkedThrowLeaf);
+-    emit_linked_export(exports, "throwCaller", LinkedThrowCaller);
++    emit_linked_export(exports, "storeChild", LinkedStoreChild); emitted_export_count++;
++    emit_linked_export(exports, "storeChildCaller", LinkedStoreChildCaller); emitted_export_count++;
++    emit_linked_export(exports, "goodValue", LinkedGoodValue); emitted_export_count++;
++    emit_linked_export(exports, "dispatch", LinkedDispatch); emitted_export_count++;
++    emit_linked_export(exports, "throwLeaf", LinkedThrowLeaf); emitted_export_count++;
++    emit_linked_export(exports, "throwCaller", LinkedThrowCaller); emitted_export_count++;
++    if (benchmark_mode) {
++      emit_linked_export(exports, "benchPrimCandidate", LinkedBenchPrimCandidate); emitted_export_count++;
++      emit_linked_export(exports, "benchPrimReference", LinkedBenchPrimReference); emitted_export_count++;
++      emit_linked_export(exports, "benchDispatchCandidate", LinkedBenchDispatchCandidate); emitted_export_count++;
++      emit_linked_export(exports, "benchDispatchReference", LinkedBenchDispatchReference); emitted_export_count++;
++      emit_linked_export(exports, "benchStoreCandidate", LinkedBenchStoreCandidate); emitted_export_count++;
++      emit_linked_export(exports, "benchStoreReference", LinkedBenchStoreReference); emitted_export_count++;
++      emit_linked_export(exports, "benchDivCandidate", LinkedBenchDivCandidate); emitted_export_count++;
++      emit_linked_export(exports, "benchDivReference", LinkedBenchDivReference); emitted_export_count++;
++      emit_linked_export(exports, "benchThrowCandidate", LinkedBenchThrowCandidate); emitted_export_count++;
++      emit_linked_export(exports, "benchThrowReference", LinkedBenchThrowReference); emitted_export_count++;
++    }
+   }
++  if (emitted_export_count != export_count) return 0;
+   module.section(7, exports);
+ 
+   WasmBuf code;
+@@ -519,7 +802,7 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
+     emitted_code_bodies++;
+     body = WasmBuf();
+-    emit_linked_store_child_caller(body);
++    emit_linked_store_child_caller(body, LinkedStoreChild);
+     code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
+     emitted_code_bodies++;
+     body = WasmBuf();
+@@ -538,6 +821,82 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     emit_linked_throw_caller(body, throw_invoke_bci);
+     code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
+     emitted_code_bodies++;
++    if (benchmark_mode) {
++      body = WasmBuf();
++      emit_bench_prim(body, LinkedCaller);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_prim(body, LinkedRefCaller);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_dispatch(body, LinkedGoodValue,
++                          oopDesc::klass_offset_in_bytes());
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_dispatch(body, LinkedRefGoodValue,
++                          oopDesc::klass_offset_in_bytes());
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_leaf(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_caller(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_good_value(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_store_child(body, *oop_layout);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_store_caller(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_safe_div(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_throw_leaf(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_linked_ref_throw_caller(body);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_store(body, LinkedStoreChildCaller);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_store(body, LinkedRefStoreChildCaller);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_div(body, LinkedSafeDiv);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_div(body, LinkedRefSafeDiv);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_throw(body, LinkedThrowCaller);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++      body = WasmBuf();
++      emit_bench_throw(body, LinkedRefThrowCaller);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++    }
+   }
+   if (emitted_code_bodies != expected_code_bodies) return 0;
+   module.section(10, code);
+@@ -595,6 +954,11 @@ static bool static_int(Method* method, const char* name, const char* sig) {
+       && method->name()->equals(name) && method->signature()->equals(sig);
+ }
+ 
++static bool static_long(Method* method, const char* name, const char* sig) {
++  return method->is_static() && method->result_type() == T_LONG
++      && method->name()->equals(name) && method->signature()->equals(sig);
++}
++
+ static bool code_is(Method* method, const unsigned char* expected, int length) {
+   return method->code_size() == length
+       && memcmp(method->code_base(), expected, (size_t)length) == 0;
+@@ -917,12 +1281,14 @@ static bool linked_oop_layout_for_class(InstanceKlass* box_klass,
+   }
+ 
+   int card_shift = CardTable::card_shift();
++  int clean_card = (int)CardTable::clean_card_val();
+   int dirty_card = (int)CardTable::dirty_card_val();
+   uintptr_t card_address = (uintptr_t)card_base;
+   if (child_field.offset() <= 0 || tag_field.offset() <= 0
+       || (child_field.offset() & 3) != 0 || (tag_field.offset() & 3) != 0
+-      || card_shift < 0 || card_shift >= 32 || dirty_card < 0
+-      || dirty_card > 255 || card_address > UINT32_MAX) {
++      || card_shift < 0 || card_shift >= 32 || clean_card < 0
++      || clean_card > 255 || dirty_card < 0 || dirty_card > 255
++      || card_address > UINT32_MAX) {
+     return false;
+   }
+ 
+@@ -930,6 +1296,7 @@ static bool linked_oop_layout_for_class(InstanceKlass* box_klass,
+   layout->tag_offset = tag_field.offset();
+   layout->card_base = (int)(uint32_t)card_address;
+   layout->card_shift = card_shift;
++  layout->clean_card = clean_card;
+   layout->dirty_card = dirty_card;
+   return true;
+ }
+@@ -965,6 +1332,18 @@ static CardTable::CardValue* linked_card_for(const LinkedOopLayout& layout,
+   return (CardTable::CardValue*)card_address;
+ }
+ 
++static bool linked_reset_store_state(const LinkedOopLayout& layout, oop box,
++                                     int* card_after_clean) {
++  if (box == nullptr) return false;
++  HeapAccess<>::oop_store_at(box, layout.child_offset, (oop)nullptr);
++  if (box->obj_field(layout.child_offset) != nullptr) return false;
++  CardTable::CardValue* card = linked_card_for(layout, box);
++  if (card == nullptr) return false;
++  *card = (CardTable::CardValue)layout.clean_card;
++  if (card_after_clean != nullptr) *card_after_clean = (int)*card;
++  return (int)*card == layout.clean_card;
++}
++
+ static FixtureMethod verify(Method* method) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return NoMethod;
+@@ -1104,6 +1483,68 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+   }
+ });
+ 
++EM_JS(int, zbb_benchmark_install, (const unsigned char* bytes, int length,
++                                   const char* key, int out_slots,
++                                   int dump_bytes), {
++  globalThis.__mcwebZeroLinkedBenchmarkCache ||= Object.create(null);
++  const metadata = UTF8ToString(key);
++  const cached = globalThis.__mcwebZeroLinkedBenchmarkCache[metadata];
++  if (cached) {
++    for (let i = 0; i < 10; i++) {
++      HEAP32[(out_slots >> 2) + i] = cached.slots[i];
++    }
++    return cached.id;
++  }
++  try {
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    if (dump_bytes) {
++      try {
++        const fs = typeof require === "function" ? require("fs") : null;
++        if (fs && typeof Buffer !== "undefined") {
++          fs.writeFileSync("/private/tmp/mcweb-zero-linked-benchmark.wasm",
++                           Buffer.from(binary));
++        }
++      } catch (dumpError) {
++        if (typeof err === "function") err("[zbp] dump failed: " + dumpError);
++      }
++    }
++    if (!WebAssembly.validate(binary)) return -1;
++    const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
++      env: { memory: wasmMemory }
++    });
++    const slots = [
++      addFunction(instance.exports.benchPrimCandidate, "jii"),
++      addFunction(instance.exports.benchPrimReference, "jii"),
++      addFunction(instance.exports.benchDispatchCandidate, "jiiii"),
++      addFunction(instance.exports.benchDispatchReference, "jiiii"),
++      addFunction(instance.exports.benchStoreCandidate, "jiiii"),
++      addFunction(instance.exports.benchStoreReference, "jiiii"),
++      addFunction(instance.exports.benchDivCandidate, "jii"),
++      addFunction(instance.exports.benchDivReference, "jii"),
++      addFunction(instance.exports.benchThrowCandidate, "jii"),
++      addFunction(instance.exports.benchThrowReference, "jii")
++    ];
++    const id = globalThis.__mcwebZeroLinkedBenchmarkCache.__nextId || 1;
++    globalThis.__mcwebZeroLinkedBenchmarkCache.__nextId = id + 1;
++    globalThis.__mcwebZeroLinkedBenchmarkCache[metadata] = {
++      id, metadata, bytes: length, instance, slots
++    };
++    for (let i = 0; i < 10; i++) {
++      HEAP32[(out_slots >> 2) + i] = slots[i];
++    }
++    if (typeof err === "function") {
++      err("[zbp] JS_INSTALL benchmark exports=10 bytes=" + length);
++    }
++    return id;
++  } catch (error) {
++    if (!globalThis.__mcwebZeroLinkedBenchmarkCache.__error) {
++      globalThis.__mcwebZeroLinkedBenchmarkCache.__error = String(error);
++      if (typeof err === "function") err("[zbp] install failed: " + error);
++    }
++    return -1;
++  }
++});
++
+ static THREAD_LOCAL int _module_id = -1;
+ static THREAD_LOCAL int _table_slots[4] = {-1, -1, -1, -1};
+ static THREAD_LOCAL uint64_t _compiled = 0;
+@@ -1126,12 +1567,18 @@ static THREAD_LOCAL uint64_t _linked_alloc_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_throw_leaf_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
++static THREAD_LOCAL int _benchmark_module_id = -1;
++static THREAD_LOCAL int _benchmark_slots[10] = {-1, -1, -1, -1, -1,
++                                                -1, -1, -1, -1, -1};
++static THREAD_LOCAL uint64_t _benchmark_table_calls = 0;
++static THREAD_LOCAL uint64_t _benchmark_sequence = 0;
+ 
+ typedef jint (*ZbbOneArg)(jint);
+ typedef jint (*ZbbTwoArg)(jint, jint);
+ typedef jlong (*ZbgOneArg)(jint);
+ typedef jlong (*ZbgTwoArg)(jint, jint);
+ typedef jlong (*ZbgThreeArg)(jint, jint, jint);
++typedef jlong (*ZbgFourArg)(jint, jint, jint, jint);
+ 
+ struct LinkedStatus {
+   int status;
+@@ -1163,6 +1610,40 @@ static jlong linked_table_call3(int slot, jint first, jint second, jint third) {
+   return ((ZbgThreeArg)(intptr_t)slot)(first, second, third);
+ }
+ 
++static jlong benchmark_table_call2(int slot, jint first, jint second) {
++  _benchmark_table_calls++;
++  return ((ZbgTwoArg)(intptr_t)slot)(first, second);
++}
++
++static jlong benchmark_table_call3(int slot, jint first, jint second,
++                                   jint third) {
++  _benchmark_table_calls++;
++  return ((ZbgThreeArg)(intptr_t)slot)(first, second, third);
++}
++
++static jlong benchmark_table_call4(int slot, jint first, jint second,
++                                   jint third, jint fourth) {
++  _benchmark_table_calls++;
++  return ((ZbgFourArg)(intptr_t)slot)(first, second, third, fourth);
++}
++
++static jlong benchmark_timed_call2(int slot, jint first, jint second,
++                                   jlong* elapsed_ns) {
++  jlong start_ns = os::javaTimeNanos();
++  jlong result = benchmark_table_call2(slot, first, second);
++  *elapsed_ns = os::javaTimeNanos() - start_ns;
++  return result;
++}
++
++static jlong benchmark_timed_call4(int slot, jint first, jint second,
++                                   jint third, jint fourth,
++                                   jlong* elapsed_ns) {
++  jlong start_ns = os::javaTimeNanos();
++  jlong result = benchmark_table_call4(slot, first, second, third, fourth);
++  *elapsed_ns = os::javaTimeNanos() - start_ns;
++  return result;
++}
++
+ static jint table_call1(int slot, jint value) {
+   _table_calls++;
+   if (ZeroWasmBaselineVerbose && _table_calls == 1) {
+@@ -1233,6 +1714,12 @@ static void push_int(intptr_t** tos, jint value) {
+   *tos = top - 1;
+ }
+ 
++static void push_long(intptr_t** tos, jlong value) {
++  intptr_t* top = *tos;
++  *((jlong*)&top[0]) = value;
++  *tos = top - 2;
++}
++
+ static void push_oop(intptr_t** tos, oop value) {
+   intptr_t* top = *tos;
+   *((oop*)&top[0]) = value;
+@@ -1258,7 +1745,17 @@ enum LinkedMethodKind {
+   LinkedInitCallerMethod,
+   LinkedFailCallerMethod,
+   LinkedDispatchMethod,
+-  LinkedThrowCallerMethod
++  LinkedThrowCallerMethod,
++  LinkedBenchPrimCandidateMethod,
++  LinkedBenchPrimReferenceMethod,
++  LinkedBenchDispatchCandidateMethod,
++  LinkedBenchDispatchReferenceMethod,
++  LinkedBenchStoreCandidateMethod,
++  LinkedBenchStoreReferenceMethod,
++  LinkedBenchDivCandidateMethod,
++  LinkedBenchDivReferenceMethod,
++  LinkedBenchThrowCandidateMethod,
++  LinkedBenchThrowReferenceMethod
+ };
+ 
+ static Method* linked_group_method(Method* seed, const char* name,
+@@ -1442,6 +1939,27 @@ static void linked_throw_classify_diagnostic(Method* method) {
+   }
+ }
+ 
++static bool linked_benchmark_shape(Method* method) {
++  // The benchmark adapter is opt-in and accepts only the exact fixture stubs
++  // `return base` / `return n`; it never substitutes an arbitrary Java body.
++  static const unsigned char primitive[] = {0x1b, 0xac};
++  static const unsigned char dispatch[] = {0x1c, 0xac};
++  static const unsigned char store[] = {0x1a, 0xac};
++  if (method == nullptr) return false;
++  if (method->signature()->equals("(II)I")) {
++    return code_is(method, primitive, sizeof(primitive));
++  }
++  if (method->signature()->equals(
++          "(ILZeroBaselineFixture$Box;LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")) {
++    return code_is(method, store, sizeof(store));
++  }
++  if (method->signature()->equals(
++          "(LZeroBaselineFixture$Base;LZeroBaselineFixture$Base;I)I")) {
++    return code_is(method, dispatch, sizeof(dispatch));
++  }
++  return false;
++}
++
+ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* virtual_bci,
+                                              int* safe_div_bci,
+@@ -1473,6 +1991,54 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                   method->code_size() > 6 ? code[6] : -1,
+                   linked_dispatch_shape(method) ? 1 : 0);
+   }
++  if (ZeroWasmLinkedGroupVerbose
++      && (method->name()->equals("benchmarkDispatchCandidate")
++          || method->name()->equals("benchmarkDispatchReference"))) {
++    const unsigned char* code = method->code_base();
++    tty->print_cr("[zbp] BENCH_DISPATCH_CLASSIFY name=%s sig=%s static=%d "
++                  "result=%d size=%d b0=%d b1=%d shape=%d",
++                  method->name()->as_C_string(), method->signature()->as_C_string(),
++                  method->is_static() ? 1 : 0, (int)method->result_type(),
++                  method->code_size(), method->code_size() > 0 ? code[0] : -1,
++                  method->code_size() > 1 ? code[1] : -1,
++                  linked_benchmark_shape(method) ? 1 : 0);
++  }
++  if (UseZeroWasmLinkedBenchmark && linked_benchmark_shape(method)) {
++    if (static_int(method, "benchmarkPrimitiveCandidate", "(II)I")) {
++      return LinkedBenchPrimCandidateMethod;
++    }
++    if (static_int(method, "benchmarkPrimitiveReference", "(II)I")) {
++      return LinkedBenchPrimReferenceMethod;
++    }
++    if (static_int(method, "benchmarkDispatchCandidate",
++                   "(LZeroBaselineFixture$Base;LZeroBaselineFixture$Base;I)I")) {
++      return LinkedBenchDispatchCandidateMethod;
++    }
++    if (static_int(method, "benchmarkDispatchReference",
++                   "(LZeroBaselineFixture$Base;LZeroBaselineFixture$Base;I)I")) {
++      return LinkedBenchDispatchReferenceMethod;
++    }
++    if (static_int(method, "benchmarkStoreCandidate",
++                   "(ILZeroBaselineFixture$Box;LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")) {
++      return LinkedBenchStoreCandidateMethod;
++    }
++    if (static_int(method, "benchmarkStoreReference",
++                   "(ILZeroBaselineFixture$Box;LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")) {
++      return LinkedBenchStoreReferenceMethod;
++    }
++    if (static_int(method, "benchmarkDivCandidate", "(II)I")) {
++      return LinkedBenchDivCandidateMethod;
++    }
++    if (static_int(method, "benchmarkDivReference", "(II)I")) {
++      return LinkedBenchDivReferenceMethod;
++    }
++    if (static_int(method, "benchmarkThrowCandidate", "(II)I")) {
++      return LinkedBenchThrowCandidateMethod;
++    }
++    if (static_int(method, "benchmarkThrowReference", "(II)I")) {
++      return LinkedBenchThrowReferenceMethod;
++    }
++  }
+   if (static_int(method, "leaf", "(I)I") && method->is_final()) {
+     static const unsigned char expected[] = {0x1a, 0x06, 0x60, 0xac};
+     if (code_is(method, expected, sizeof(expected))) {
+@@ -1711,6 +2277,318 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+   return true;
+ }
+ 
++static bool install_benchmark_module(Method* seed) {
++  if (seed == nullptr || ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_REJECT subreason=missing-seed-or-identity");
++    }
++    return false;
++  }
++  LinkedOopLayout layout;
++  InstanceKlass* box_klass = linked_fixture_klass(
++      seed, "ZeroBaselineFixture$Box");
++  bool layout_ready = linked_oop_layout_for_fixture(seed, &layout);
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] BENCH_LAYOUT box=%p ready=%d serial=%d compressed-oops=%d "
++                  "compressed-class=%d compact-headers=%d ptr=%d oop=%d "
++                  "header=%d klass-offset=%d barrier=%p",
++                  (void*)box_klass, layout_ready ? 1 : 0, UseSerialGC ? 1 : 0,
++                  UseCompressedOops ? 1 : 0, UseCompressedClassPointers ? 1 : 0,
++                  UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                  (int)sizeof(oop), (int)(oopDesc::header_size() * HeapWordSize),
++                  oopDesc::klass_offset_in_bytes(),
++                  (void*)BarrierSet::barrier_set());
++  }
++  if (!layout_ready) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_REJECT subreason=oop-layout");
++    }
++    return false;
++  }
++  Method* dispatch = linked_group_method(
++      seed, "dispatch", "(LZeroBaselineFixture$Base;I)I");
++  int dispatch_bci = dispatch == nullptr
++      ? -1 : first_opcode(dispatch, (unsigned char)Bytecodes::_invokevirtual);
++  InstanceKlass* expected_klass = nullptr;
++  Method* target_method = nullptr;
++  int table_index = -1;
++  ResolvedMethodEntry* entry = nullptr;
++  int cp_index = -1;
++  if (dispatch != nullptr && dispatch_bci >= 0
++      && dispatch_bci + 2 < dispatch->code_size()) {
++    cp_index = Bytes::get_native_u2((address)(dispatch->code_base()
++                                               + dispatch_bci + 1));
++    if (cp_index >= 0
++        && cp_index < dispatch->constants()->resolved_method_entries_length()) {
++      entry = dispatch->constants()->resolved_method_entry_at(cp_index);
++    }
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] BENCH_DISPATCH_PRE method=%p name=%s bci=%d cp-index=%d "
++                  "entry=%p resolved=%d bytecode1=%d bytecode2=%d table-index=%d",
++                  (void*)dispatch,
++                  dispatch == nullptr ? "<null>" : dispatch->name()->as_C_string(),
++                  dispatch_bci, cp_index, (void*)entry,
++                  entry != nullptr && entry->is_resolved(Bytecodes::_invokevirtual)
++                      ? 1 : 0,
++                  entry == nullptr ? -1 : (int)entry->bytecode1(),
++                  entry == nullptr ? -1 : (int)entry->bytecode2(),
++                  entry == nullptr ? -1 : (int)entry->table_index());
++  }
++  bool metadata_ready = dispatch != nullptr && dispatch_bci == 2
++      && linked_dispatch_shape(dispatch)
++      && linked_dispatch_metadata(dispatch, dispatch_bci, &expected_klass,
++                                  &target_method, &table_index)
++      && expected_klass != nullptr && target_method != nullptr
++      && table_index >= 0;
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] BENCH_DISPATCH_POST metadata=%d expected=%p target=%p "
++                  "target-holder=%p table-index=%d",
++                  metadata_ready ? 1 : 0, (void*)expected_klass,
++                  (void*)target_method,
++                  target_method == nullptr ? nullptr
++                      : (void*)target_method->method_holder(), table_index);
++  }
++  if (!metadata_ready) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_REJECT subreason=dispatch-metadata");
++    }
++    return false;
++  }
++  char key[2048];
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-benchmark-v1;compiler=zero-baseline-abi-v2;"
++      "mode=benchmark;primitive=candidate->leaf|reference->refLeaf;"
++      "dispatch=candidate->Good.value|reference->refGoodValue;"
++      "store=candidate->storeChildCaller|reference->refStoreChildCaller;"
++      "div=candidate->safeDiv|reference->refSafeDiv;"
++      "throw=candidate->throwCaller|reference->refThrowCaller;"
++      "dispatch-bci=%d;klass-offset=%d;jar=%s;classHash=%s;dependencies=%s;"
++      "features=wasm32-i32-i64-linear-memory-direct-loop;oop-mode=raw32-serial-card;"
++      "clean-card=%d;dirty-card=%d",
++      dispatch_bci, oopDesc::klass_offset_in_bytes(), ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
++      layout.clean_card, layout.dirty_card);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++  WasmBuf module;
++  int length = build_linked_module(module, 0, 0, &layout, dispatch_bci, 0, true);
++  if (length <= 0) return false;
++  _benchmark_module_id = zbb_benchmark_install(
++      module.data(), length, key, (int)(intptr_t)_benchmark_slots,
++      ZeroWasmLinkedGroupVerbose ? 1 : 0);
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] BENCH_INSTALL_RESULT module-id=%d slots=%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
++                  _benchmark_module_id, _benchmark_slots[0],
++                  _benchmark_slots[1], _benchmark_slots[2],
++                  _benchmark_slots[3], _benchmark_slots[4], _benchmark_slots[5],
++                  _benchmark_slots[6], _benchmark_slots[7], _benchmark_slots[8],
++                  _benchmark_slots[9]);
++  }
++  if (_benchmark_module_id < 0) return false;
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] module benchmark-mode=1 exports=10 internal-functions=28 "
++                  "loops=direct-calls klass-offset=%d table-index=%d bytes=%d",
++                  oopDesc::klass_offset_in_bytes(), table_index, length);
++  }
++  return true;
++}
++
++static ZeroWasmBaseline::Result run_linked_benchmark(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmLinkedBenchmark || method == nullptr || istate == nullptr
++      || istate->thread()->has_pending_exception()) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  int return_bci = first_opcode(method, (unsigned char)Bytecodes::_ireturn);
++  int unused_virtual_bci = -1;
++  int unused_safe_div_bci = -1;
++  int unused_safe_div_handler_bci = -1;
++  int unused_alloc_bci = -1;
++  int unused_init_bci = -1;
++  int unused_dispatch_bci = -1;
++  int unused_throw_invoke_bci = -1;
++  int unused_throw_handler_bci = -1;
++  LinkedMethodKind kind = verify_linked_method(
++      method, &unused_virtual_bci, &unused_safe_div_bci,
++      &unused_safe_div_handler_bci, &return_bci, &unused_alloc_bci,
++      &unused_init_bci, &unused_dispatch_bci, &unused_throw_invoke_bci,
++      &unused_throw_handler_bci);
++  bool primitive = kind == LinkedBenchPrimCandidateMethod
++      || kind == LinkedBenchPrimReferenceMethod;
++  bool dispatch = kind == LinkedBenchDispatchCandidateMethod
++      || kind == LinkedBenchDispatchReferenceMethod;
++  bool store = kind == LinkedBenchStoreCandidateMethod
++      || kind == LinkedBenchStoreReferenceMethod;
++  bool div = kind == LinkedBenchDivCandidateMethod
++      || kind == LinkedBenchDivReferenceMethod;
++  bool throwing = kind == LinkedBenchThrowCandidateMethod
++      || kind == LinkedBenchThrowReferenceMethod;
++  if ((!primitive && !dispatch && !store && !div && !throwing)
++      || return_bci < 0 || locals == nullptr) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_benchmark_module_id < 0 && !install_benchmark_module(method)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_REJECT reason=module-install-or-metadata");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  const uint64_t sequence = ++_benchmark_sequence;
++  jlong raw;
++  jlong wasm_elapsed_ns = 0;
++  const char* lane;
++  jint n;
++  if (primitive) {
++    n = (jint)locals[0];
++    jint base = (jint)locals[-1];
++    int slot = kind == LinkedBenchPrimCandidateMethod ? 0 : 1;
++    lane = kind == LinkedBenchPrimCandidateMethod ? "primitive-candidate"
++                                                   : "primitive-reference";
++    raw = benchmark_timed_call2(_benchmark_slots[slot], n, base,
++                                &wasm_elapsed_ns);
++  } else if (store) {
++    n = (jint)locals[0];
++    oop box = cast_to_oop((void*)locals[-1]);
++    oop child_a = cast_to_oop((void*)locals[-2]);
++    oop child_b = cast_to_oop((void*)locals[-3]);
++    LinkedOopLayout layout;
++    int card_after_clean = -1;
++    if (box == nullptr || child_a == nullptr || child_b == nullptr
++        || !linked_oop_layout_for(box, &layout)
++        || !linked_reset_store_state(layout, box, &card_after_clean)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    int slot = kind == LinkedBenchStoreCandidateMethod ? 4 : 5;
++    lane = kind == LinkedBenchStoreCandidateMethod ? "store-candidate"
++                                                   : "store-reference";
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_STORE_RESET lane=%s reset-excluded=1 "
++                    "field-null=1 card-before-clean=%d field-offset=%d",
++                    lane, card_after_clean, layout.child_offset);
++    }
++    raw = benchmark_timed_call4(_benchmark_slots[slot], n,
++                                (jint)(intptr_t)box,
++                                (jint)(intptr_t)child_a,
++                                (jint)(intptr_t)child_b, &wasm_elapsed_ns);
++    oop expected_child = n > 0 && ((n - 1) & 1) != 0 ? child_b : child_a;
++    oop actual_child = box->obj_field(layout.child_offset);
++    int final_tag = actual_child == nullptr ? -1
++        : actual_child->int_field(layout.tag_offset);
++    CardTable::CardValue* final_card = linked_card_for(layout, box);
++    int card_after_dirty = final_card == nullptr ? -1 : (int)*final_card;
++    bool child_match = actual_child == expected_child;
++    bool post_ok = child_match && actual_child != nullptr
++        && final_tag == expected_child->int_field(layout.tag_offset)
++        && card_after_dirty == layout.dirty_card;
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_STORE_POST lane=%s child-match=%d final-tag=%d "
++                    "card-after-dirty=%d expected-dirty=%d field-offset=%d",
++                    lane, child_match ? 1 : 0, final_tag, card_after_dirty,
++                    layout.dirty_card, layout.child_offset);
++    }
++    if (!post_ok) {
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbp] BENCH_REJECT subreason=store-post-state lane=%s",
++                      lane);
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++  } else if (div || throwing) {
++    n = (jint)locals[0];
++    jint base = (jint)locals[-1];
++    bool is_div = div;
++    int slot = is_div
++        ? (kind == LinkedBenchDivCandidateMethod ? 6 : 7)
++        : (kind == LinkedBenchThrowCandidateMethod ? 8 : 9);
++    lane = is_div
++        ? (kind == LinkedBenchDivCandidateMethod ? "div-candidate" : "div-reference")
++        : (kind == LinkedBenchThrowCandidateMethod ? "throw-candidate" : "throw-reference");
++    raw = benchmark_timed_call2(_benchmark_slots[slot], n, base,
++                                &wasm_elapsed_ns);
++  } else {
++    oop receiver_a = cast_to_oop((void*)locals[0]);
++    oop receiver_b = cast_to_oop((void*)locals[-1]);
++    n = (jint)locals[-2];
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_DISPATCH_ADAPTER locals0=%p locals-1=%p "
++                    "locals-2=%d receiver-a-klass=%p receiver-b-klass=%p",
++                    (void*)receiver_a, (void*)receiver_b, n,
++                    receiver_a == nullptr ? nullptr : (void*)receiver_a->klass(),
++                    receiver_b == nullptr ? nullptr : (void*)receiver_b->klass());
++    }
++    if (receiver_a == nullptr || receiver_b == nullptr
++        || receiver_a->klass() == nullptr || receiver_b->klass() == nullptr) {
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbp] BENCH_REJECT lane=dispatch reason=null-receiver");
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++    Method* dispatch_method = linked_group_method(
++        method, "dispatch", "(LZeroBaselineFixture$Base;I)I");
++    int dispatch_bci = dispatch_method == nullptr
++        ? -1 : first_opcode(dispatch_method,
++                            (unsigned char)Bytecodes::_invokevirtual);
++    InstanceKlass* expected_klass = nullptr;
++    Method* target_method = nullptr;
++    int table_index = -1;
++    if (dispatch_method == nullptr || dispatch_bci != 2
++        || !linked_dispatch_metadata(dispatch_method, dispatch_bci,
++                                     &expected_klass, &target_method,
++                                     &table_index)
++        || expected_klass == nullptr || target_method == nullptr
++        || receiver_a->klass() != expected_klass
++        || receiver_b->klass() != expected_klass) {
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbp] BENCH_REJECT lane=dispatch reason=exact-class "
++                      "method=%p bci=%d expected=%p a=%p b=%p target=%p table-index=%d",
++                      (void*)dispatch_method, dispatch_bci, (void*)expected_klass,
++                      receiver_a == nullptr ? nullptr : (void*)receiver_a->klass(),
++                      receiver_b == nullptr ? nullptr : (void*)receiver_b->klass(),
++                      (void*)target_method, table_index);
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++    int slot = kind == LinkedBenchDispatchCandidateMethod ? 2 : 3;
++    lane = kind == LinkedBenchDispatchCandidateMethod ? "dispatch-candidate"
++                                                       : "dispatch-reference";
++    raw = benchmark_timed_call4(_benchmark_slots[slot], n,
++                                (jint)(intptr_t)receiver_a,
++                                (jint)(intptr_t)receiver_b,
++                                (jint)(intptr_t)expected_klass,
++                                &wasm_elapsed_ns);
++  }
++  if (wasm_elapsed_ns <= 0) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp] BENCH_REJECT subreason=non-positive-wasm-elapsed "
++                    "lane=%s elapsed-ns=%lld", lane,
++                    (long long)wasm_elapsed_ns);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  jint result = (jint)(uint32_t)raw;
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp] BENCH_WASM_ELAPSED lane=%s n=%d seq=%llu "
++                  "elapsed-ns=%lld checksum=%lld", lane, n,
++                  (unsigned long long)sequence, (long long)wasm_elapsed_ns,
++                  (long long)raw);
++    tty->print_cr("[zbp] BENCH_ENTRY lane=%s n=%d table-call=1 "
++                  "loops-in-wasm=1 direct-internal=1 checksum=%lld",
++                  lane, n, (long long)raw);
++  }
++  if (!linked_validate_pre_push(istate, *tos, 1)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  push_int(tos, result);
++  if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  return ZeroWasmBaseline::Returned;
++}
++
+ static ZeroWasmBaseline::Result run_linked_group(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -1944,6 +2822,7 @@ static ZeroWasmBaseline::Result run_linked_group(
+           || actual_layout.tag_offset != oop_layout.tag_offset
+           || actual_layout.card_base != oop_layout.card_base
+           || actual_layout.card_shift != oop_layout.card_shift
++          || actual_layout.clean_card != oop_layout.clean_card
+           || actual_layout.dirty_card != oop_layout.dirty_card) {
+         return ZeroWasmBaseline::NotRun;
+       }
+@@ -2137,6 +3016,11 @@ static ZeroWasmBaseline::Result run_linked_group(
+ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
++  if (UseZeroWasmLinkedBenchmark) {
++    Result benchmark = run_linked_benchmark(method, locals, code_base, pc,
++                                             tos, istate);
++    if (benchmark != NotRun) return benchmark;
++  }
+   if (UseZeroWasmLinkedGroup) {
+     return run_linked_group(method, locals, code_base, pc, tos, istate);
+   }
+

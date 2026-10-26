@@ -1,0 +1,247 @@
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index ca17f17..e95d620 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -552,6 +552,63 @@ static bool alloc_caller_target_is(Method* method) {
+       && signature->equals("(LZeroBaselineFixture$Box;I)I");
+ }
+ 
++static bool invokestatic_target_is(Method* method, int invoke_bci,
++                                   const char* expected_owner,
++                                   const char* expected_name,
++                                   const char* expected_signature) {
++  const unsigned char* code = method->code_base();
++  if (invoke_bci < 0 || invoke_bci + 3 >= method->code_size()
++      || code[invoke_bci] != (unsigned char)Bytecodes::_invokestatic) {
++    return false;
++  }
++  int index = Bytes::get_native_u2((address)(code + invoke_bci + 1));
++  ConstantPool* constants = method->constants();
++  if (index < 0 || index >= constants->resolved_method_entries_length()) {
++    return false;
++  }
++  Symbol* owner = constants->klass_ref_at_noresolve(index, Bytecodes::_invokestatic);
++  Symbol* name = constants->name_ref_at(index, Bytecodes::_invokestatic);
++  Symbol* signature = constants->signature_ref_at(index, Bytecodes::_invokestatic);
++  return owner != nullptr && name != nullptr && signature != nullptr
++      && owner->equals(expected_owner) && name->equals(expected_name)
++      && signature->equals(expected_signature);
++}
++
++static InstanceKlass* linked_invokestatic_target_klass(Method* method,
++                                                        int invoke_bci,
++                                                        const char* owner_name,
++                                                        const char* target_name,
++                                                        const char* target_signature) {
++  if (!invokestatic_target_is(method, invoke_bci, owner_name, target_name,
++                              target_signature)) return nullptr;
++  const unsigned char* code = method->code_base();
++  int index = Bytes::get_native_u2((address)(code + invoke_bci + 1));
++  Symbol* owner = method->constants()->klass_ref_at_noresolve(
++      index, Bytecodes::_invokestatic);
++  JavaThread* current = JavaThread::current();
++  Handle loader(current, method->method_holder()->class_loader());
++  // Resolve/load metadata without invoking class initialization. The
++  // interpreter remains the only owner of the initialization barrier.
++  Klass* klass = SystemDictionary::resolve_or_null(owner, loader, current);
++  if (klass == nullptr || current->has_pending_exception()
++      || !klass->is_instance_klass()) return nullptr;
++  return InstanceKlass::cast(klass);
++}
++
++static bool init_caller_shape(Method* method) {
++  const unsigned char* code = method->code_base();
++  return method->code_size() == 10
++      && code[0] == 0x1a && code[1] == 0x9a
++      && code[2] == 0x00 && code[3] == 0x05
++      && code[4] == 0x03 && code[5] == 0xac
++      && code[6] == 0xb8 && code[9] == 0xac;
++}
++
++static bool fail_caller_shape(Method* method) {
++  const unsigned char* code = method->code_base();
++  return method->code_size() == 4 && code[0] == 0xb8 && code[3] == 0xac;
++}
++
+ static bool virtual_code_is(Method* method) {
+   // The constant-pool index varies with javac's pool layout; the invoke
+   // opcode, count, zero byte, and return shape are the verified contract.
+@@ -941,7 +998,9 @@ enum LinkedMethodKind {
+   LinkedSafeDivMethod,
+   LinkedStoreChildMethod,
+   LinkedStoreChildCallerMethod,
+-  LinkedAllocCallerMethod
++  LinkedAllocCallerMethod,
++  LinkedInitCallerMethod,
++  LinkedFailCallerMethod
+ };
+ 
+ static int first_opcode(Method* method, unsigned char opcode) {
+@@ -968,7 +1027,8 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* virtual_bci,
+                                              int* safe_div_bci,
+                                              int* return_bci,
+-                                             int* alloc_bci) {
++                                             int* alloc_bci,
++                                             int* init_bci) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -1021,6 +1081,22 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     *return_bci = first_opcode(method, 0xac);
+     return *alloc_bci == 2 ? LinkedAllocCallerMethod : LinkedNoMethod;
+   }
++  if (static_int(method, "initCaller", "(Z)I")
++      && init_caller_shape(method)
++      && invokestatic_target_is(method, 6, "ZeroBaselineFixture$InitOK",
++                                "leaf", "()I")) {
++    *init_bci = 6;
++    *return_bci = 9;
++    return LinkedInitCallerMethod;
++  }
++  if (static_int(method, "failCaller", "()I")
++      && fail_caller_shape(method)
++      && invokestatic_target_is(method, 0, "ZeroBaselineFixture$InitFail",
++                                "leaf", "()I")) {
++    *init_bci = 0;
++    *return_bci = 3;
++    return LinkedFailCallerMethod;
++  }
+   return LinkedNoMethod;
+ }
+ 
+@@ -1077,9 +1153,10 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+                                  address* pc, address resume_pc, int depth) {
+   // push_int/push_oop already moved the downward-growing TOS. Validate the
+   // resulting pointer against the same invariant used by the interpreter;
+-  // subtracting depth again would reject a valid max_stack boundary.
++  // subtracting depth again would reject a valid max_stack boundary. A zero
++  // depth is valid for an invokestatic with no arguments.
+   bool valid = istate != nullptr && *tos != nullptr && resume_pc != nullptr
+-      && depth > 0 && *tos >= istate->stack_limit()
++      && depth >= 0 && *tos >= istate->stack_limit()
+       && *tos < istate->stack_base();
+   if (valid) {
+     // The post-push TOS must still describe a pre-push pointer strictly below
+@@ -1126,7 +1203,8 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "storeChild(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I|"
+       "storeChildCaller(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I;"
+       "allocLeaf(LZeroBaselineFixture$Box;I)I|"
+-      "allocCaller(LZeroBaselineFixture$Box;I)I;"
++      "allocCaller(LZeroBaselineFixture$Box;I)I|"
++      "initCaller(Z)I|failCaller()I;"
+       "virtual-bci=%d;safe-div-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+       "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;"
+       "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+@@ -1163,10 +1241,11 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int virtual_bci = -1;
+   int safe_div_bci = -1;
+   int alloc_bci = -1;
++  int init_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci, &return_bci,
+-                                                &alloc_bci);
++                                                &alloc_bci, &init_bci);
+   LinkedOopLayout oop_layout;
+   const LinkedOopLayout* install_oop_layout = nullptr;
+   if (kind != LinkedNoMethod) {
+@@ -1180,10 +1259,20 @@ static ZeroWasmBaseline::Result run_linked_group(
+   }
+   if (ZeroWasmLinkedGroupVerbose && fixture_class(method)
+       && _linked_entry_diagnostics < 16) {
+-    tty->print_cr("[zbg] ENTRY method=%s kind=%d locals0=%d locals-1=%d",
+-                  method->name()->as_C_string(), (int)kind,
+-                  locals == nullptr ? 0 : (jint)locals[0],
+-                  locals == nullptr ? 0 : (jint)locals[-1]);
++    // Diagnostics must respect the interpreter's local layout.  In
++    // particular, a zero-argument static method has no locals[0], and there
++    // is never a valid locals[-1] slot to inspect for a synthetic receiver.
++    int parameter_count = method->size_of_parameters();
++    bool has_arg0 = locals != nullptr && parameter_count > 0;
++    if (has_arg0) {
++      tty->print_cr("[zbg] ENTRY method=%s kind=%d params=%d static=%d arg0=%d",
++                    method->name()->as_C_string(), (int)kind, parameter_count,
++                    method->is_static() ? 1 : 0, (jint)locals[0]);
++    } else {
++      tty->print_cr("[zbg] ENTRY method=%s kind=%d params=%d static=%d arg0=na",
++                    method->name()->as_C_string(), (int)kind, parameter_count,
++                    method->is_static() ? 1 : 0);
++    }
+     _linked_entry_diagnostics++;
+   }
+   if (kind == LinkedNoMethod) {
+@@ -1363,6 +1452,72 @@ static ZeroWasmBaseline::Result run_linked_group(
+       }
+       return ZeroWasmBaseline::InvokeResume;
+     }
++    case LinkedInitCallerMethod: {
++      InstanceKlass* target = linked_invokestatic_target_klass(
++          method, init_bci, "ZeroBaselineFixture$InitOK", "leaf", "()I");
++      if (target == nullptr) return ZeroWasmBaseline::NotRun;
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] INIT_STATE initCaller initialized=%d error=%d trigger=%d",
++                      target->is_initialized() ? 1 : 0,
++                      target->is_in_error_state() ? 1 : 0,
++                      (jint)locals[0]);
++      }
++      if (!target->is_initialized() && !target->is_in_error_state()) {
++        if ((jint)locals[0] == 0) {
++          if (!linked_validate_pre_push(istate, *tos, 1)) {
++            return ZeroWasmBaseline::NotRun;
++          }
++          push_int(tos, 0);
++          if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++            return ZeroWasmBaseline::NotRun;
++          }
++          if (ZeroWasmLinkedGroupVerbose) {
++            tty->print_cr("[zbg] INIT_DIRECT initCaller trigger=0 initialized=0");
++          }
++          _linked_returned++;
++          return ZeroWasmBaseline::Returned;
++        }
++        if (!linked_prepare_state(istate, tos, pc, code_base + init_bci, 0)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] INIT_BAIL initCaller->InitOK.leaf "
++                        "reason=class-init resume-bci=%d depth=0 sp-offset=%ld "
++                        "pending=0", init_bci,
++                        (long)(istate->stack_base() - istate->stack()));
++        }
++        return ZeroWasmBaseline::InvokeResume;
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] INIT_INTERPRETER initCaller initialized=%d "
++                      "reason=class-init-safe", target->is_initialized() ? 1 : 0);
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++    case LinkedFailCallerMethod: {
++      InstanceKlass* target = linked_invokestatic_target_klass(
++          method, init_bci, "ZeroBaselineFixture$InitFail", "leaf", "()I");
++      if (target == nullptr) return ZeroWasmBaseline::NotRun;
++      if (!target->is_initialized() && !target->is_in_error_state()) {
++        if (!linked_prepare_state(istate, tos, pc, code_base + init_bci, 0)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] INIT_FAIL_BAIL failCaller->InitFail.leaf "
++                        "reason=class-init resume-bci=%d depth=0 pending=0",
++                        init_bci);
++        }
++        // BCI zero is the method entry itself. Return NotRun so the current
++        // interpreter dispatch reaches invokestatic without re-entering this
++        // linked hook at the same code_base address.
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] INIT_FAIL_INTERPRETER failCaller state=%s",
++                      target->is_in_error_state() ? "error" : "initialized");
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
+     default:
+       return ZeroWasmBaseline::NotRun;
+   }
+

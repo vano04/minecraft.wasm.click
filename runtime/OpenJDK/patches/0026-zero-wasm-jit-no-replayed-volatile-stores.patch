@@ -1,0 +1,39 @@
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+@@ -5957,6 +5957,6 @@ bool Codegen::emit_range(Method* m, address code, int start, int end,
+           // A volatile (atomic) store is visible to other threads at once: one
+           // that a retry put back could be seen as new, old, new.
+-          if ((_frameless && (!fl_stores_ok() || (sop & ATOMIC) != 0)) || _undo_n >= MAX_UNDO
++          if ((_frameless && !fl_stores_ok()) || (sop & ATOMIC) != 0 || _undo_n >= MAX_UNDO
+               || _next_local + 3 > LOCALS_SOFT_LIMIT) {
+             emit_bail(bci, depth); return true;
+           }
+@@ -6251,6 +6251,10 @@ bool Codegen::emit_range(Method* m, address code, int start, int end,
+       case Bytecodes::_putstatic: {
+         address handle; int off, kind, lop, sop, align;
++        // Static stores have no undo entry when a splice rewinds.
++        if (_frameless || (_local_base >= 0 && _inl_bail_bci >= 0)) {
++          emit_bail(bci, depth); return true;
++        }
+         if (!getstatic_shape(m, u2_at(code, bci + 1), Bytecodes::_putstatic,
+                              &handle, &off, &kind, &lop, &sop, &align)) {
+           emit_bail(bci, depth); return true;
+         }
+@@ -7804,6 +7808,9 @@ bool Codegen::inline_cfg(Method* callee, int nest,
+         if (depth < 0) return false;
+         break;
+       }
++      // A splice cannot replay a static store after a later guard.
++      case Bytecodes::_putstatic:
++        return false;
+       // A field store: allowed in an ordinary body's splice, where the undo
+       // log (_undo) takes it back if a later guard rewinds the call; and in a
+       // frameless body under ZeroWasmJITFramelessStores, whose callers are
+@@ -7822,5 +7829,5 @@ bool Codegen::inline_cfg(Method* callee, int nest,
+             || !field_shape(callee, u2_at(code, bci + 1), Bytecodes::_putfield, slow_form,
+                             &off, &kind, &lop, &sop, &align, &is_oop)
+-            || (_frameless && (sop & ATOMIC) != 0)
++            || (sop & ATOMIC) != 0
+             || (is_oop && (!_can_store_oop || disabled(NO_OOPSTORE)))) {
+           COLD_OR_FAIL();

@@ -1,0 +1,2493 @@
+Source archive entries: com/ibm/icu/impl/OlsonTimeZone.java
+/*
+  *******************************************************************************
+  * Copyright (C) 2005-2016, International Business Machines Corporation and
+  * others. All Rights Reserved.
+  *******************************************************************************
+  */
+
+Source archive entries: com/ibm/icu/text/DateFormat.java, com/ibm/icu/util/Calendar.java
+/*
+ *   Copyright (C) 1996-2016, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ */
+
+Source archive entries: com/ibm/icu/util/STZInfo.java
+/*
+ *   Copyright (C) 2005-2010, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUResourceBundle.java
+/*
+ * *****************************************************************************
+ * Copyright (C) 2005-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ * *****************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/TextTrieMap.java
+/*
+ * ********************************************************************************
+ * Copyright (C) 2007-2011, International Business Machines Corporation and others.
+ * All Rights Reserved.
+ * ********************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/TimeZone.java
+/*
+ * @(#)TimeZone.java    1.51 00/01/19
+ *
+ * Copyright (C) 1996-2016, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ */
+
+Source archive entries: com/ibm/icu/text/UnicodeNameTransliterator.java
+/*
+ * Copyright (C) 1996-2010, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ */
+
+Source archive entries: com/ibm/icu/text/TitlecaseTransliterator.java
+/*
+ * Copyright (C) 1996-2011, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *
+ */
+
+Source archive entries: com/ibm/icu/text/NameUnicodeTransliterator.java
+/*
+ * Copyright (C) 1996-2011, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ */
+
+Source archive entries: com/ibm/icu/util/GregorianCalendar.java
+/*
+ * Copyright (C) 1996-2016, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ */
+
+Source archive entries: com/ibm/icu/text/NormalizationTransliterator.java
+/*
+ **********************************************************************
+ *   Copyright (C) 2001-2014, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ **********************************************************************
+ *   Date        Name        Description
+ *   06/08/01    aliu        Creation.
+ **********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Row.java
+/*
+ **********************************************************************
+ * Copyright (c) 2002-2014, Google, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ **********************************************************************
+ * Author: Mark Davis
+ **********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UPropertyAliases.java
+/*
+ **********************************************************************
+ * Copyright (c) 2002-2015, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ **********************************************************************
+ * Author: Alan Liu
+ * Created: November 5 2002
+ * Since: ICU 2.4
+ * 2010nov19 Markus Scherer  Rewrite for formatVersion 2.
+ **********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Relation.java
+/*
+ **********************************************************************
+ * Copyright (c) 2002-2015, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ **********************************************************************
+ * Author: Mark Davis
+ **********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/TimeZoneAdapter.java
+/*
+ **********************************************************************
+ * Copyright (c) 2003-2010, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ **********************************************************************
+ * Author: Alan Liu
+ * Created: October 2 2003
+ * Since: ICU 2.8
+ **********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/MeasureFormat.java
+/*
+ **********************************************************************
+ * Copyright (c) 2004-2016, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ **********************************************************************
+ * Author: Alan Liu
+ * Created: April 20, 2004
+ * Since: ICU 3.0
+ **********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/TimeUnitAmount.java
+/*
+ **************************************************************************
+ * Copyright (C) 2008-2009, Google, International Business Machines
+ * Corporation and others. All Rights Reserved.
+ **************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/TimeUnitFormat.java, com/ibm/icu/util/TimeUnit.java
+/*
+ **************************************************************************
+ * Copyright (C) 2008-2014, Google, International Business Machines
+ * Corporation and others. All Rights Reserved.
+ **************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/SpoofChecker.java
+/*
+ ***************************************************************************
+ * Copyright (C) 2008-2016 International Business Machines Corporation
+ * and others. All Rights Reserved.
+ ***************************************************************************
+ *
+ * Unicode Spoof Detection
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUCache.java
+/*
+ ***************************************************************************
+ * Copyright (c) 2007-2009 International Business Machines Corporation and *
+ * others.  All rights reserved.                                           *
+ ***************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CharsetRecog_mbcs.java
+/*
+ ****************************************************************************
+ * Copyright (C) 2005-2012, International Business Machines Corporation and *
+ * others. All Rights Reserved.                                             *
+ ****************************************************************************
+ *
+ */
+
+Source archive entries: com/ibm/icu/text/CharsetRecog_sbcs.java
+/*
+ ****************************************************************************
+ * Copyright (C) 2005-2013, International Business Machines Corporation and *
+ * others. All Rights Reserved.                                             *
+ ************************************************************************** *
+ *
+ */
+
+Source archive entries: com/ibm/icu/impl/SimpleCache.java
+/*
+ ****************************************************************************
+ * Copyright (c) 2007-2015 International Business Machines Corporation and  *
+ * others.  All rights reserved.                                            *
+ ****************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/BMPSet.java, com/ibm/icu/impl/UnicodeSetStringSpan.java
+/*
+ ******************************************************************************
+ *
+ *   Copyright (C) 2009-2015, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/LocaleUtility.java
+/*
+ ******************************************************************************
+ * Copyright (C) 1996-2007, International Business Machines Corporation and   *
+ * others. All Rights Reserved.                                               *
+ ******************************************************************************
+ *
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/PVecToTrieCompactHandler.java
+/*
+ ******************************************************************************
+ * Copyright (C) 1996-2009, International Business Machines Corporation and   *
+ * others. All Rights Reserved.                                               *
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/PropsVectors.java
+/*
+ ******************************************************************************
+ * Copyright (C) 1996-2011, International Business Machines Corporation and   *
+ * others. All Rights Reserved.                                               *
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CharTrie.java, com/ibm/icu/impl/IntTrie.java, com/ibm/icu/impl/Trie.java
+/*
+ ******************************************************************************
+ * Copyright (C) 1996-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/StringPrepDataReader.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2003-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ******************************************************************************
+ *
+ * Created on May 2, 2003
+ *
+ * To change the template for this generated file go to
+ * Window>Preferences>Java>Code Generation>Code and Comments
+ */
+
+Source archive entries: com/ibm/icu/util/ULocale.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2003-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/URLHandler.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2005-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/Freezable.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2005-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                               *
+ ******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/PeriodFormatterService.java, com/ibm/icu/impl/duration/impl/DataRecord.java, com/ibm/icu/impl/duration/impl/PeriodFormatterDataService.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2007-2009, International Business Machines Corporation and   *
+ * others. All Rights Reserved.                                               *
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/duration/BasicPeriodFormatterService.java, com/ibm/icu/impl/duration/impl/XMLRecordWriter.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2007-2010, International Business Machines Corporation and   *
+ * others. All Rights Reserved.                                               *
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/duration/impl/ResourceBasedPeriodFormatterDataService.java
+/*
+ ******************************************************************************
+ * Copyright (C) 2007-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/lang/UScriptRun.java
+/*
+ *******************************************************************************
+ *
+ *   Copyright (C) 1999-2014, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UBiDiProps.java
+/*
+ *******************************************************************************
+ *
+ *   Copyright (C) 2004-2015, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *
+ *******************************************************************************
+ *   file name:  UBiDiProps.java
+ *   encoding:   US-ASCII
+ *   tab size:   8 (not used)
+ *   indentation:4
+ *
+ *   created on: 2005jan16
+ *   created by: Markus W. Scherer
+ *
+ *   Low-level Unicode bidi/shaping properties access.
+ *   Java port of ubidi_props.h/.c.
+ */
+
+Source archive entries: com/ibm/icu/impl/UCaseProps.java
+/*
+ *******************************************************************************
+ *
+ *   Copyright (C) 2004-2015, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *
+ *******************************************************************************
+ *   file name:  UCaseProps.java
+ *   encoding:   US-ASCII
+ *   tab size:   8 (not used)
+ *   indentation:4
+ *
+ *   created on: 2005jan29
+ *   created by: Markus W. Scherer
+ *
+ *   Low-level Unicode character/string case mapping code.
+ *   Java port of ucase.h/.c.
+ */
+
+Source archive entries: com/ibm/icu/text/ArabicShapingException.java
+/*
+ *******************************************************************************
+ *   Copyright (C) 2001-2008, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/USerializedSet.java
+/*
+ *******************************************************************************
+ *   Copyright (C) 2002-2010, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/DateInterval.java
+/*
+ *******************************************************************************
+ *   Copyright (C) 2008-2009, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Normalizer2Impl.java
+/*
+ *******************************************************************************
+ *   Copyright (C) 2009-2015, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Norm2AllModes.java, com/ibm/icu/text/Normalizer2.java
+/*
+ *******************************************************************************
+ *   Copyright (C) 2009-2016, International Business Machines
+ *   Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/data/HolidayBundle.java, com/ibm/icu/impl/data/HolidayBundle_da.java, com/ibm/icu/impl/data/HolidayBundle_de.java, com/ibm/icu/impl/data/HolidayBundle_el.java, com/ibm/icu/impl/data/HolidayBundle_en.java, com/ibm/icu/impl/data/HolidayBundle_es.java, com/ibm/icu/impl/data/HolidayBundle_fr.java, com/ibm/icu/impl/data/HolidayBundle_it.java, com/ibm/icu/impl/data/HolidayBundle_iw.java, com/ibm/icu/text/SymbolTable.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2005, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/SCSU.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2007, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/StringTransform.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2009, Google, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CharacterIteratorWrapper.java, com/ibm/icu/impl/UCharacterIteratorWrapper.java, com/ibm/icu/impl/data/HolidayBundle_da_DK.java, com/ibm/icu/impl/data/HolidayBundle_de_AT.java, com/ibm/icu/impl/data/HolidayBundle_de_DE.java, com/ibm/icu/impl/data/HolidayBundle_el_GR.java, com/ibm/icu/impl/data/HolidayBundle_en_CA.java, com/ibm/icu/impl/data/HolidayBundle_en_GB.java, com/ibm/icu/impl/data/HolidayBundle_en_US.java, com/ibm/icu/impl/data/HolidayBundle_es_MX.java, com/ibm/icu/impl/data/HolidayBundle_fr_CA.java, com/ibm/icu/impl/data/HolidayBundle_fr_FR.java, com/ibm/icu/impl/data/HolidayBundle_it_IT.java, com/ibm/icu/impl/data/HolidayBundle_iw_IL.java, com/ibm/icu/impl/data/HolidayBundle_ja_JP.java, com/ibm/icu/text/CompoundTransliterator.java, com/ibm/icu/text/NullTransliterator.java, com/ibm/icu/text/TransliterationRule.java, com/ibm/icu/text/TransliterationRuleSet.java, com/ibm/icu/util/DateRule.java, com/ibm/icu/util/HebrewHoliday.java, com/ibm/icu/util/RangeDateRule.java, com/ibm/icu/util/SimpleDateRule.java, com/ibm/icu/util/TaiwanCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2010, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CalendarAstronomer.java, com/ibm/icu/impl/CalendarCache.java, com/ibm/icu/text/LowercaseTransliterator.java, com/ibm/icu/text/UppercaseTransliterator.java, com/ibm/icu/util/Holiday.java, com/ibm/icu/util/IndianCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2011, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UnicodeMapIterator.java, com/ibm/icu/util/BuddhistCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2012, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/CharsetRecog_Unicode.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2013, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ *
+ */
+
+Source archive entries: com/ibm/icu/impl/UCharacterName.java, com/ibm/icu/text/BreakTransliterator.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/CanonicalIterator.java, com/ibm/icu/text/ComposedCharIter.java, com/ibm/icu/text/RemoveTransliterator.java, com/ibm/icu/text/StringCharacterIterator.java, com/ibm/icu/text/UnicodeSetIterator.java, com/ibm/icu/util/CompactByteArray.java, com/ibm/icu/util/CompactCharArray.java, com/ibm/icu/util/EasterHoliday.java, com/ibm/icu/util/JapaneseCalendar.java, com/ibm/icu/util/PersianCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/StringRange.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2015, Google, Inc., International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/coll/CollationCompare.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2015, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+ * CollationCompare.java, ported from collationcompare.h/.cpp
+ *
+ * C++ version created on: 2012feb14 with new and old collation code
+ * created by: Markus W. Scherer
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUBinary.java, com/ibm/icu/impl/RBBIDataWrapper.java, com/ibm/icu/impl/ReplaceableUCharacterIterator.java, com/ibm/icu/impl/UCharacterNameReader.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Utility.java, com/ibm/icu/text/NFRule.java, com/ibm/icu/text/NFRuleSet.java, com/ibm/icu/text/NFSubstitution.java, com/ibm/icu/text/SearchIterator.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2015, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/CompactDecimalFormat.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2016, Google, International Business Machines Corporation and
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UCharacterProperty.java, com/ibm/icu/text/DateFormatSymbols.java, com/ibm/icu/text/DecimalFormatSymbols.java, com/ibm/icu/text/NumberFormat.java, com/ibm/icu/text/RuleBasedNumberFormat.java, com/ibm/icu/text/SimpleDateFormat.java, com/ibm/icu/text/StringSearch.java, com/ibm/icu/text/Transliterator.java, com/ibm/icu/text/UCharacterIterator.java, com/ibm/icu/text/UnicodeSet.java, com/ibm/icu/util/HebrewCalendar.java, com/ibm/icu/util/VersionInfo.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UnicodeMap.java, com/ibm/icu/text/BreakIterator.java, com/ibm/icu/text/Replaceable.java, com/ibm/icu/text/ReplaceableString.java, com/ibm/icu/text/RuleBasedTransliterator.java, com/ibm/icu/text/UForwardCharacterIterator.java, com/ibm/icu/text/UnicodeCompressor.java, com/ibm/icu/text/UnicodeDecompressor.java, com/ibm/icu/text/UnicodeFilter.java, com/ibm/icu/util/IslamicCalendar.java, com/ibm/icu/util/SimpleHoliday.java
+/*
+ *******************************************************************************
+ * Copyright (C) 1996-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/BidiClassifier.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2000-2009, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/Normalizer.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2000-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/StringMatcher.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2001-2004, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/Quantifier.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2001-2011, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/UnicodeMatcher.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2001-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UtilityExtensions.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2002-2010, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/BreakIteratorFactory.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2002-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/NumberFormatServiceShim.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2003-2011, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Punycode.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2003-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/StringPrepParseException.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2003-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/StringPrep.java, com/ibm/icu/text/UFormat.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2003-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/IDNA.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2003-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/RBBIRuleScanner.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2003-2016, International Business Machines Corporation and others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/RBNFChinesePostProcessor.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2009, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/RBNFPostProcessor.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2010, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUData.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ *
+ * Created on Feb 4, 2004
+ *
+ */
+
+Source archive entries: com/ibm/icu/util/GlobalizationPreferences.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/MeasureUnit.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2016, Google Inc, International Business Machines
+ * Corporation and others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUResourceBundleImpl.java, com/ibm/icu/impl/ICUResourceBundleReader.java, com/ibm/icu/util/UResourceBundle.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/SelectFormat.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2004-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ * Copyright (C) 2009 , Yahoo! Inc.                                            *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/CECalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2005-2011, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/RuleBasedBreakIterator.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2005-2016 International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/EthiopicCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2005-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/CopticCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2005-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/PatternTokenizer.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2006-2009, Google, International Business Machines Corporation *
+ * and others. All Rights Reserved.                                            *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/InitialTimeZoneRule.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2008, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/AnnualTimeZoneRule.java, com/ibm/icu/util/DateTimeRule.java, com/ibm/icu/util/TimeArrayTimeZoneRule.java, com/ibm/icu/util/TimeZoneTransition.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2010, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/duration/BasicDurationFormat.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2013, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/BasicTimeZone.java, com/ibm/icu/util/RuleBasedTimeZone.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/DurationFormat.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/VTimeZone.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2015, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/RelativeDateFormat.java, com/ibm/icu/text/PluralFormat.java, com/ibm/icu/text/PluralRules.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/TimeZoneRule.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2007-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/JavaTimeZone.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2008-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUConfig.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2008-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/AlphabeticIndex.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2008-2016, Google Inc, International Business Machines Corporation
+ * and others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/PluralRulesLoader.java, com/ibm/icu/text/DateIntervalInfo.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2008-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/IllegalIcuArgumentException.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009, Google, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Trie2Writable.java, com/ibm/icu/impl/locale/LocaleSyntaxException.java, com/ibm/icu/impl/locale/StringTokenIterator.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CalendarUtil.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009,2016 International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/locale/AsciiUtil.java, com/ibm/icu/impl/locale/BaseLocale.java, com/ibm/icu/impl/locale/Extension.java, com/ibm/icu/impl/locale/InternalLocaleBuilder.java, com/ibm/icu/impl/locale/LocaleExtensions.java, com/ibm/icu/impl/locale/LocaleObjectCache.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2010, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/CaseFoldTransliterator.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2011, Google, International Business Machines Corporation
+ * and others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ImmutableEntry.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2012, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/IllformedLocaleException.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2012, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/LocaleIDs.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2013, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUResourceTableAccess.java, com/ibm/icu/impl/Trie2_16.java, com/ibm/icu/impl/Trie2_32.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/locale/UnicodeLocaleExtension.java, com/ibm/icu/text/CurrencyPluralInfo.java, com/ibm/icu/text/RbnfLenientScanner.java, com/ibm/icu/text/RbnfLenientScannerProvider.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UnicodeRegex.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2015, Google, International Business Machines Corporation
+ * and others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Trie2.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/CurrencyMetaInfo.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2015, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CurrencyData.java, com/ibm/icu/impl/ICUCurrencyDisplayInfoProvider.java, com/ibm/icu/impl/ICUCurrencyMetaInfo.java, com/ibm/icu/impl/ICULangDataTables.java, com/ibm/icu/impl/ICURegionDataTables.java, com/ibm/icu/impl/LocaleDisplayNamesImpl.java, com/ibm/icu/text/NumberingSystem.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/CurrencyDisplayNames.java, com/ibm/icu/text/LocaleDisplayNames.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2009-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/locale/ParseStatus.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2010, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/SourceTargetUtility.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2010-2011, Google, International Business Machines            *
+ * Corporation and others. All Rights Reserved.                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/locale/LanguageTag.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2010-2013, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/LocalePriorityList.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2010-2016, Google, Inc.; International Business Machines      *
+ * Corporation and others. All Rights Reserved.                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/TimeZoneNamesFactoryImpl.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2011, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/Region.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2011-2016, International Business Machines Corporation
+ * All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/TimeZoneGenericNames.java, com/ibm/icu/impl/TimeZoneNamesImpl.java, com/ibm/icu/text/TimeZoneFormat.java, com/ibm/icu/text/TimeZoneNames.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2011-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/Output.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2011-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/breakiter/DictionaryMatcher.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/DangiCalendar.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/coll/CollationKeys.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012-2015, International Business Machines
+ * Corporation and others.  All Rights Reserved.
+ *******************************************************************************
+ * CollationKeys.java, ported from collationkeys.h/.cpp
+ *
+ * C++ version created on: 2012sep02
+ * created by: Markus W. Scherer
+ */
+
+Source archive entries: com/ibm/icu/text/DisplayContext.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012-2015, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/ListFormatter.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012-2016, Google, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/breakiter/DictionaryData.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/breakiter/CjkBreakEngine.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2012-2016, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/PluralRulesSerialProxy.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2013, Google Inc, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CharacterIteration.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2013, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/UFieldPosition.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2013-2014, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/QuantityFormatter.java, com/ibm/icu/text/RelativeDateTimeFormatter.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2013-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/coll/UVector32.java, com/ibm/icu/impl/coll/UVector64.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ *
+ * created on: 2014feb10
+ * created by: Markus W. Scherer
+ */
+
+Source archive entries: com/ibm/icu/impl/Pair.java, com/ibm/icu/util/OutputInt.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/breakiter/BurmeseBreakEngine.java, com/ibm/icu/impl/breakiter/BytesDictionaryMatcher.java, com/ibm/icu/impl/breakiter/CharsDictionaryMatcher.java, com/ibm/icu/impl/breakiter/DictionaryBreakEngine.java, com/ibm/icu/impl/breakiter/KhmerBreakEngine.java, com/ibm/icu/impl/breakiter/LanguageBreakEngine.java, com/ibm/icu/impl/breakiter/LaoBreakEngine.java, com/ibm/icu/impl/breakiter/ThaiBreakEngine.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2014, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/ICUCloneNotSupportedException.java, com/ibm/icu/util/ICUException.java, com/ibm/icu/util/ICUUncheckedIOException.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2014-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/SimpleFilteredSentenceBreakIterator.java, com/ibm/icu/impl/SimpleFormatterImpl.java, com/ibm/icu/impl/TZDBTimeZoneNames.java, com/ibm/icu/impl/locale/KeyTypeData.java, com/ibm/icu/text/FilteredBreakIteratorBuilder.java, com/ibm/icu/text/ScientificNumberFormatter.java, com/ibm/icu/text/SimpleFormatter.java, com/ibm/icu/text/UnicodeSetSpanner.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2014-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ClassLoaderUtil.java, com/ibm/icu/impl/StandardPlural.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UResource.java, com/ibm/icu/impl/ValidIdentifiers.java, com/ibm/icu/impl/locale/LocaleValidityChecker.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2015-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/CacheValue.java, com/ibm/icu/impl/DayPeriodRules.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/breakiter/UnhandledBreakEngine.java
+/*
+ *******************************************************************************
+ * Copyright (C) 2016, International Business Machines Corporation and         *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/RBBIRuleParseTable.java
+/*
+ *******************************************************************************
+ * Copyright (c) 2003-2016, International Business Machines
+ * Corporation and others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/GenderInfo.java
+/*
+ ********************************************************************************
+ * Copyright (C) 2003-2016, Google, International Business Machines Corporation
+ * and others. All Rights Reserved.
+ ********************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/DateTimePatternGenerator.java
+/*
+ ********************************************************************************
+ * Copyright (C) 2006-2016, Google, International Business Machines Corporation
+ * and others. All Rights Reserved.
+ ********************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/Transform.java
+/*
+ ********************************************************************************
+ * Copyright (C) 2009-2010, Google, International Business Machines Corporation *
+ * and others. All Rights Reserved.                                             *
+ ********************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/lang/CharSequences.java
+/*
+ ********************************************************************************
+ * Copyright (C) 2010-2014, Google, International Business Machines Corporation *
+ * and others. All Rights Reserved.                                                 *
+ ********************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/UniversalTimeScale.java
+/*
+ *********************************************************************************
+ * Copyright (C) 2004-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                  *
+ *********************************************************************************
+ *
+ */
+
+Source archive entries: com/ibm/icu/impl/IterableComparator.java
+/*
+ ************************************************************************************
+ * Copyright (C) 2007-2015, Google Inc, International Business Machines Corporation
+ * and others. All Rights Reserved.
+ ************************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/LocaleData.java
+/*
+ **************************************************************************************
+ * Copyright (C) 2009-2016, International Business Machines Corporation,
+ * Google, Inc. and others. All Rights Reserved.
+ **************************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/LocaleMatcher.java
+/*
+ ****************************************************************************************
+ * Copyright (C) 2009-2016, Google, Inc.; International Business Machines Corporation
+ * and others. All Rights Reserved.
+ ****************************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/SimpleTimeZone.java
+/*
+*   Copyright (C) 1996-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*/
+
+Source archive entries: com/ibm/icu/text/DateIntervalFormat.java
+/*
+*   Copyright (C) 2008-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*/
+
+Source archive entries: com/ibm/icu/text/AnyTransliterator.java
+/*
+*****************************************************************
+* Copyright (c) 2002-2014, International Business Machines Corporation
+* and others.  All Rights Reserved.
+*****************************************************************
+* Date        Name        Description
+* 06/06/2002  aliu        Creation.
+*****************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/EscapeTransliterator.java, com/ibm/icu/text/UnescapeTransliterator.java
+/*
+**********************************************************************
+*   Copyright (c) 2001-2011, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+**********************************************************************
+*   Date        Name        Description
+*   11/19/2001  aliu        Creation.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/TransliteratorParser.java
+/*
+**********************************************************************
+*   Copyright (c) 2001-2011, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/TransliteratorRegistry.java
+/*
+**********************************************************************
+*   Copyright (c) 2001-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+**********************************************************************
+*   Date        Name        Description
+*   08/19/2001  aliu        Creation.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/UnicodeReplacer.java
+/*
+**********************************************************************
+*   Copyright (c) 2002, International Business Machines Corporation
+*   and others.  All Rights Reserved.
+**********************************************************************
+*   Date        Name        Description
+*   01/14/2002  aliu        Creation.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/StringReplacer.java
+/*
+**********************************************************************
+*   Copyright (c) 2002-2007, International Business Machines Corporation
+*   and others.  All Rights Reserved.
+**********************************************************************
+*   Date        Name        Description
+*   01/14/2002  aliu        Creation.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/FunctionReplacer.java
+/*
+**********************************************************************
+*   Copyright (c) 2002-2010, International Business Machines Corporation
+*   and others.  All Rights Reserved.
+**********************************************************************
+*   Date        Name        Description
+*   01/14/2002  aliu        Creation.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/TransliteratorIDParser.java
+/*
+**********************************************************************
+*   Copyright (c) 2002-2011, International Business Machines Corporation
+*   and others.  All Rights Reserved.
+**********************************************************************
+*   Date        Name        Description
+*   01/14/2002  aliu        Creation.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/RBBITableBuilder.java
+/*
+**********************************************************************
+*   Copyright (c) 2002-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/SortedSetRelation.java
+/*
+**********************************************************************
+* Copyright (c) 2002-2010, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: M. Davis
+* Created: December 2002 (moved from UnicodeSet)
+* Since: ICU 2.4
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/RuleCharacterIterator.java
+/*
+**********************************************************************
+* Copyright (c) 2003-2011, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: September 23 2003
+* Since: ICU 2.8
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/ZoneMeta.java
+/*
+**********************************************************************
+* Copyright (c) 2003-2016 International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: September 4 2003
+* Since: ICU 2.8
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/CurrencyAmount.java
+/*
+**********************************************************************
+* Copyright (c) 2004-2010, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: April 12, 2004
+* Since: ICU 3.0
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/Measure.java
+/*
+**********************************************************************
+* Copyright (c) 2004-2013, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: April 20, 2004
+* Since: ICU 3.0
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CurrencyFormat.java
+/*
+**********************************************************************
+* Copyright (c) 2004-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: April 20, 2004
+* Since: ICU 3.0
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/data/TokenIterator.java
+/*
+**********************************************************************
+* Copyright (c) 2004-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: March 16 2004
+* Since: ICU 3.0
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/MessageFormat.java
+/*
+**********************************************************************
+* Copyright (c) 2004-2016, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+* Author: Alan Liu
+* Created: April 6, 2004
+* Since: ICU 3.0
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/DontCareFieldPosition.java
+/*
+**********************************************************************
+* Copyright (c) 2013-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+**********************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/RBBISymbolTable.java
+/*
+***************************************************************************
+*   Copyright (C) 2002-2009 International Business Machines Corporation   *
+*   and others. All rights reserved.                                      *
+***************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/IntTrieBuilder.java, com/ibm/icu/impl/TrieBuilder.java
+/*
+******************************************************************************
+* Copyright (C) 1996-2010, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/lang/UCharacterNameIterator.java
+/*
+******************************************************************************
+* Copyright (C) 1996-2011, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/TrieIterator.java
+/*
+******************************************************************************
+* Copyright (C) 1996-2015, International Business Machines Corporation and
+* others. All Rights Reserved.
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/RangeValueIterator.java, com/ibm/icu/util/ValueIterator.java
+/*
+******************************************************************************
+* Copyright (C) 1996-2016, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/LocaleIDParser.java
+/*
+******************************************************************************
+* Copyright (C) 2003-2011, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/UResourceTypeMismatchException.java
+/*
+******************************************************************************
+* Copyright (C) 2004-2006, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/UResourceBundleIterator.java
+/*
+******************************************************************************
+* Copyright (C) 2004-2009, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/ResourceBundleWrapper.java
+/*
+******************************************************************************
+* Copyright (C) 2004-2016, International Business Machines Corporation and
+* others. All Rights Reserved.
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/DateFormatter.java, com/ibm/icu/impl/duration/DurationFormatter.java, com/ibm/icu/impl/duration/Period.java, com/ibm/icu/impl/duration/PeriodBuilder.java, com/ibm/icu/impl/duration/PeriodFormatter.java, com/ibm/icu/impl/duration/PeriodFormatterFactory.java, com/ibm/icu/impl/duration/TimeUnit.java, com/ibm/icu/impl/duration/TimeUnitConstants.java, com/ibm/icu/impl/duration/impl/RecordReader.java, com/ibm/icu/impl/duration/impl/RecordWriter.java
+/*
+******************************************************************************
+* Copyright (C) 2007, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/BasicDurationFormatterFactory.java, com/ibm/icu/impl/duration/PeriodBuilderFactory.java
+/*
+******************************************************************************
+* Copyright (C) 2007-2009, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/BasicPeriodFormatter.java, com/ibm/icu/impl/duration/BasicPeriodFormatterFactory.java, com/ibm/icu/impl/duration/impl/XMLRecordReader.java
+/*
+******************************************************************************
+* Copyright (C) 2007-2010, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/BasicPeriodBuilderFactory.java
+/*
+******************************************************************************
+* Copyright (C) 2007-2011, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/impl/Utils.java
+/*
+******************************************************************************
+* Copyright (C) 2007-2012, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/BasicDurationFormatter.java
+/*
+******************************************************************************
+* Copyright (C) 2007-2014, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/DurationFormatterFactory.java
+/*
+******************************************************************************
+* Copyright (C) 2009, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/duration/impl/PeriodFormatterData.java
+/*
+******************************************************************************
+* Copyright (C) 2009-2011, International Business Machines Corporation and   *
+* others. All Rights Reserved.                                               *
+******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationLoader.java
+/*
+*******************************************************************************
+*
+*   Copyright (C) 1996-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*
+*******************************************************************************
+*
+* CollationLoader.java, ported from ucol_res.cpp
+*
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationWeights.java
+/*
+*******************************************************************************
+*
+*   Copyright (C) 1999-2015, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*
+*******************************************************************************
+*   CollationWeights.java, ported from collationweights.h/.cpp
+*
+*   C++ version created on: 2001mar08 as ucol_wgt.h
+*   created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/text/ReplaceableContextIterator.java
+/*
+*******************************************************************************
+*
+*   Copyright (C) 2004-2010, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*
+*******************************************************************************
+*   file name:  ReplaceableContextIterator.java
+*   encoding:   US-ASCII
+*   tab size:   8 (not used)
+*   indentation:4
+*
+*   created on: 2005feb04
+*   created by: Markus W. Scherer
+*
+*   Implementation of UCaseProps.ContextIterator, iterates over a Replaceable.
+*   Java port of casetrn.cpp/utrans_rep_caseContextIterator().
+*/
+
+Source archive entries: com/ibm/icu/text/BidiWriter.java
+/*
+*******************************************************************************
+*   Copyright (C) 2001-2010, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/ArabicShaping.java
+/*
+*******************************************************************************
+*   Copyright (C) 2001-2012, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/BidiLine.java
+/*
+*******************************************************************************
+*   Copyright (C) 2001-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/Bidi.java, com/ibm/icu/text/BidiRun.java
+/*
+*******************************************************************************
+*   Copyright (C) 2001-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/Assert.java
+/*
+*******************************************************************************
+*   Copyright (C) 2005-2006, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/DateNumberFormat.java
+/*
+*******************************************************************************
+*   Copyright (C) 2007-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/FilteredNormalizer2.java
+/*
+*******************************************************************************
+*   Copyright (C) 2009-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/ICUDataVersion.java
+/*
+*******************************************************************************
+*   Copyright (C) 2009-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/CacheBase.java
+/*
+*******************************************************************************
+*   Copyright (C) 2010, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/BytesTrie.java
+/*
+*******************************************************************************
+*   Copyright (C) 2010-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2010nov23
+*   created by: Markus W. Scherer
+*   ported from ICU4C bytestrie.h/.cpp
+*/
+
+Source archive entries: com/ibm/icu/text/MessagePattern.java
+/*
+*******************************************************************************
+*   Copyright (C) 2010-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2010aug21
+*   created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/SoftCache.java
+/*
+*******************************************************************************
+*   Copyright (C) 2010-2016, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/PatternProps.java
+/*
+*******************************************************************************
+*   Copyright (C) 2011, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2011feb25
+*   created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/util/BytesTrieBuilder.java
+/*
+*******************************************************************************
+*   Copyright (C) 2011-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2011jan05
+*   created by: Markus W. Scherer
+*   ported from ICU4C bytestriebuilder.h/.cpp
+*/
+
+Source archive entries: com/ibm/icu/util/StringTrieBuilder.java
+/*
+*******************************************************************************
+*   Copyright (C) 2011-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2011jan05
+*   created by: Markus W. Scherer
+*   ported from ICU4C stringtriebuilder.h/.cpp
+*/
+
+Source archive entries: com/ibm/icu/util/CharsTrie.java
+/*
+*******************************************************************************
+*   Copyright (C) 2011-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2011jan06
+*   created by: Markus W. Scherer
+*   ported from ICU4C ucharstrie.h/.cpp
+*/
+
+Source archive entries: com/ibm/icu/util/CharsTrieBuilder.java
+/*
+*******************************************************************************
+*   Copyright (C) 2011-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2011jan07
+*   created by: Markus W. Scherer
+*   ported from ICU4C ucharstriebuilder/.cpp
+*/
+
+Source archive entries: com/ibm/icu/text/MessagePatternUtil.java
+/*
+*******************************************************************************
+*   Copyright (C) 2011-2014, International Business Machines
+*   Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*   created on: 2011jul14
+*   created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/IDNA2003.java
+/*
+*******************************************************************************
+* Copyright (C) 2003-2010, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/RBBISetBuilder.java
+/*
+*******************************************************************************
+* Copyright (C) 2003-2011, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CharsetRecog_2022.java
+/*
+*******************************************************************************
+* Copyright (C) 2005 - 2012, International Business Machines Corporation and  *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/text/RbnfScannerProviderImpl.java
+/*
+*******************************************************************************
+* Copyright (C) 2009-2014, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationIterator.java
+/*
+*******************************************************************************
+* Copyright (C) 2010-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationIterator.java, ported from collationiterator.h/.cpp
+*
+* C++ version created on: 2010oct27
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/FCDUTF16CollationIterator.java
+/*
+*******************************************************************************
+* Copyright (C) 2010-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* FCDUTF16CollationIterator.java, ported from utf16collationiterator.h/.cpp
+*
+* C++ version created on: 2010oct27
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/UTF16CollationIterator.java
+/*
+*******************************************************************************
+* Copyright (C) 2010-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* UTF16CollationIterator.java, ported from utf16collationiterator.h/.cpp
+*
+* C++ version created on: 2010oct27
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/UTS46.java
+/*
+*******************************************************************************
+* Copyright (C) 2010-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/Collation.java
+/*
+*******************************************************************************
+* Copyright (C) 2010-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* Collation.java, ported from collation.h/.cpp
+*
+* C++ version created on: 2010oct27
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationData.java
+/*
+*******************************************************************************
+* Copyright (C) 2010-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationData.java, ported from collationdata.h/.cpp
+*
+* C++ version created on: 2010oct27
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationRoot.java
+/*
+*******************************************************************************
+* Copyright (C) 2012-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationRoot.java, ported from collationroot.h/.cpp
+*
+* C++ version created on: 2012dec17
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/FCDIterCollationIterator.java
+/*
+*******************************************************************************
+* Copyright (C) 2012-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* FCDIterCollationIterator.java, ported from uitercollationiterator.h/.cpp
+*
+* C++ version created on: 2012sep23 (from utf16collationiterator.h)
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/IterCollationIterator.java
+/*
+*******************************************************************************
+* Copyright (C) 2012-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* IterCollationIterator.java, ported from uitercollationiterator.h/.cpp
+*
+* C++ version created on: 2012sep23 (from utf16collationiterator.h)
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationDataBuilder.java
+/*
+*******************************************************************************
+* Copyright (C) 2012-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationDataBuilder.java, ported from collationdatabuilder.h/.cpp
+*
+* C++ version created on: 2012apr01
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationFCD.java
+/*
+*******************************************************************************
+* Copyright (C) 2012-2016, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationFCD.java, ported from collationfcd.h/.cpp
+*
+* C++ version created on: 2012aug18
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationRootElements.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationRootElements.java, ported from collationrootelements.h/.cpp
+*
+* C++ version created on: 2013mar01
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/ContractionsAndExpansions.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* ContractionsAndExpansions.java, ported from collationsets.h/.cpp
+*
+* C++ version created on: 2013feb09
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/SharedObject.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* SharedObject.java, ported from sharedobject.h/.cpp
+*
+* C++ version created on: 2013dec19
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/TailoredSet.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2014, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* TailoredSet.java, ported from collationsets.h/.cpp
+*
+* C++ version created on: 2013feb09
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationBuilder.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationBuilder.java, ported from collationbuilder.h/.cpp
+*
+* C++ version created on: 2013may06
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationDataReader.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationDataReader.java, ported from collationdatareader.h/.cpp
+*
+* C++ version created on: 2013feb07
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationFastLatin.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationFastLatin.java, ported from collationfastlatin.h/.cpp
+*
+* C++ version created on: 2013aug09
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationFastLatinBuilder.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationFastLatinBuilder.java, ported from collationfastlatinbuilder.h/.cpp
+*
+* C++ version created on: 2013aug09
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationRuleParser.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationRuleParser.java, ported from collationruleparser.h/.cpp
+*
+* C++ version created on: 2013apr10
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationSettings.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationSettings.java, ported from collationsettings.h/.cpp
+*
+* C++ version created on: 2013feb07
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/CollationTailoring.java
+/*
+*******************************************************************************
+* Copyright (C) 2013-2015, International Business Machines
+* Corporation and others.  All Rights Reserved.
+*******************************************************************************
+* CollationTailoring.java, ported from collationtailoring.h/.cpp
+*
+* C++ version created on: 2013mar12
+* created by: Markus W. Scherer
+*/
+
+Source archive entries: com/ibm/icu/math/BigDecimal.java
+/* 2000.01.01      copyright update [Y2K has arrived]                 */
+
+Source archive entries: com/ibm/icu/math/MathContext.java
+/* 2000.01.01 1.06 copyright update                                   */
+
+Source archive entries: com/ibm/icu/math/BigDecimal.java
+/* Copyright IBM Corporation, 1996-2016.  All Rights Reserved.        */
+
+Source archive entries: com/ibm/icu/math/MathContext.java
+/* Copyright IBM Corporation, 1997, 2000, 2005, 2007.  All Rights Reserved. */
+
+Source archive entries: com/ibm/icu/impl/ICUBinary.java
+/**
+     * Writes an ICU data header.
+     * Does not write a copyright string.
+     *
+     * @return The length of the header (number of bytes written).
+     * @throws IOException from the DataOutputStream
+     */
+
+Source archive entries: com/ibm/icu/text/TransliterationRuleSet.java
+/**
+ * A set of rules for a <code>RuleBasedTransliterator</code>.  This set encodes
+ * the transliteration in one direction from one set of characters or short
+ * strings to another.  A <code>RuleBasedTransliterator</code> consists of up to
+ * two such sets, one for the forward direction, and one for the reverse.
+ *
+ * <p>A <code>TransliterationRuleSet</code> has one important operation, that of
+ * finding a matching rule at a given point in the text.  This is accomplished
+ * by the <code>findMatch()</code> method.
+ *
+ * <p>Copyright &copy; IBM Corporation 1999.  All rights reserved.
+ *
+ * @author Alan Liu
+ */
+
+Source archive entries: com/ibm/icu/text/TransliterationRule.java
+/**
+ * A transliteration rule used by
+ * <code>RuleBasedTransliterator</code>.
+ * <code>TransliterationRule</code> is an immutable object.
+ *
+ * <p>A rule consists of an input pattern and an output string.  When
+ * the input pattern is matched, the output string is emitted.  The
+ * input pattern consists of zero or more characters which are matched
+ * exactly (the key) and optional context.  Context must match if it
+ * is specified.  Context may be specified before the key, after the
+ * key, or both.  The key, preceding context, and following context
+ * may contain variables.  Variables represent a set of Unicode
+ * characters, such as the letters <i>a</i> through <i>z</i>.
+ * Variables are detected by looking up each character in a supplied
+ * variable list to see if it has been so defined.
+ *
+ * <p>A rule may contain segments in its input string and segment
+ * references in its output string.  A segment is a substring of the
+ * input pattern, indicated by an offset and limit.  The segment may
+ * be in the preceding or following context.  It may not span a
+ * context boundary.  A segment reference is a special character in
+ * the output string that causes a segment of the input string (not
+ * the input pattern) to be copied to the output string.  The range of
+ * special characters that represent segment references is defined by
+ * RuleBasedTransliterator.Data.
+ *
+ * <p>Example: The rule "([a-z]) . ([0-9]) > $2 . $1" will change the input
+ * string "abc.123" to "ab1.c23".
+ *
+ * <p>Copyright &copy; IBM Corporation 1999.  All rights reserved.
+ *
+ * @author Alan Liu
+ */
+
+Source archive entries: com/ibm/icu/text/CompoundTransliterator.java
+/**
+ * A transliterator that is composed of two or more other
+ * transliterator objects linked together.  For example, if one
+ * transliterator transliterates from script A to script B, and
+ * another transliterates from script B to script C, the two may be
+ * combined to form a new transliterator from A to C.
+ *
+ * <p>Composed transliterators may not behave as expected.  For
+ * example, inverses may not combine to form the identity
+ * transliterator.  See the class documentation for {@link
+ * Transliterator} for details.
+ *
+ * <p>Copyright &copy; IBM Corporation 1999.  All rights reserved.
+ *
+ * @author Alan Liu
+ */
+
+Source archive entries: com/ibm/icu/lang/UCharacterCategory.java
+/**
+ *******************************************************************************
+ * Copyright (C) 1996-2004, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/lang/UCharacter.java, com/ibm/icu/text/RuleBasedCollator.java, com/ibm/icu/text/UTF16.java
+/**
+ *******************************************************************************
+ * Copyright (C) 1996-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/RawCollationKey.java, com/ibm/icu/util/ByteArrayWrapper.java
+/**
+ *******************************************************************************
+ * Copyright (C) 1996-2016, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUNotifier.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2009, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICUDebug.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2010, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/util/CurrencyServiceShim.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2011, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICURWLock.java, com/ibm/icu/util/CaseInsensitiveString.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2013, International Business Machines Corporation and    *
+ * others. All Rights Reserved.                                                *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/data/ResourceReader.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2015, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/lang/UScript.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2016 International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/ICULocaleService.java, com/ibm/icu/impl/ICUService.java, com/ibm/icu/util/Currency.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2001-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/dev/tool/docs/ICUCategoryTaglet.java, com/ibm/icu/dev/tool/docs/ICUDiscouragedTaglet.java, com/ibm/icu/dev/tool/docs/ICUDraftTaglet.java, com/ibm/icu/dev/tool/docs/ICUEnhancedTaglet.java, com/ibm/icu/dev/tool/docs/ICUInternalTaglet.java, com/ibm/icu/dev/tool/docs/ICUNewTaglet.java, com/ibm/icu/dev/tool/docs/ICUNoteTaglet.java, com/ibm/icu/dev/tool/docs/ICUObsoleteTaglet.java, com/ibm/icu/dev/tool/docs/ICUProvisionalTaglet.java, com/ibm/icu/dev/tool/docs/ICUStableTaglet.java, com/ibm/icu/dev/tool/docs/ICUTaglet.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2002-2016 International Business Machines Corporation         *
+ * and others. All Rights Reserved.                                            *
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/Grego.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2003-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ * Partial port from ICU4C's Grego class in i18n/gregoimp.h.
+ *
+ * Methods ported, or moved here from OlsonTimeZone, initially
+ * for work on Jitterbug 5470:
+ *   tzdata2006n Brazil incorrect fall-back date 2009-mar-01
+ * Only the methods necessary for that work are provided - this is not a full
+ * port of ICU4C's Grego class (yet).
+ *
+ * These utilities are used by both OlsonTimeZone and SimpleTimeZone.
+ */
+
+Source archive entries: com/ibm/icu/lang/UCharacterEnums.java
+/**
+ *******************************************************************************
+ * Copyright (C) 2004-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *******************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/impl/UCharacterUtility.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2004, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/UCharArrayIterator.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2010, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/UCharacterNameChoice.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2011, International Business Machines Corporation and
+* others. All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/lang/UCharacterDirection.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2013, International Business Machines Corporation and
+* others. All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/coll/BOCSU.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2014, International Business Machines Corporation and
+* others. All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/lang/UProperty.java, com/ibm/icu/text/CollationElementIterator.java, com/ibm/icu/text/CollationKey.java, com/ibm/icu/text/Collator.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2016, International Business Machines Corporation and
+* others. All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/util/StringTokenizer.java
+/**
+*******************************************************************************
+* Copyright (C) 1996-2016, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CollatorServiceShim.java
+/**
+*******************************************************************************
+* Copyright (C) 2003-2016, International Business Machines Corporation and
+* others. All Rights Reserved.
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CharsetRecog_UTF8.java
+/**
+*******************************************************************************
+* Copyright (C) 2005 - 2014, International Business Machines Corporation and  *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CharsetRecognizer.java
+/**
+*******************************************************************************
+* Copyright (C) 2005-2012, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/CharsetDetector.java, com/ibm/icu/text/CharsetMatch.java
+/**
+*******************************************************************************
+* Copyright (C) 2005-2016, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/impl/InvalidFormatException.java
+/**
+*******************************************************************************
+* Copyright (C) 2006-2015, International Business Machines Corporation and
+* others. All Rights Reserved.
+*******************************************************************************
+*
+*******************************************************************************
+*/
+
+Source archive entries: com/ibm/icu/text/RBBINode.java
+/********************************************************************
+ * COPYRIGHT:
+ * Copyright (c) 2001-2016, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ********************************************************************/
+
+Source archive entries: com/ibm/icu/util/ChineseCalendar.java
+/*********************************************************************
+ * Copyright (C) 2000-2014, International Business Machines
+ * Corporation and others. All Rights Reserved.
+ *********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/ChineseDateFormat.java
+/*********************************************************************
+ * Copyright (C) 2000-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ *********************************************************************
+ */
+
+Source archive entries: com/ibm/icu/text/ChineseDateFormatSymbols.java
+/****************************************************************************
+ * Copyright (C) 2000-2014, International Business Machines Corporation and
+ * others. All Rights Reserved.
+ ****************************************************************************
+ */
+
+Source archive entries: com/ibm/icu/dev/tool/docs/ICUCategoryTaglet.java, com/ibm/icu/dev/tool/docs/ICUDiscouragedTaglet.java, com/ibm/icu/dev/tool/docs/ICUDraftTaglet.java, com/ibm/icu/dev/tool/docs/ICUEnhancedTaglet.java, com/ibm/icu/dev/tool/docs/ICUInternalTaglet.java, com/ibm/icu/dev/tool/docs/ICUNewTaglet.java, com/ibm/icu/dev/tool/docs/ICUNoteTaglet.java, com/ibm/icu/dev/tool/docs/ICUObsoleteTaglet.java, com/ibm/icu/dev/tool/docs/ICUProvisionalTaglet.java, com/ibm/icu/dev/tool/docs/ICUStableTaglet.java, com/ibm/icu/dev/tool/docs/ICUTaglet.java, com/ibm/icu/impl/Assert.java, com/ibm/icu/impl/BMPSet.java, com/ibm/icu/impl/CacheBase.java, com/ibm/icu/impl/CacheValue.java, com/ibm/icu/impl/CalendarAstronomer.java, com/ibm/icu/impl/CalendarCache.java, com/ibm/icu/impl/CalendarUtil.java, com/ibm/icu/impl/CaseMapImpl.java, com/ibm/icu/impl/CharTrie.java, com/ibm/icu/impl/CharacterIteration.java, com/ibm/icu/impl/CharacterIteratorWrapper.java, com/ibm/icu/impl/ClassLoaderUtil.java, com/ibm/icu/impl/CurrencyData.java, com/ibm/icu/impl/DateNumberFormat.java, com/ibm/icu/impl/DayPeriodRules.java, com/ibm/icu/impl/DontCareFieldPosition.java, com/ibm/icu/impl/Grego.java, com/ibm/icu/impl/ICUBinary.java, com/ibm/icu/impl/ICUCache.java, com/ibm/icu/impl/ICUConfig.java, com/ibm/icu/impl/ICUCurrencyDisplayInfoProvider.java, com/ibm/icu/impl/ICUCurrencyMetaInfo.java, com/ibm/icu/impl/ICUData.java, com/ibm/icu/impl/ICUDataVersion.java, com/ibm/icu/impl/ICUDebug.java, com/ibm/icu/impl/ICULangDataTables.java, com/ibm/icu/impl/ICULocaleService.java, com/ibm/icu/impl/ICUNotifier.java, com/ibm/icu/impl/ICURWLock.java, com/ibm/icu/impl/ICURegionDataTables.java, com/ibm/icu/impl/ICUResourceBundle.java, com/ibm/icu/impl/ICUResourceBundleImpl.java, com/ibm/icu/impl/ICUResourceBundleReader.java, com/ibm/icu/impl/ICUResourceTableAccess.java, com/ibm/icu/impl/ICUService.java, com/ibm/icu/impl/IDNA2003.java, com/ibm/icu/impl/IllegalIcuArgumentException.java, com/ibm/icu/impl/ImmutableEntry.java, com/ibm/icu/impl/IntTrie.java, com/ibm/icu/impl/IntTrieBuilder.java, com/ibm/icu/impl/InvalidFormatException.java, com/ibm/icu/impl/IterableComparator.java, com/ibm/icu/impl/JavaTimeZone.java, com/ibm/icu/impl/LocaleDisplayNamesImpl.java, com/ibm/icu/impl/LocaleIDParser.java, com/ibm/icu/impl/LocaleIDs.java, com/ibm/icu/impl/LocaleUtility.java, com/ibm/icu/impl/Norm2AllModes.java, com/ibm/icu/impl/Normalizer2Impl.java, com/ibm/icu/impl/OlsonTimeZone.java, com/ibm/icu/impl/PVecToTrieCompactHandler.java, com/ibm/icu/impl/Pair.java, com/ibm/icu/impl/PatternProps.java, com/ibm/icu/impl/PatternTokenizer.java, com/ibm/icu/impl/PluralRulesLoader.java, com/ibm/icu/impl/PropsVectors.java, com/ibm/icu/impl/Punycode.java, com/ibm/icu/impl/RBBIDataWrapper.java, com/ibm/icu/impl/Relation.java, com/ibm/icu/impl/RelativeDateFormat.java, com/ibm/icu/impl/ReplaceableUCharacterIterator.java, com/ibm/icu/impl/ResourceBundleWrapper.java, com/ibm/icu/impl/Row.java, com/ibm/icu/impl/RuleCharacterIterator.java, com/ibm/icu/impl/SimpleCache.java, com/ibm/icu/impl/SimpleFilteredSentenceBreakIterator.java, com/ibm/icu/impl/SimpleFormatterImpl.java, com/ibm/icu/impl/SoftCache.java, com/ibm/icu/impl/SortedSetRelation.java, com/ibm/icu/impl/StandardPlural.java, com/ibm/icu/impl/StringPrepDataReader.java, com/ibm/icu/impl/StringRange.java, com/ibm/icu/impl/TZDBTimeZoneNames.java, com/ibm/icu/impl/TextTrieMap.java, com/ibm/icu/impl/TimeZoneAdapter.java, com/ibm/icu/impl/TimeZoneGenericNames.java, com/ibm/icu/impl/TimeZoneNamesFactoryImpl.java, com/ibm/icu/impl/TimeZoneNamesImpl.java, com/ibm/icu/impl/Trie.java, com/ibm/icu/impl/Trie2.java, com/ibm/icu/impl/Trie2Writable.java, com/ibm/icu/impl/Trie2_16.java, com/ibm/icu/impl/Trie2_32.java, com/ibm/icu/impl/TrieBuilder.java, com/ibm/icu/impl/TrieIterator.java, com/ibm/icu/impl/UBiDiProps.java, com/ibm/icu/impl/UCaseProps.java, com/ibm/icu/impl/UCharArrayIterator.java, com/ibm/icu/impl/UCharacterIteratorWrapper.java, com/ibm/icu/impl/UCharacterName.java, com/ibm/icu/impl/UCharacterNameChoice.java, com/ibm/icu/impl/UCharacterNameReader.java, com/ibm/icu/impl/UCharacterProperty.java, com/ibm/icu/impl/UCharacterUtility.java, com/ibm/icu/impl/UPropertyAliases.java, com/ibm/icu/impl/URLHandler.java, com/ibm/icu/impl/UResource.java, com/ibm/icu/impl/USerializedSet.java, com/ibm/icu/impl/UTS46.java, com/ibm/icu/impl/UnicodeMap.java, com/ibm/icu/impl/UnicodeMapIterator.java, com/ibm/icu/impl/UnicodeRegex.java, com/ibm/icu/impl/UnicodeSetStringSpan.java, com/ibm/icu/impl/Utility.java, com/ibm/icu/impl/UtilityExtensions.java, com/ibm/icu/impl/ValidIdentifiers.java, com/ibm/icu/impl/ZoneMeta.java, com/ibm/icu/impl/breakiter/BurmeseBreakEngine.java, com/ibm/icu/impl/breakiter/BytesDictionaryMatcher.java, com/ibm/icu/impl/breakiter/CharsDictionaryMatcher.java, com/ibm/icu/impl/breakiter/CjkBreakEngine.java, com/ibm/icu/impl/breakiter/DictionaryBreakEngine.java, com/ibm/icu/impl/breakiter/DictionaryData.java, com/ibm/icu/impl/breakiter/DictionaryMatcher.java, com/ibm/icu/impl/breakiter/KhmerBreakEngine.java, com/ibm/icu/impl/breakiter/LanguageBreakEngine.java, com/ibm/icu/impl/breakiter/LaoBreakEngine.java, com/ibm/icu/impl/breakiter/ThaiBreakEngine.java, com/ibm/icu/impl/breakiter/UnhandledBreakEngine.java, com/ibm/icu/impl/coll/BOCSU.java, com/ibm/icu/impl/coll/Collation.java, com/ibm/icu/impl/coll/CollationBuilder.java, com/ibm/icu/impl/coll/CollationCompare.java, com/ibm/icu/impl/coll/CollationData.java, com/ibm/icu/impl/coll/CollationDataBuilder.java, com/ibm/icu/impl/coll/CollationDataReader.java, com/ibm/icu/impl/coll/CollationFCD.java, com/ibm/icu/impl/coll/CollationFastLatin.java, com/ibm/icu/impl/coll/CollationFastLatinBuilder.java, com/ibm/icu/impl/coll/CollationIterator.java, com/ibm/icu/impl/coll/CollationKeys.java, com/ibm/icu/impl/coll/CollationLoader.java, com/ibm/icu/impl/coll/CollationRoot.java, com/ibm/icu/impl/coll/CollationRootElements.java, com/ibm/icu/impl/coll/CollationRuleParser.java, com/ibm/icu/impl/coll/CollationSettings.java, com/ibm/icu/impl/coll/CollationTailoring.java, com/ibm/icu/impl/coll/CollationWeights.java, com/ibm/icu/impl/coll/ContractionsAndExpansions.java, com/ibm/icu/impl/coll/FCDIterCollationIterator.java, com/ibm/icu/impl/coll/FCDUTF16CollationIterator.java, com/ibm/icu/impl/coll/IterCollationIterator.java, com/ibm/icu/impl/coll/SharedObject.java, com/ibm/icu/impl/coll/TailoredSet.java, com/ibm/icu/impl/coll/UTF16CollationIterator.java, com/ibm/icu/impl/coll/UVector32.java, com/ibm/icu/impl/coll/UVector64.java, com/ibm/icu/impl/data/HolidayBundle.java, com/ibm/icu/impl/data/HolidayBundle_da.java, com/ibm/icu/impl/data/HolidayBundle_da_DK.java, com/ibm/icu/impl/data/HolidayBundle_de.java, com/ibm/icu/impl/data/HolidayBundle_de_AT.java, com/ibm/icu/impl/data/HolidayBundle_de_DE.java, com/ibm/icu/impl/data/HolidayBundle_el.java, com/ibm/icu/impl/data/HolidayBundle_el_GR.java, com/ibm/icu/impl/data/HolidayBundle_en.java, com/ibm/icu/impl/data/HolidayBundle_en_CA.java, com/ibm/icu/impl/data/HolidayBundle_en_GB.java, com/ibm/icu/impl/data/HolidayBundle_en_US.java, com/ibm/icu/impl/data/HolidayBundle_es.java, com/ibm/icu/impl/data/HolidayBundle_es_MX.java, com/ibm/icu/impl/data/HolidayBundle_fr.java, com/ibm/icu/impl/data/HolidayBundle_fr_CA.java, com/ibm/icu/impl/data/HolidayBundle_fr_FR.java, com/ibm/icu/impl/data/HolidayBundle_it.java, com/ibm/icu/impl/data/HolidayBundle_it_IT.java, com/ibm/icu/impl/data/HolidayBundle_iw.java, com/ibm/icu/impl/data/HolidayBundle_iw_IL.java, com/ibm/icu/impl/data/HolidayBundle_ja_JP.java, com/ibm/icu/impl/data/ResourceReader.java, com/ibm/icu/impl/data/TokenIterator.java, com/ibm/icu/impl/duration/BasicDurationFormat.java, com/ibm/icu/impl/duration/BasicDurationFormatter.java, com/ibm/icu/impl/duration/BasicDurationFormatterFactory.java, com/ibm/icu/impl/duration/BasicPeriodBuilderFactory.java, com/ibm/icu/impl/duration/BasicPeriodFormatter.java, com/ibm/icu/impl/duration/BasicPeriodFormatterFactory.java, com/ibm/icu/impl/duration/BasicPeriodFormatterService.java, com/ibm/icu/impl/duration/DateFormatter.java, com/ibm/icu/impl/duration/DurationFormatter.java, com/ibm/icu/impl/duration/DurationFormatterFactory.java, com/ibm/icu/impl/duration/Period.java, com/ibm/icu/impl/duration/PeriodBuilder.java, com/ibm/icu/impl/duration/PeriodBuilderFactory.java, com/ibm/icu/impl/duration/PeriodFormatter.java, com/ibm/icu/impl/duration/PeriodFormatterFactory.java, com/ibm/icu/impl/duration/PeriodFormatterService.java, com/ibm/icu/impl/duration/TimeUnit.java, com/ibm/icu/impl/duration/TimeUnitConstants.java, com/ibm/icu/impl/duration/impl/DataRecord.java, com/ibm/icu/impl/duration/impl/PeriodFormatterData.java, com/ibm/icu/impl/duration/impl/PeriodFormatterDataService.java, com/ibm/icu/impl/duration/impl/RecordReader.java, com/ibm/icu/impl/duration/impl/RecordWriter.java, com/ibm/icu/impl/duration/impl/ResourceBasedPeriodFormatterDataService.java, com/ibm/icu/impl/duration/impl/Utils.java, com/ibm/icu/impl/duration/impl/XMLRecordReader.java, com/ibm/icu/impl/duration/impl/XMLRecordWriter.java, com/ibm/icu/impl/locale/AsciiUtil.java, com/ibm/icu/impl/locale/BaseLocale.java, com/ibm/icu/impl/locale/Extension.java, com/ibm/icu/impl/locale/InternalLocaleBuilder.java, com/ibm/icu/impl/locale/KeyTypeData.java, com/ibm/icu/impl/locale/LanguageTag.java, com/ibm/icu/impl/locale/LocaleExtensions.java, com/ibm/icu/impl/locale/LocaleObjectCache.java, com/ibm/icu/impl/locale/LocaleSyntaxException.java, com/ibm/icu/impl/locale/LocaleValidityChecker.java, com/ibm/icu/impl/locale/ParseStatus.java, com/ibm/icu/impl/locale/StringTokenIterator.java, com/ibm/icu/impl/locale/UnicodeLocaleExtension.java, com/ibm/icu/impl/text/RbnfScannerProviderImpl.java, com/ibm/icu/lang/CharSequences.java, com/ibm/icu/lang/UCharacter.java, com/ibm/icu/lang/UCharacterCategory.java, com/ibm/icu/lang/UCharacterDirection.java, com/ibm/icu/lang/UCharacterEnums.java, com/ibm/icu/lang/UCharacterNameIterator.java, com/ibm/icu/lang/UProperty.java, com/ibm/icu/lang/UScript.java, com/ibm/icu/lang/UScriptRun.java, com/ibm/icu/math/BigDecimal.java, com/ibm/icu/math/MathContext.java, com/ibm/icu/text/AlphabeticIndex.java, com/ibm/icu/text/AnyTransliterator.java, com/ibm/icu/text/ArabicShaping.java, com/ibm/icu/text/ArabicShapingException.java, com/ibm/icu/text/Bidi.java, com/ibm/icu/text/BidiClassifier.java, com/ibm/icu/text/BidiLine.java, com/ibm/icu/text/BidiRun.java, com/ibm/icu/text/BidiTransform.java, com/ibm/icu/text/BidiWriter.java, com/ibm/icu/text/BreakIterator.java, com/ibm/icu/text/BreakIteratorFactory.java, com/ibm/icu/text/BreakTransliterator.java, com/ibm/icu/text/CanonicalIterator.java, com/ibm/icu/text/CaseFoldTransliterator.java, com/ibm/icu/text/CharsetDetector.java, com/ibm/icu/text/CharsetMatch.java, com/ibm/icu/text/CharsetRecog_2022.java, com/ibm/icu/text/CharsetRecog_UTF8.java, com/ibm/icu/text/CharsetRecog_Unicode.java, com/ibm/icu/text/CharsetRecog_mbcs.java, com/ibm/icu/text/CharsetRecog_sbcs.java, com/ibm/icu/text/CharsetRecognizer.java, com/ibm/icu/text/ChineseDateFormat.java, com/ibm/icu/text/ChineseDateFormatSymbols.java, com/ibm/icu/text/CollationElementIterator.java, com/ibm/icu/text/CollationKey.java, com/ibm/icu/text/Collator.java, com/ibm/icu/text/CollatorServiceShim.java, com/ibm/icu/text/CompactDecimalFormat.java, com/ibm/icu/text/ComposedCharIter.java, com/ibm/icu/text/CompoundTransliterator.java, com/ibm/icu/text/CurrencyDisplayNames.java, com/ibm/icu/text/CurrencyFormat.java, com/ibm/icu/text/CurrencyMetaInfo.java, com/ibm/icu/text/CurrencyPluralInfo.java, com/ibm/icu/text/DateFormat.java, com/ibm/icu/text/DateFormatSymbols.java, com/ibm/icu/text/DateIntervalFormat.java, com/ibm/icu/text/DateIntervalInfo.java, com/ibm/icu/text/DateTimePatternGenerator.java, com/ibm/icu/text/DecimalFormatSymbols.java, com/ibm/icu/text/DisplayContext.java, com/ibm/icu/text/DurationFormat.java, com/ibm/icu/text/EscapeTransliterator.java, com/ibm/icu/text/FilteredBreakIteratorBuilder.java, com/ibm/icu/text/FilteredNormalizer2.java, com/ibm/icu/text/FunctionReplacer.java, com/ibm/icu/text/IDNA.java, com/ibm/icu/text/ListFormatter.java, com/ibm/icu/text/LocaleDisplayNames.java, com/ibm/icu/text/LowercaseTransliterator.java, com/ibm/icu/text/MeasureFormat.java, com/ibm/icu/text/MessageFormat.java, com/ibm/icu/text/MessagePattern.java, com/ibm/icu/text/MessagePatternUtil.java, com/ibm/icu/text/NFRule.java, com/ibm/icu/text/NFRuleSet.java, com/ibm/icu/text/NFSubstitution.java, com/ibm/icu/text/NameUnicodeTransliterator.java, com/ibm/icu/text/NormalizationTransliterator.java, com/ibm/icu/text/Normalizer.java, com/ibm/icu/text/Normalizer2.java, com/ibm/icu/text/NullTransliterator.java, com/ibm/icu/text/NumberFormat.java, com/ibm/icu/text/NumberFormatServiceShim.java, com/ibm/icu/text/NumberingSystem.java, com/ibm/icu/text/PluralFormat.java, com/ibm/icu/text/PluralRules.java, com/ibm/icu/text/PluralRulesSerialProxy.java, com/ibm/icu/text/Quantifier.java, com/ibm/icu/text/QuantityFormatter.java, com/ibm/icu/text/RBBINode.java, com/ibm/icu/text/RBBIRuleParseTable.java, com/ibm/icu/text/RBBIRuleScanner.java, com/ibm/icu/text/RBBISetBuilder.java, com/ibm/icu/text/RBBISymbolTable.java, com/ibm/icu/text/RBBITableBuilder.java, com/ibm/icu/text/RBNFChinesePostProcessor.java, com/ibm/icu/text/RBNFPostProcessor.java, com/ibm/icu/text/RawCollationKey.java, com/ibm/icu/text/RbnfLenientScanner.java, com/ibm/icu/text/RbnfLenientScannerProvider.java, com/ibm/icu/text/RelativeDateTimeFormatter.java, com/ibm/icu/text/RemoveTransliterator.java, com/ibm/icu/text/Replaceable.java, com/ibm/icu/text/ReplaceableContextIterator.java, com/ibm/icu/text/ReplaceableString.java, com/ibm/icu/text/RuleBasedBreakIterator.java, com/ibm/icu/text/RuleBasedCollator.java, com/ibm/icu/text/RuleBasedNumberFormat.java, com/ibm/icu/text/RuleBasedTransliterator.java, com/ibm/icu/text/SCSU.java, com/ibm/icu/text/ScientificNumberFormatter.java, com/ibm/icu/text/SearchIterator.java, com/ibm/icu/text/SelectFormat.java, com/ibm/icu/text/SimpleDateFormat.java, com/ibm/icu/text/SimpleFormatter.java, com/ibm/icu/text/SourceTargetUtility.java, com/ibm/icu/text/SpoofChecker.java, com/ibm/icu/text/StringCharacterIterator.java, com/ibm/icu/text/StringMatcher.java, com/ibm/icu/text/StringPrep.java, com/ibm/icu/text/StringPrepParseException.java, com/ibm/icu/text/StringReplacer.java, com/ibm/icu/text/StringSearch.java, com/ibm/icu/text/StringTransform.java, com/ibm/icu/text/SymbolTable.java, com/ibm/icu/text/TimeUnitFormat.java, com/ibm/icu/text/TimeZoneFormat.java, com/ibm/icu/text/TimeZoneNames.java, com/ibm/icu/text/TitlecaseTransliterator.java, com/ibm/icu/text/Transform.java, com/ibm/icu/text/TransliterationRule.java, com/ibm/icu/text/TransliterationRuleSet.java, com/ibm/icu/text/Transliterator.java, com/ibm/icu/text/TransliteratorIDParser.java, com/ibm/icu/text/TransliteratorParser.java, com/ibm/icu/text/TransliteratorRegistry.java, com/ibm/icu/text/UCharacterIterator.java, com/ibm/icu/text/UFieldPosition.java, com/ibm/icu/text/UFormat.java, com/ibm/icu/text/UForwardCharacterIterator.java, com/ibm/icu/text/UTF16.java, com/ibm/icu/text/UnescapeTransliterator.java, com/ibm/icu/text/UnicodeCompressor.java, com/ibm/icu/text/UnicodeDecompressor.java, com/ibm/icu/text/UnicodeFilter.java, com/ibm/icu/text/UnicodeMatcher.java, com/ibm/icu/text/UnicodeNameTransliterator.java, com/ibm/icu/text/UnicodeReplacer.java, com/ibm/icu/text/UnicodeSet.java, com/ibm/icu/text/UnicodeSetIterator.java, com/ibm/icu/text/UnicodeSetSpanner.java, com/ibm/icu/text/UppercaseTransliterator.java, com/ibm/icu/util/AnnualTimeZoneRule.java, com/ibm/icu/util/BasicTimeZone.java, com/ibm/icu/util/BuddhistCalendar.java, com/ibm/icu/util/ByteArrayWrapper.java, com/ibm/icu/util/BytesTrie.java, com/ibm/icu/util/BytesTrieBuilder.java, com/ibm/icu/util/CECalendar.java, com/ibm/icu/util/Calendar.java, com/ibm/icu/util/CaseInsensitiveString.java, com/ibm/icu/util/CharsTrie.java, com/ibm/icu/util/CharsTrieBuilder.java, com/ibm/icu/util/ChineseCalendar.java, com/ibm/icu/util/CompactByteArray.java, com/ibm/icu/util/CompactCharArray.java, com/ibm/icu/util/CopticCalendar.java, com/ibm/icu/util/Currency.java, com/ibm/icu/util/CurrencyAmount.java, com/ibm/icu/util/CurrencyServiceShim.java, com/ibm/icu/util/DangiCalendar.java, com/ibm/icu/util/DateInterval.java, com/ibm/icu/util/DateRule.java, com/ibm/icu/util/DateTimeRule.java, com/ibm/icu/util/EasterHoliday.java, com/ibm/icu/util/EthiopicCalendar.java, com/ibm/icu/util/Freezable.java, com/ibm/icu/util/GenderInfo.java, com/ibm/icu/util/GlobalizationPreferences.java, com/ibm/icu/util/GregorianCalendar.java, com/ibm/icu/util/HebrewCalendar.java, com/ibm/icu/util/HebrewHoliday.java, com/ibm/icu/util/Holiday.java, com/ibm/icu/util/ICUCloneNotSupportedException.java, com/ibm/icu/util/ICUException.java, com/ibm/icu/util/ICUUncheckedIOException.java, com/ibm/icu/util/IllformedLocaleException.java, com/ibm/icu/util/IndianCalendar.java, com/ibm/icu/util/InitialTimeZoneRule.java, com/ibm/icu/util/IslamicCalendar.java, com/ibm/icu/util/JapaneseCalendar.java, com/ibm/icu/util/LocaleData.java, com/ibm/icu/util/LocaleMatcher.java, com/ibm/icu/util/LocalePriorityList.java, com/ibm/icu/util/Measure.java, com/ibm/icu/util/MeasureUnit.java, com/ibm/icu/util/Output.java, com/ibm/icu/util/OutputInt.java, com/ibm/icu/util/PersianCalendar.java, com/ibm/icu/util/RangeDateRule.java, com/ibm/icu/util/RangeValueIterator.java, com/ibm/icu/util/Region.java, com/ibm/icu/util/RuleBasedTimeZone.java, com/ibm/icu/util/STZInfo.java, com/ibm/icu/util/SimpleDateRule.java, com/ibm/icu/util/SimpleHoliday.java, com/ibm/icu/util/SimpleTimeZone.java, com/ibm/icu/util/StringTokenizer.java, com/ibm/icu/util/StringTrieBuilder.java, com/ibm/icu/util/TaiwanCalendar.java, com/ibm/icu/util/TimeArrayTimeZoneRule.java, com/ibm/icu/util/TimeUnit.java, com/ibm/icu/util/TimeUnitAmount.java, com/ibm/icu/util/TimeZone.java, com/ibm/icu/util/TimeZoneRule.java, com/ibm/icu/util/TimeZoneTransition.java, com/ibm/icu/util/ULocale.java, com/ibm/icu/util/UResourceBundle.java, com/ibm/icu/util/UResourceBundleIterator.java, com/ibm/icu/util/UResourceTypeMismatchException.java, com/ibm/icu/util/UniversalTimeScale.java, com/ibm/icu/util/VTimeZone.java, com/ibm/icu/util/ValueIterator.java, com/ibm/icu/util/VersionInfo.java
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/text/RBBIRuleBuilder.java
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//
+//    Copyright (C) 2002-2014, International Business Machines Corporation and others.
+//    All Rights Reserved.
+//
+//
+
+Source archive entries: com/ibm/icu/impl/CSCharacterIterator.java, com/ibm/icu/impl/FormattedStringBuilder.java, com/ibm/icu/impl/StaticUnicodeSets.java, com/ibm/icu/impl/StringSegment.java, com/ibm/icu/impl/locale/LSR.java, com/ibm/icu/impl/locale/LikelySubtags.java, com/ibm/icu/impl/locale/LocaleDistance.java, com/ibm/icu/impl/locale/XCldrStub.java, com/ibm/icu/impl/number/AdoptingModifierStore.java, com/ibm/icu/impl/number/AffixPatternProvider.java, com/ibm/icu/impl/number/AffixUtils.java, com/ibm/icu/impl/number/CompactData.java, com/ibm/icu/impl/number/ConstantAffixModifier.java, com/ibm/icu/impl/number/ConstantMultiFieldModifier.java, com/ibm/icu/impl/number/CurrencyPluralInfoAffixProvider.java, com/ibm/icu/impl/number/CurrencySpacingEnabledModifier.java, com/ibm/icu/impl/number/CustomSymbolCurrency.java, com/ibm/icu/impl/number/DecimalFormatProperties.java, com/ibm/icu/impl/number/DecimalQuantity.java, com/ibm/icu/impl/number/DecimalQuantity_AbstractBCD.java, com/ibm/icu/impl/number/DecimalQuantity_DualStorageBCD.java, com/ibm/icu/impl/number/Grouper.java, com/ibm/icu/impl/number/LongNameHandler.java, com/ibm/icu/impl/number/MacroProps.java, com/ibm/icu/impl/number/MicroProps.java, com/ibm/icu/impl/number/MicroPropsGenerator.java, com/ibm/icu/impl/number/MicroPropsMutator.java, com/ibm/icu/impl/number/Modifier.java, com/ibm/icu/impl/number/MultiplierFormatHandler.java, com/ibm/icu/impl/number/MultiplierProducer.java, com/ibm/icu/impl/number/MutablePatternModifier.java, com/ibm/icu/impl/number/Padder.java, com/ibm/icu/impl/number/PatternStringParser.java, com/ibm/icu/impl/number/PatternStringUtils.java, com/ibm/icu/impl/number/Properties.java, com/ibm/icu/impl/number/PropertiesAffixPatternProvider.java, com/ibm/icu/impl/number/RoundingUtils.java, com/ibm/icu/impl/number/SimpleModifier.java, com/ibm/icu/impl/number/parse/AffixMatcher.java, com/ibm/icu/impl/number/parse/ApproximatelySignMatcher.java, com/ibm/icu/impl/number/parse/DecimalMatcher.java, com/ibm/icu/impl/number/parse/IgnorablesMatcher.java, com/ibm/icu/impl/number/parse/InfinityMatcher.java, com/ibm/icu/impl/number/parse/MinusSignMatcher.java, com/ibm/icu/impl/number/parse/MultiplierParseHandler.java, com/ibm/icu/impl/number/parse/NanMatcher.java, com/ibm/icu/impl/number/parse/NumberParseMatcher.java, com/ibm/icu/impl/number/parse/NumberParserImpl.java, com/ibm/icu/impl/number/parse/PaddingMatcher.java, com/ibm/icu/impl/number/parse/ParsedNumber.java, com/ibm/icu/impl/number/parse/ParsingUtils.java, com/ibm/icu/impl/number/parse/PercentMatcher.java, com/ibm/icu/impl/number/parse/PermilleMatcher.java, com/ibm/icu/impl/number/parse/PlusSignMatcher.java, com/ibm/icu/impl/number/parse/RequireAffixValidator.java, com/ibm/icu/impl/number/parse/RequireCurrencyValidator.java, com/ibm/icu/impl/number/parse/RequireDecimalSeparatorValidator.java, com/ibm/icu/impl/number/parse/RequireNumberValidator.java, com/ibm/icu/impl/number/parse/ScientificMatcher.java, com/ibm/icu/impl/number/parse/SymbolMatcher.java, com/ibm/icu/impl/number/parse/ValidationMatcher.java, com/ibm/icu/number/CompactNotation.java, com/ibm/icu/number/CurrencyPrecision.java, com/ibm/icu/number/FormattedNumber.java, com/ibm/icu/number/FractionPrecision.java, com/ibm/icu/number/IntegerWidth.java, com/ibm/icu/number/LocalizedNumberFormatter.java, com/ibm/icu/number/Notation.java, com/ibm/icu/number/NumberFormatter.java, com/ibm/icu/number/NumberFormatterImpl.java, com/ibm/icu/number/NumberFormatterSettings.java, com/ibm/icu/number/NumberPropertyMapper.java, com/ibm/icu/number/Precision.java, com/ibm/icu/number/ScientificNotation.java, com/ibm/icu/number/SimpleNotation.java, com/ibm/icu/number/UnlocalizedNumberFormatter.java, com/ibm/icu/text/CaseMap.java, com/ibm/icu/text/DecimalFormat.java, com/ibm/icu/text/Edits.java, com/ibm/icu/util/NoUnit.java
+// © 2017 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/CalType.java, com/ibm/icu/impl/CharacterPropertiesImpl.java, com/ibm/icu/impl/CollectionSet.java, com/ibm/icu/impl/EraRules.java, com/ibm/icu/impl/number/LocalizedNumberFormatterAsFormat.java, com/ibm/icu/impl/number/ModifierStore.java, com/ibm/icu/impl/number/parse/AffixPatternMatcher.java, com/ibm/icu/impl/number/parse/AffixTokenMatcherFactory.java, com/ibm/icu/impl/number/parse/CodePointMatcher.java, com/ibm/icu/impl/number/parse/CombinedCurrencyMatcher.java, com/ibm/icu/impl/number/parse/SeriesMatcher.java, com/ibm/icu/impl/number/range/PrefixInfixSuffixLengthHelper.java, com/ibm/icu/impl/number/range/RangeMacroProps.java, com/ibm/icu/impl/number/range/StandardPluralRanges.java, com/ibm/icu/lang/CharacterProperties.java, com/ibm/icu/number/FormattedNumberRange.java, com/ibm/icu/number/LocalizedNumberRangeFormatter.java, com/ibm/icu/number/NumberRangeFormatter.java, com/ibm/icu/number/NumberRangeFormatterImpl.java, com/ibm/icu/number/NumberRangeFormatterSettings.java, com/ibm/icu/number/NumberSkeletonImpl.java, com/ibm/icu/number/Scale.java, com/ibm/icu/number/SkeletonSyntaxException.java, com/ibm/icu/number/UnlocalizedNumberRangeFormatter.java, com/ibm/icu/text/ConstrainedFieldPosition.java, com/ibm/icu/text/FormattedValue.java, com/ibm/icu/util/CodePointMap.java, com/ibm/icu/util/CodePointTrie.java, com/ibm/icu/util/MutableCodePointTrie.java
+// © 2018 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/FormattedValueFieldPositionIteratorImpl.java, com/ibm/icu/impl/FormattedValueStringBuilderImpl.java
+// © 2019 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/number/LongNameMultiplexer.java, com/ibm/icu/impl/number/MixedUnitLongNameHandler.java, com/ibm/icu/impl/number/UnitConversionHandler.java, com/ibm/icu/impl/number/UsagePrefsHandler.java, com/ibm/icu/impl/units/ComplexUnitsConverter.java, com/ibm/icu/impl/units/ConversionRates.java, com/ibm/icu/impl/units/MeasureUnitImpl.java, com/ibm/icu/impl/units/SingleUnitImpl.java, com/ibm/icu/impl/units/UnitPreferences.java, com/ibm/icu/impl/units/UnitsConverter.java, com/ibm/icu/impl/units/UnitsData.java, com/ibm/icu/impl/units/UnitsRouter.java, com/ibm/icu/util/ICUInputTooLongException.java
+// © 2020 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/EmojiProps.java
+// © 2021 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/breakiter/LSTMBreakEngine.java
+// © 2021 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//
+
+Source archive entries: com/ibm/icu/impl/breakiter/MlBreakEngine.java, com/ibm/icu/impl/personname/FieldModifierImpl.java, com/ibm/icu/impl/personname/PersonNameFormatterImpl.java, com/ibm/icu/impl/personname/PersonNamePattern.java, com/ibm/icu/text/DisplayOptions.java, com/ibm/icu/text/PersonName.java, com/ibm/icu/text/PersonNameFormatter.java, com/ibm/icu/text/SimplePersonName.java
+// © 2022 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/LocaleFallbackData.java
+// © 2022 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//
+// Internal static data tables used by ICUResourceBundle.java
+// WARNING: This file is mechanically generated by the CLDR-to-ICU tool
+// (see tools/cldr/cldr-to-icu/src/main/java/org/unicode/tool/cldrtoicu/generator/ResourcFallbackCodeGenerator.java).
+// DO NOT HAND EDIT!!!
+
+Source archive entries: com/ibm/icu/message2/DateTimeFunctionFactory.java, com/ibm/icu/message2/FormattedMessage.java, com/ibm/icu/message2/FormattedPlaceholder.java, com/ibm/icu/message2/Function.java, com/ibm/icu/message2/FunctionFactory.java, com/ibm/icu/message2/MFDataModel.java, com/ibm/icu/message2/MFDataModelFormatter.java, com/ibm/icu/message2/MFFunctionRegistry.java, com/ibm/icu/message2/MFParser.java, com/ibm/icu/message2/MFSerializer.java, com/ibm/icu/message2/MessageFormatter.java, com/ibm/icu/message2/NumberFunctionFactory.java, com/ibm/icu/message2/OptUtils.java, com/ibm/icu/message2/PlainStringFormattedValue.java, com/ibm/icu/message2/TextFunctionFactory.java
+// © 2022 and later: Unicode, Inc. and others.
+// License & terms of use: https://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/impl/JavaTimeConverters.java, com/ibm/icu/message2/InputSource.java, com/ibm/icu/message2/MFDataModelValidator.java, com/ibm/icu/message2/MFParseException.java, com/ibm/icu/message2/StringUtils.java, com/ibm/icu/message2/StringView.java
+// © 2024 and later: Unicode, Inc. and others.
+// License & terms of use: https://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/dev/tool/docs/ICUBugTaglet.java, com/ibm/icu/dev/tool/docs/ICUSummaryTaglet.java, com/ibm/icu/dev/tool/docs/ICUTestTaglet.java, com/ibm/icu/impl/units/UnitAliases.java, com/ibm/icu/lang/IterableOfInt.java
+// © 2025 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+Source archive entries: com/ibm/icu/message2/Directionality.java, com/ibm/icu/segmenter/BoundaryIteratorOfInts.java, com/ibm/icu/segmenter/BoundarySpliterator.java, com/ibm/icu/segmenter/LocalizedSegmenter.java, com/ibm/icu/segmenter/RuleBasedSegmenter.java, com/ibm/icu/segmenter/Segment.java, com/ibm/icu/segmenter/SegmentIterable.java, com/ibm/icu/segmenter/SegmentIterator.java, com/ibm/icu/segmenter/Segmenter.java, com/ibm/icu/segmenter/Segments.java, com/ibm/icu/segmenter/SegmentsImpl.java
+// © 2025 and later: Unicode, Inc. and others.
+// License & terms of use: https://www.unicode.org/copyright.html

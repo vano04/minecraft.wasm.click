@@ -1,0 +1,67 @@
+Source archive entries: net/jpountz/lz4/LZ4BlockInputStream.java, net/jpountz/lz4/LZ4BlockOutputStream.java, net/jpountz/lz4/LZ4ByteBufferUtils.java, net/jpountz/lz4/LZ4Compressor.java, net/jpountz/lz4/LZ4Constants.java, net/jpountz/lz4/LZ4Decompressor.java, net/jpountz/lz4/LZ4Exception.java, net/jpountz/lz4/LZ4Factory.java, net/jpountz/lz4/LZ4FastDecompressor.java, net/jpountz/lz4/LZ4HCJNICompressor.java, net/jpountz/lz4/LZ4JNI.java, net/jpountz/lz4/LZ4JNICompressor.java, net/jpountz/lz4/LZ4JNIFastDecompressor.java, net/jpountz/lz4/LZ4JNISafeDecompressor.java, net/jpountz/lz4/LZ4SafeDecompressor.java, net/jpountz/lz4/LZ4SafeUtils.java, net/jpountz/lz4/LZ4UnknownSizeDecompressor.java, net/jpountz/lz4/LZ4UnsafeUtils.java, net/jpountz/lz4/LZ4Utils.java, net/jpountz/util/ByteBufferUtils.java, net/jpountz/util/Native.java, net/jpountz/util/SafeUtils.java, net/jpountz/util/UnsafeUtils.java, net/jpountz/util/Utils.java, net/jpountz/xxhash/AbstractStreamingXXHash32Java.java, net/jpountz/xxhash/StreamingXXHash32.java, net/jpountz/xxhash/StreamingXXHash32JNI.java, net/jpountz/xxhash/XXHash32.java, net/jpountz/xxhash/XXHash32JNI.java, net/jpountz/xxhash/XXHashConstants.java, net/jpountz/xxhash/XXHashFactory.java, net/jpountz/xxhash/XXHashJNI.java
+/*
+ * Copyright 2020 Adrien Grand and the lz4-java contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source archive entries: net/jpountz/xxhash/AbstractStreamingXXHash64Java.java, net/jpountz/xxhash/StreamingXXHash64.java, net/jpountz/xxhash/StreamingXXHash64JNI.java, net/jpountz/xxhash/XXHash64.java, net/jpountz/xxhash/XXHash64JNI.java
+/*
+ * Copyright 2020 Linnaea Von Lavia and the lz4-java contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source archive entries: net/jpountz/lz4/LZ4CompressorWithLength.java, net/jpountz/lz4/LZ4DecompressorWithLength.java
+/*
+ * Copyright 2020 Rei Odaira and the lz4-java contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source archive entries: net/jpountz/lz4/LZ4FrameInputStream.java, net/jpountz/lz4/LZ4FrameOutputStream.java
+/*
+ * Copyright 2020 The Apache Software Foundation and the lz4-java contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

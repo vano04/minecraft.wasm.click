@@ -1,0 +1,484 @@
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index e95d620..a9947b5 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -24,6 +24,7 @@
+ #include "oops/instanceKlass.inline.hpp"
+ #include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
++#include "oops/resolvedMethodEntry.hpp"
+ #include "runtime/fieldDescriptor.inline.hpp"
+ #include "runtime/globals.hpp"
+ #include "utilities/ostream.hpp"
+@@ -230,7 +231,9 @@ enum LinkedFunction {
+   LinkedVirtual = 2,
+   LinkedSafeDiv = 3,
+   LinkedStoreChild = 4,
+-  LinkedStoreChildCaller = 5
++  LinkedStoreChildCaller = 5,
++  LinkedGoodValue = 6,
++  LinkedDispatch = 7
+ };
+ 
+ struct LinkedOopLayout {
+@@ -350,6 +353,39 @@ static void emit_linked_store_child_caller(WasmBuf& body) {
+   body.u8(0x0b);
+ }
+ 
++static void emit_linked_good_value(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);          // x
++  body.u8(0x41); body.sleb(11);
++  body.u8(0x6a);                       // Good.value: x + 11
++  linked_extend_i32(body);
++  body.u8(0x0b);
++}
++
++static void emit_linked_dispatch(WasmBuf& body, int resume_bci,
++                                 int klass_offset) {
++  empty_locals(body);
++  // Null is a guard miss before the linear-memory load; the interpreter owns
++  // the canonical NullPointerException path.
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x45);                       // receiver == null
++  body.u8(0x04); body.u8(0x7e);
++  linked_i64_const(body, linked_status(LINKED_DEOPT, resume_bci));
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)klass_offset);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x46);                       // exact receiver Klass == expected
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x10); body.uleb(LinkedGoodValue); // direct dispatch -> Good.value
++  body.u8(0x05);
++  linked_i64_const(body, linked_status(LINKED_DEOPT, resume_bci));
++  body.u8(0x0b);
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
+ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+   body.string(name);
+   body.u8(0x00);
+@@ -357,15 +393,20 @@ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+ }
+ 
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+-                               const LinkedOopLayout* oop_layout) {
++                               const LinkedOopLayout* oop_layout,
++                               int dispatch_bci) {
+   static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
+                                          0x01, 0x00, 0x00, 0x00};
+   module.raw(magic, sizeof(magic));
+ 
+   WasmBuf types;
+-  types.uleb(2);
++  types.uleb(oop_layout == nullptr ? 2 : 4);
+   linked_type(types, 1);               // leaf/caller -> i64
+   linked_type(types, 2);               // virtual/safeDiv -> i64
++  if (oop_layout != nullptr) {
++    linked_type(types, 1);              // Good.value -> i64
++    linked_type(types, 3);              // dispatch(receiver,x,expected Klass)
++  }
+   module.section(1, types);
+ 
+   if (oop_layout != nullptr) {
+@@ -377,12 +418,14 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+   }
+ 
+   WasmBuf functions;
+-  int function_count = oop_layout == nullptr ? 4 : 6;
++  int function_count = oop_layout == nullptr ? 4 : 8;
+   functions.uleb((unsigned)function_count);
+   functions.uleb(0); functions.uleb(0);
+   functions.uleb(1); functions.uleb(1);
+   if (oop_layout != nullptr) {
+     functions.uleb(1); functions.uleb(1);
++    functions.uleb(2);
++    functions.uleb(3);
+   }
+   module.section(3, functions);
+ 
+@@ -395,6 +438,8 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+   if (oop_layout != nullptr) {
+     emit_linked_export(exports, "storeChild", LinkedStoreChild);
+     emit_linked_export(exports, "storeChildCaller", LinkedStoreChildCaller);
++    emit_linked_export(exports, "goodValue", LinkedGoodValue);
++    emit_linked_export(exports, "dispatch", LinkedDispatch);
+   }
+   module.section(7, exports);
+ 
+@@ -427,6 +472,14 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     emit_linked_store_child_caller(body);
+     code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
+     emitted_code_bodies++;
++    body = WasmBuf();
++    emit_linked_good_value(body);
++    code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++    emitted_code_bodies++;
++    body = WasmBuf();
++    emit_linked_dispatch(body, dispatch_bci, oopDesc::klass_offset_in_bytes());
++    code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++    emitted_code_bodies++;
+   }
+   if (emitted_code_bodies != expected_code_bodies) return 0;
+   module.section(10, code);
+@@ -609,6 +662,130 @@ static bool fail_caller_shape(Method* method) {
+   return method->code_size() == 4 && code[0] == 0xb8 && code[3] == 0xac;
+ }
+ 
++static bool linked_dispatch_shape(Method* method) {
++  const unsigned char* code = method->code_base();
++  return method->code_size() == 6
++      && (code[0] == (unsigned char)Bytecodes::_fast_aload_0
++          || code[0] == (unsigned char)Bytecodes::_aload_0)
++      && code[1] == 0x1b
++      && code[2] == (unsigned char)Bytecodes::_invokevirtual
++      && code[5] == 0xac;
++}
++
++static uint64_t linked_bytecode_hash(const unsigned char* bytes, int length) {
++  uint64_t hash = 1469598103934665603ULL;
++  for (int i = 0; i < length; i++) {
++    hash ^= bytes[i];
++    hash *= 1099511628211ULL;
++  }
++  return hash;
++}
++
++static void linked_dispatch_reject(Method* method, int invoke_bci,
++                                   const char* reason, int operand,
++                                   ResolvedMethodEntry* entry,
++                                   InstanceKlass* expected_klass,
++                                   Method* target_method, int table_index,
++                                   bool target_shape, uint64_t target_hash) {
++  if (!ZeroWasmLinkedGroupVerbose) return;
++  const unsigned char* code = method == nullptr ? nullptr : method->code_base();
++  int opcode = method == nullptr || method->code_size() <= 2 ? -1 : code[2];
++  tty->print_cr("[zbg] DISPATCH_VERIFY reject=%s method=%s bci=%d opcode=%d "
++                "operand=%d entry=%p bytecode1=%d bytecode2=%d vfinal=%d "
++                "entry-method=%p table-index=%d expected-good=%p target=%p "
++                "target-holder=%p target-shape=%d target-hash=%016llx",
++                reason, method == nullptr ? "<null>" : method->name()->as_C_string(),
++                invoke_bci, opcode, operand, (void*)entry,
++                entry == nullptr ? -1 : (int)entry->bytecode1(),
++                entry == nullptr ? -1 : (int)entry->bytecode2(),
++                entry == nullptr ? -1 : (entry->is_vfinal() ? 1 : 0),
++                entry == nullptr ? nullptr : (void*)entry->method(), table_index,
++                (void*)expected_klass, (void*)target_method,
++                target_method == nullptr ? nullptr : (void*)target_method->method_holder(),
++                target_shape ? 1 : 0, (unsigned long long)target_hash);
++}
++
++static InstanceKlass* linked_fixture_klass(Method* seed, const char* name) {
++  if (seed == nullptr || name == nullptr) return nullptr;
++  Symbol* klass_name = SymbolTable::probe(name, (int)strlen(name));
++  if (klass_name == nullptr) return nullptr;
++  Thread* current = Thread::current();
++  Handle loader(current, seed->method_holder()->class_loader());
++  return SystemDictionary::find_instance_klass(current, klass_name, loader);
++}
++
++static bool linked_dispatch_metadata(Method* method, int invoke_bci,
++                                     InstanceKlass** expected_klass,
++                                     Method** target_method, int* table_index) {
++  if (method == nullptr || !linked_dispatch_shape(method)
++      || invoke_bci != 2
++      || expected_klass == nullptr || target_method == nullptr
++      || table_index == nullptr) {
++    linked_dispatch_reject(method, invoke_bci, "shape-or-output", -1, nullptr,
++                           nullptr, nullptr, -1, false, 0);
++    return false;
++  }
++  const unsigned char* code = method->code_base();
++  int index = Bytes::get_native_u2((address)(code + invoke_bci + 1));
++  ConstantPool* constants = method->constants();
++  if (index < 0 || index >= constants->resolved_method_entries_length()) {
++    linked_dispatch_reject(method, invoke_bci, "operand-range", index, nullptr,
++                           nullptr, nullptr, -1, false, 0);
++    return false;
++  }
++  ResolvedMethodEntry* entry = constants->resolved_method_entry_at(index);
++  if (entry == nullptr || entry->bytecode2() != Bytecodes::_invokevirtual
++      || entry->is_vfinal()) {
++    linked_dispatch_reject(method, invoke_bci, "entry-kind", index, entry,
++                           nullptr, nullptr,
++                           entry != nullptr
++                               && entry->bytecode2() == Bytecodes::_invokevirtual
++                               && !entry->is_vfinal()
++                             ? (int)entry->table_index() : -1,
++                           false, 0);
++    return false;
++  }
++  Symbol* owner = constants->klass_ref_at_noresolve(index, Bytecodes::_invokevirtual);
++  Symbol* name = constants->name_ref_at(index, Bytecodes::_invokevirtual);
++  Symbol* signature = constants->signature_ref_at(index, Bytecodes::_invokevirtual);
++  if (owner == nullptr || name == nullptr || signature == nullptr
++      || !owner->equals("ZeroBaselineFixture$Base")
++      || !name->equals("value") || !signature->equals("(I)I")) {
++    linked_dispatch_reject(method, invoke_bci, "symbol-contract", index, entry,
++                           nullptr, nullptr, (int)entry->table_index(), false, 0);
++    return false;
++  }
++  InstanceKlass* base_klass = linked_fixture_klass(method, "ZeroBaselineFixture$Base");
++  InstanceKlass* good_klass = linked_fixture_klass(method, "ZeroBaselineFixture$Good");
++  if (base_klass == nullptr || good_klass == nullptr) {
++    linked_dispatch_reject(method, invoke_bci, "klass-resolution", index, entry,
++                           good_klass, nullptr, (int)entry->table_index(), false, 0);
++    return false;
++  }
++  int vtable = (int)entry->table_index();
++  Method* declared = base_klass->method_at_vtable(vtable);
++  Method* target = good_klass->method_at_vtable(vtable);
++  static const unsigned char good_code[] = {0x1b, 0x10, 0x0b, 0x60, 0xac};
++  bool target_shape = target != nullptr && code_is(target, good_code, sizeof(good_code));
++  uint64_t target_hash = target == nullptr ? 0
++      : linked_bytecode_hash((const unsigned char*)target->code_base(),
++                             target->code_size());
++  if (declared == nullptr || target == nullptr
++      || !declared->name()->equals("value")
++      || !declared->signature()->equals("(I)I")
++      || target->method_holder() != good_klass
++      || target->is_final()
++      || !target_shape || target_hash != 0x54600dc659075bf5ULL) {
++    linked_dispatch_reject(method, invoke_bci, "target-contract", index, entry,
++                           good_klass, target, vtable, target_shape, target_hash);
++    return false;
++  }
++  *expected_klass = good_klass;
++  *target_method = target;
++  *table_index = vtable;
++  return true;
++}
++
+ static bool virtual_code_is(Method* method) {
+   // The constant-pool index varies with javac's pool layout; the invoke
+   // opcode, count, zero byte, and return shape are the verified contract.
+@@ -836,6 +1013,12 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+       slots.push(addFunction(instance.exports.storeChild, "jii"));
+       slots.push(addFunction(instance.exports.storeChildCaller, "jii"));
+     }
++    if (slot_count === 8) {
++      slots.push(addFunction(instance.exports.storeChild, "jii"));
++      slots.push(addFunction(instance.exports.storeChildCaller, "jii"));
++      slots.push(addFunction(instance.exports.goodValue, "ji"));
++      slots.push(addFunction(instance.exports.dispatch, "jiii"));
++    }
+     const id = globalThis.__mcwebZeroLinkedGroupCache.__nextId || 1;
+     globalThis.__mcwebZeroLinkedGroupCache.__nextId = id + 1;
+     globalThis.__mcwebZeroLinkedGroupCache[metadata] = { id, instance, slots };
+@@ -865,7 +1048,7 @@ static THREAD_LOCAL uint64_t _deopt = 0;
+ static THREAD_LOCAL uint64_t _exception_resume = 0;
+ 
+ static THREAD_LOCAL int _linked_module_id = -1;
+-static THREAD_LOCAL int _linked_table_slots[6] = {-1, -1, -1, -1, -1, -1};
++static THREAD_LOCAL int _linked_table_slots[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+ static THREAD_LOCAL uint64_t _linked_calls = 0;
+ static THREAD_LOCAL uint64_t _linked_returned = 0;
+ static THREAD_LOCAL uint64_t _linked_deopt = 0;
+@@ -881,6 +1064,7 @@ typedef jint (*ZbbOneArg)(jint);
+ typedef jint (*ZbbTwoArg)(jint, jint);
+ typedef jlong (*ZbgOneArg)(jint);
+ typedef jlong (*ZbgTwoArg)(jint, jint);
++typedef jlong (*ZbgThreeArg)(jint, jint, jint);
+ 
+ struct LinkedStatus {
+   int status;
+@@ -907,6 +1091,11 @@ static jlong linked_table_call2(int slot, jint first, jint second) {
+   return ((ZbgTwoArg)(intptr_t)slot)(first, second);
+ }
+ 
++static jlong linked_table_call3(int slot, jint first, jint second, jint third) {
++  _linked_calls++;
++  return ((ZbgThreeArg)(intptr_t)slot)(first, second, third);
++}
++
+ static jint table_call1(int slot, jint value) {
+   _table_calls++;
+   if (ZeroWasmBaselineVerbose && _table_calls == 1) {
+@@ -1000,7 +1189,8 @@ enum LinkedMethodKind {
+   LinkedStoreChildCallerMethod,
+   LinkedAllocCallerMethod,
+   LinkedInitCallerMethod,
+-  LinkedFailCallerMethod
++  LinkedFailCallerMethod,
++  LinkedDispatchMethod
+ };
+ 
+ static int first_opcode(Method* method, unsigned char opcode) {
+@@ -1028,7 +1218,8 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* safe_div_bci,
+                                              int* return_bci,
+                                              int* alloc_bci,
+-                                             int* init_bci) {
++                                             int* init_bci,
++                                             int* dispatch_bci) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -1036,6 +1227,20 @@ static LinkedMethodKind verify_linked_method(Method* method,
+       && strstr(method->name()->as_C_string(), ZeroWasmBaselineOnly) == nullptr) {
+     return LinkedNoMethod;
+   }
++  if (ZeroWasmLinkedGroupVerbose && method->name()->equals("dispatch")) {
++    const unsigned char* code = method->code_base();
++    tty->print_cr("[zbg] DISPATCH_CLASSIFY size=%d static=%d result=%d "
++                  "b0=%d b1=%d b2=%d b3=%d b4=%d b5=%d b6=%d shape=%d",
++                  method->code_size(), method->is_static() ? 1 : 0,
++                  (int)method->result_type(), method->code_size() > 0 ? code[0] : -1,
++                  method->code_size() > 1 ? code[1] : -1,
++                  method->code_size() > 2 ? code[2] : -1,
++                  method->code_size() > 3 ? code[3] : -1,
++                  method->code_size() > 4 ? code[4] : -1,
++                  method->code_size() > 5 ? code[5] : -1,
++                  method->code_size() > 6 ? code[6] : -1,
++                  linked_dispatch_shape(method) ? 1 : 0);
++  }
+   if (static_int(method, "leaf", "(I)I") && method->is_final()) {
+     static const unsigned char expected[] = {0x1a, 0x06, 0x60, 0xac};
+     if (code_is(method, expected, sizeof(expected))) {
+@@ -1097,6 +1302,18 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     *return_bci = 3;
+     return LinkedFailCallerMethod;
+   }
++  if (static_int(method, "dispatch", "(LZeroBaselineFixture$Base;I)I")
++      && linked_dispatch_shape(method)) {
++    *dispatch_bci = first_opcode(method, (unsigned char)Bytecodes::_invokevirtual);
++    *return_bci = first_opcode(method, 0xac);
++    InstanceKlass* expected = nullptr;
++    Method* target = nullptr;
++    int table_index = -1;
++    return *dispatch_bci == 2
++        && linked_dispatch_metadata(method, *dispatch_bci, &expected, &target,
++                                    &table_index)
++        ? LinkedDispatchMethod : LinkedNoMethod;
++  }
+   return LinkedNoMethod;
+ }
+ 
+@@ -1187,6 +1404,7 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+ }
+ 
+ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci,
++                                 int dispatch_bci,
+                                  const LinkedOopLayout* oop_layout) {
+   if (ZeroWasmBaselineJarHash == nullptr
+       || ZeroWasmBaselineClassHash == nullptr
+@@ -1204,11 +1422,12 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "storeChildCaller(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I;"
+       "allocLeaf(LZeroBaselineFixture$Box;I)I|"
+       "allocCaller(LZeroBaselineFixture$Box;I)I|"
+-      "initCaller(Z)I|failCaller()I;"
+-      "virtual-bci=%d;safe-div-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
++      "initCaller(Z)I|failCaller()I|"
++      "dispatch(LZeroBaselineFixture$Base;I)I;"
++      "virtual-bci=%d;safe-div-bci=%d;dispatch-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+       "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;"
+       "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+-      virtual_bci, safe_div_bci, ZeroWasmBaselineJarHash,
++      virtual_bci, safe_div_bci, dispatch_bci, ZeroWasmBaselineJarHash,
+       ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
+       oop_layout == nullptr ? "none" : "raw32-serial-card",
+       oop_layout == nullptr ? 0 : oop_layout->child_offset,
+@@ -1218,11 +1437,12 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       oop_layout == nullptr ? 0 : oop_layout->dirty_card);
+   if (written <= 0 || written >= (int)sizeof(key)) return false;
+   WasmBuf module;
+-  int length = build_linked_module(module, virtual_bci, safe_div_bci, oop_layout);
++  int length = build_linked_module(module, virtual_bci, safe_div_bci, oop_layout,
++                                   dispatch_bci);
+   if (length <= 0) return false;
+   _linked_module_id = zbb_linked_install(module.data(), length, key,
+                                            (int)(intptr_t)_linked_table_slots,
+-                                           oop_layout == nullptr ? 4 : 6,
++                                           oop_layout == nullptr ? 4 : 8,
+                                            ZeroWasmLinkedGroupVerbose ? 1 : 0);
+   if (_linked_module_id < 0) return false;
+   if (ZeroWasmLinkedGroupVerbose) {
+@@ -1242,10 +1462,12 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int safe_div_bci = -1;
+   int alloc_bci = -1;
+   int init_bci = -1;
++  int dispatch_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci, &return_bci,
+-                                                &alloc_bci, &init_bci);
++                                                &alloc_bci, &init_bci,
++                                                &dispatch_bci);
+   LinkedOopLayout oop_layout;
+   const LinkedOopLayout* install_oop_layout = nullptr;
+   if (kind != LinkedNoMethod) {
+@@ -1286,7 +1508,7 @@ static ZeroWasmBaseline::Result run_linked_group(
+   }
+   if (return_bci < 0) return ZeroWasmBaseline::NotRun;
+   if (_linked_module_id < 0
+-      && !install_linked_group(method, virtual_bci, safe_div_bci,
++      && !install_linked_group(method, virtual_bci, safe_div_bci, dispatch_bci,
+                                install_oop_layout)) {
+     return ZeroWasmBaseline::NotRun;
+   }
+@@ -1427,6 +1649,61 @@ static ZeroWasmBaseline::Result run_linked_group(
+       _linked_store_entries++;
+       break;
+     }
++    case LinkedDispatchMethod: {
++      InstanceKlass* expected_klass = nullptr;
++      Method* target_method = nullptr;
++      int table_index = -1;
++      if (!linked_dispatch_metadata(method, dispatch_bci, &expected_klass,
++                                     &target_method, &table_index)
++          || _linked_table_slots[LinkedDispatch] < 0
++          || oopDesc::klass_offset_in_bytes() != 4) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      oop receiver = cast_to_oop((void*)locals[0]);
++      jint x = (jint)locals[-1];
++      result = decode_linked_status(linked_table_call3(
++          _linked_table_slots[LinkedDispatch], (jint)(intptr_t)receiver, x,
++          (jint)(intptr_t)expected_klass));
++      if (result.status == LINKED_RETURN && result.bci == 0) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, result.value);
++        if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose && _linked_calls <= 16) {
++          tty->print_cr("[zbg] DIRECT_CALL dispatch->Good.value runtime=1 "
++                        "table-index=%d target-bytecode-hash=54600dc659075bf5",
++                        table_index);
++        }
++        _linked_returned++;
++        return ZeroWasmBaseline::Returned;
++      }
++      if (result.status != LINKED_DEOPT || result.bci != dispatch_bci) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (!linked_validate_pre_push(istate, *tos, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      // Preserve the invokevirtual receiver/argument order for the real
++      // interpreter. Null is handled by the Wasm guard before any load.
++      push_oop(tos, receiver);
++      push_int(tos, x);
++      if (!linked_prepare_state(istate, tos, pc, code_base + dispatch_bci, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (ZeroWasmLinkedGroupVerbose && _linked_calls <= 16) {
++        const char* receiver_name = receiver == nullptr ? "null"
++            : receiver->klass()->name()->as_C_string();
++        tty->print_cr("[zbg] DISPATCH_BAIL reason=exact-class-or-null "
++                      "receiver-class=%s expected-class=%s resume-bci=%d "
++                      "depth=2 pending=0", receiver_name,
++                      expected_klass->name()->as_C_string(), dispatch_bci);
++      }
++      _linked_deopt++;
++      return ZeroWasmBaseline::DeoptResume;
++    }
+     case LinkedAllocCallerMethod: {
+       oop root = cast_to_oop((void*)locals[0]);
+       jint tag = (jint)locals[-1];
+

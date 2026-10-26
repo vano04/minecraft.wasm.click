@@ -1,0 +1,526 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -160,6 +160,9 @@
+           "uses more of the engine's stack than of the one HotSpot checks")  \
+           range(0, 4096)                                                     \
+                                                                             \
++  product(bool, ZeroWasmJITResidenceStats, false, EXPERIMENTAL,             \
++          "Observe generated units, imports and table roots; no reclamation")\
++                                                                            \
+   product(bool, ZeroWasmJITCallStats, false, EXPERIMENTAL,                 \
+           "Count how compiled-to-compiled calls are made (frameless, "       \
+           "framed, megamorphic, slow path) and print it per thread every "   \
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+@@ -64,6 +64,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include "interpreter/zero/zeroWasmResidence.hpp"
+ 
+ // ---------------------------------------------------------------------------
+ // Installing generated code
+@@ -716,12 +717,23 @@
+ // install after that read an empty buffer, and those methods stayed
+ // interpreted. (Node hid it: its file system calls refresh the views.) The
+ // copy also keeps a shared buffer out of the Module constructor.
+-EM_JS(int, zwc_install, (const unsigned char* bytes, int len, int slot, int invoke, int subtype, int flcall, int fbail, const int* direct, int ndirect), {
++EM_JS(int, zwc_install, (const unsigned char* bytes, int len, int slot, int invoke, int subtype, int flcall, int fbail, const int* direct, int ndirect, int residence), {
++  let trace = null;
++  if (residence) { try { trace = globalThis.__zwcResidence; } catch (_) {} }
++  const observe = trace ? (fn, fallback = undefined) => {
++    try { return fn(); } catch (_) {
++      try { trace.problem('installer observer exception'); } catch (_) {}
++      return fallback;
++    }
++  } : null;
++  let traceId = 0;
+   try {
+     const t0 = performance.now();
++    if (trace) traceId = observe(() => trace.begin(len, [slot], invoke ? 'jit' : 'ffi', invoke ? 4 : 0), 0);
+     const copy = new Uint8Array(wasmMemory.buffer, bytes >>> 0, len).slice();
+     const t1 = performance.now();
+     const mod = new WebAssembly.Module(copy);
++    if (trace) observe(() => trace.moduleCreated(traceId));
+     const t2 = performance.now();
+     let env;
+     if (invoke) {
+@@ -734,13 +746,20 @@
+       if (ndirect > 0) {
+         env = Object.assign({}, env);
+         const d = new Int32Array(wasmMemory.buffer, direct >>> 0, ndirect);
+-        for (let k = 0; k < ndirect; k++) env['d' + k] = wasmTable.get(d[k]);
++        for (let k = 0; k < ndirect; k++) {
++          const target = wasmTable.get(d[k]); env['d' + k] = target;
++          if (trace) observe(() => trace.bind(traceId, k, target));
++        }
+       }
+     } else {
+       env = { memory: wasmMemory, __indirect_function_table: wasmTable };
+     }
+     const inst = new WebAssembly.Instance(mod, { env });
++    if (trace) observe(() => trace.instanceCreated(traceId));
++    if (trace) observe(() => trace.register(traceId, 0, slot, inst.exports.f));
++    const previous = trace ? observe(() => wasmTable.get(slot), null) : null;
+     wasmTable.set(slot, inst.exports.f);
++    if (trace) observe(() => trace.written(traceId, 0, slot, previous));
+     const t3 = performance.now();
+     // A slow install, with where its time went (-XX:+ZeroWasmJITPrintCompileTime
+     // finds them; this says which part).
+@@ -751,6 +770,7 @@
+     }
+     return 1;
+   } catch (e) {
++    if (trace) observe(() => trace.failed(traceId));
+     globalThis.__zwcErr = (globalThis.__zwcErr || 0) + 1;
+     if (globalThis.__zwcErr <= 3 || (globalThis.__zwcErr & (globalThis.__zwcErr - 1)) == 0) {
+       err('[zwc] install failed (' + globalThis.__zwcErr + '): ' + e);
+@@ -762,11 +782,22 @@
+ // A unit (assemble_unit): instantiates it once and puts export "k" in this
+ // thread's table at slots[k], for each of its `n` functions. Returns 1, or 0
+ // if the engine rejected it (nothing installed). Otherwise as zwc_install.
+-EM_JS(int, zwc_install_unit, (const unsigned char* bytes, int len, const int* slots, int n, int invoke, int subtype, int flcall, int fbail, int frem, int drem, int clock, const int* direct, int ndirect), {
++EM_JS(int, zwc_install_unit, (const unsigned char* bytes, int len, const int* slots, int n, int invoke, int subtype, int flcall, int fbail, int frem, int drem, int clock, const int* direct, int ndirect, int residence), {
++  let trace = null;
++  if (residence) { try { trace = globalThis.__zwcResidence; } catch (_) {} }
++  const observe = trace ? (fn, fallback = undefined) => {
++    try { return fn(); } catch (_) {
++      try { trace.problem('installer observer exception'); } catch (_) {}
++      return fallback;
++    }
++  } : null;
++  let traceId = 0;
+   try {
+     const t0 = performance.now();
++    if (trace) traceId = observe(() => trace.begin(len, Array.from(new Int32Array(wasmMemory.buffer, slots >>> 0, n)), 'jit', 7), 0);
+     const copy = new Uint8Array(wasmMemory.buffer, bytes >>> 0, len).slice();
+     const mod = new WebAssembly.Module(copy);
++    if (trace) observe(() => trace.moduleCreated(traceId));
+     const t1 = performance.now();
+     let env = (globalThis.__zwcEnv ||= {
+       memory: wasmMemory, i: wasmTable.get(invoke), s: wasmTable.get(subtype),
+@@ -778,11 +809,20 @@
+     if (ndirect > 0) {
+       env = Object.assign({}, env);
+       const d = new Int32Array(wasmMemory.buffer, direct >>> 0, ndirect);
+-      for (let k = 0; k < ndirect; k++) env['d' + k] = wasmTable.get(d[k]);
++      for (let k = 0; k < ndirect; k++) {
++          const target = wasmTable.get(d[k]); env['d' + k] = target;
++          if (trace) observe(() => trace.bind(traceId, k, target));
++        }
+     }
+     const inst = new WebAssembly.Instance(mod, { env });
++    if (trace) observe(() => trace.instanceCreated(traceId));
+     const s = new Int32Array(wasmMemory.buffer, slots >>> 0, n);
+-    for (let k = 0; k < n; k++) wasmTable.set(s[k], inst.exports[k]);
++    if (trace) for (let k = 0; k < n; k++) observe(() => trace.register(traceId, k, s[k], inst.exports[k]));
++    for (let k = 0; k < n; k++) {
++      const previous = trace ? observe(() => wasmTable.get(s[k]), null) : null;
++      wasmTable.set(s[k], inst.exports[k]);
++      if (trace) observe(() => trace.written(traceId, k, s[k], previous));
++    }
+     const t2 = performance.now();
+     if (t2 - t0 > 20) {
+       err('[zwc] slow install ' + (t2 - t0).toFixed(1) + ' ms: compile ' + (t1 - t0).toFixed(1)
+@@ -792,6 +832,7 @@
+     globalThis.__zwcUnits = (globalThis.__zwcUnits || 0) + 1;
+     return 1;
+   } catch (e) {
++    if (trace) observe(() => trace.failed(traceId));
+     globalThis.__zwcErr = (globalThis.__zwcErr || 0) + 1;
+     if (globalThis.__zwcErr <= 3 || (globalThis.__zwcErr & (globalThis.__zwcErr - 1)) == 0) {
+       err('[zwc] install failed (' + globalThis.__zwcErr + '): ' + e);
+@@ -8675,7 +8716,9 @@
+ }
+ 
+ // Takes an entry's code away (both bodies) and gives their slots back.
+-static void release_code(CacheEntry* e) {
++static void release_code(CacheEntry* e, int reason) {
++  if (ZeroWasmJITResidenceStats) zwc_residence_retire((int)(intptr_t)e, (int)(intptr_t)e->method,
++      (int)e->gen, (int)(intptr_t)e->fn, (int)(intptr_t)e->frameless, reason, (int)e->uses);
+   _slot_owner[e->slot] = nullptr;
+   _free_slots[_nfree++] = e->slot;
+   if (e->frameless != nullptr) _free_slots[_nfree++] = e->fslot;
+@@ -8698,7 +8741,7 @@
+   for (int i = 0; i < n; i++) {
+     CacheEntry* c = d[i].e;
+     if (c == e || c->index != 1 || c->gen != d[i].gen) continue;
+-    release_code(c);
++    release_code(c, RR_DEPENDENT);
+     c->why = RR_DEPENDENT;
+     c->count = (int)ZeroWasmJITThreshold - 1;
+     if (depth < 16) release_dependents(c, depth + 1);
+@@ -8707,9 +8750,13 @@
+ static THREAD_LOCAL unsigned _takes_total = 0;
+ 
+ static void sweep_slots() {
++  if (ZeroWasmJITResidenceStats) zwc_residence_sweep(0);
+   _rr_sweeps++;
+   CacheEntry** live = (CacheEntry**)::malloc(ZWC_SLOT_COUNT * sizeof(CacheEntry*));
+-  if (live == nullptr) return;
++  if (live == nullptr) {
++    if (ZeroWasmJITResidenceStats) zwc_residence_sweep(2);
++    return;
++  }
+   int n = 0;
+   for (int i = 0; i < ZWC_SLOT_COUNT; i++) {
+     if (_slot_owner[i] != nullptr) live[n++] = _slot_owner[i];
+@@ -8719,8 +8766,8 @@
+   for (int i = 0; i < n; i++) {
+     CacheEntry* e = live[i];
+     if (dropped < drop && (!gentle || _takes_total - e->born >= SWEEP_GRACE)) {
+       dropped++;
+-      release_code(e);
++      release_code(e, RR_SWEEP);
+       e->why = RR_SWEEP;
+       e->count = 0;
+       _recycled++;
+@@ -8727,6 +8774,7 @@
+     e->uses >>= 1;
+   }
+   ::free(live);
++  if (ZeroWasmJITResidenceStats) zwc_residence_sweep(1);
+   if (ZeroWasmJITVerbose) {
+     tty->print_cr("[zwc] slot sweep: %d of %d compiled methods lost their code", dropped, n);
+   }
+@@ -8770,7 +8818,7 @@
+           tty->print_cr("[zwc] recompiling %s: the cache @%d met %d new classes",
+                         m->name_and_sig_as_C_string(), bci, s->nseen - s->pic_seen); }
+         e->repic++;
+-        release_code(e);
++        release_code(e, RR_PROFILE);
+         e->why = RR_PROFILE;
+         release_dependents(e);
+         e->count = (int)ZeroWasmJITThreshold - 1;
+@@ -8808,7 +8856,7 @@
+   }
+   e->recompiles++;
+   e->bails = 0;
+-  release_code(e);
++  release_code(e, RR_BAILS);
+   e->why = RR_BAILS;
+   release_dependents(e);
+   e->count = (int)ZeroWasmJITThreshold - 1;
+@@ -8873,7 +8921,7 @@
+ static NOINLINE void profile_recompile(CacheEntry* e) {
+   e->profiled = true;
+   if (!profile_worthy(e)) return;
+-  release_code(e);
++  release_code(e, RR_PROFILE);
+   e->why = RR_PROFILE;
+   release_dependents(e);
+   e->count = (int)ZeroWasmJITThreshold - 1;   // the next entry compiles
+@@ -8959,6 +9007,7 @@
+ // Assembles and installs pieces as one unit at the given slots (zwc_slots
+ // indices). The four runtime helpers are this thread's.
+ static bool install_unit(ZwcPiece** p, int n, const int* slot_index) {
++  if (ZeroWasmJITResidenceStats) zwc_residence_init((int)(intptr_t)Thread::current());
+   WasmBuf module;
+   int* dslots = (int*)::malloc(sizeof(int) * (size_t)(n * ZwcPiece::MAX_DIRECT + 1));
+   int* slots = (int*)::malloc(sizeof(int) * (size_t)(n + 1));
+@@ -8970,7 +9019,7 @@
+                           (int)(intptr_t)&zwc_invoke, (int)(intptr_t)&zwc_subtype,
+                           (int)(intptr_t)&zwc_fl_call, (int)(intptr_t)&zwc_framed_bail,
+                           (int)(intptr_t)&zwc_frem, (int)(intptr_t)&zwc_drem,
+-                          (int)(intptr_t)&zwc_clock, dslots, nd) == 1;
++                          (int)(intptr_t)&zwc_clock, dslots, nd, ZeroWasmJITResidenceStats ? 1 : 0) == 1;
+   ::free(dslots);
+   ::free(slots);
+   return ok;
+@@ -8994,6 +9043,7 @@
+ // ZeroWasmJITUnitSize > 1 it waits here, the method still interpreted
+ // (index PENDING), until its thread's unit is installed (flush_pending).
+ struct ZwcBuilt {
++  int residence_id;          // numeric observer identity, zero when disabled
+   CacheEntry* e;
+   Method* method;
+   ZwcPiece piece;            // the ordinary body
+@@ -9146,6 +9196,11 @@
+ 
+     }
+   }
++  if (ZeroWasmJITResidenceStats) {
++    zwc_residence_init((int)(intptr_t)Thread::current());
++    b->residence_id = zwc_residence_build((int)(intptr_t)e, (int)(intptr_t)method, (int)(e->gen + 1u),
++        (int)(intptr_t)zwc_slots[b->slot], b->fs >= 0 ? (int)(intptr_t)zwc_slots[b->fs] : 0, e->why);
++  }
+   return b;
+ }
+ 
+@@ -9163,6 +9218,7 @@
+   if (b->e->method != b->method || b->e->index != PENDING) return false;
+   if (!deps_valid(b->piece, b->dep, b->dep_gen)) return false;
+   if (b->fl_built && !deps_valid(b->fpiece, b->fdep, b->fdep_gen)) {
++    if (ZeroWasmJITResidenceStats) zwc_residence_drop(b->residence_id, (int)(intptr_t)zwc_slots[b->fs]);
+     _free_slots[_nfree++] = b->fs;       // just the frameless body goes
+     b->fs = -1;
+     b->fl_built = false;
+@@ -9187,6 +9243,7 @@
+                   installed ? "ok" : "engine rejected module");
+   }
+   if (!installed) {
++    if (ZeroWasmJITResidenceStats) zwc_residence_finish(b->residence_id, 0, 0, (int)e->gen);
+     _free_slots[_nfree++] = slot;
+     ::free(sites);
+     ::free(b->osr);
+@@ -9290,11 +9347,13 @@
+   if (e->sites != nullptr) ::free(e->sites);
+   e->sites = sites;
+   e->since = 0;
++  if (ZeroWasmJITResidenceStats) zwc_residence_finish(b->residence_id, 1, fl_installed ? 1 : 0, (int)e->gen);
+ }
+ 
+ // A waiting body that can no longer be installed: its method is compiled
+ // again at its next entry.
+ static void drop_built(ZwcBuilt* b) {
++  if (ZeroWasmJITResidenceStats) zwc_residence_drop(b->residence_id, 0);
+   _free_slots[_nfree++] = b->slot;
+   if (b->fs >= 0) _free_slots[_nfree++] = b->fs;
+   ::free(b->sites);
+@@ -9447,6 +9506,7 @@
+   _pending[_npending++] = b;
+   b->waited = true;
+   e->index = PENDING;
++  if (ZeroWasmJITResidenceStats) zwc_residence_pending(b->residence_id);
+   if (_npending >= (int)ZeroWasmJITUnitSize
+       || now - _pending_born >= (jlong)ZeroWasmJITUnitDelay * 1000000LL) flush_pending();
+   return e->index == 1;
+@@ -9944,6 +10004,8 @@
+     tty->print_cr("[zwc] frameless dropped %s: %u retries, %u completed",
+                   e->method->name_and_sig_as_C_string(), e->fl_retry, e->fl_ok);
+   }
++  if (ZeroWasmJITResidenceStats) zwc_residence_retire((int)(intptr_t)e, (int)(intptr_t)e->method,
++      (int)e->gen, 0, (int)(intptr_t)e->frameless, RR_N, (int)e->uses);
+   _free_slots[_nfree++] = e->fslot;
+   e->frameless = nullptr;
+   e->fslot = -1;
+@@ -10415,7 +10477,8 @@
+       c->cif = cif;
+       WasmBuf module;
+       int slot = build_ffi_trampoline(cif, module) ? take_slot() : -1;
+-      if (slot >= 0 && zwc_install(module.data(), module.length(), (int)(intptr_t)zwc_slots[slot], 0, 0, 0, 0, nullptr, 0)) {
++      if (slot >= 0 && ZeroWasmJITResidenceStats) zwc_residence_init((int)(intptr_t)Thread::current());
++      if (slot >= 0 && zwc_install(module.data(), module.length(), (int)(intptr_t)zwc_slots[slot], 0, 0, 0, 0, nullptr, 0, ZeroWasmJITResidenceStats ? 1 : 0)) {
+         // Never recycled: slot sweeps only reclaim compiled methods.
+         c->tramp = (zwc_ffi_fn)zwc_slots[slot];
+         if (ZeroWasmJITVerbose) {
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmResidence.hpp b/src/hotspot/share/interpreter/zero/zeroWasmResidence.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/hotspot/share/interpreter/zero/zeroWasmResidence.hpp
+@@ -0,0 +1,213 @@
++// Default-off diagnostic ownership model. Never owns executable objects.
++#ifndef SHARE_INTERPRETER_ZERO_ZEROWASMRESIDENCE_HPP
++#define SHARE_INTERPRETER_ZERO_ZEROWASMRESIDENCE_HPP
++
++EM_JS(void, zwc_residence_init, (int worker), {
++  try {
++    if (globalThis.__zwcResidence) return;
++    // MCWEB_RESIDENCE_FACTORY_BEGIN
++    const makeResidenceLedger = ({worker, emit = () => {}, unitLimit = 16384, exportLimit = 131072, edgeLimit = 262144, buildLimit = 65536, reportLimit = 64}) => {
++      const realm = (worker >>> 0) + ':' + Date.now() + ':' + Math.random().toString(36).slice(2);
++      const units = new Map(), builds = new Map(), reservations = new Map(), roots = new Map(), assignments = new Map();
++      const identities = new WeakMap();
++      const counts = {attempts: 0, attemptedBytes: 0, modules: 0, moduleBytes: 0, instances: 0, instanceBytes: 0, installedUnits: 0,
++        publishedBytes: 0, exports: 0, edges: 0, failures: 0, partialFailures: 0, overwrittenRetired: 0,
++        retireEvents: 0, sweepEvents: 0, sweepsCompleted: 0, abandonedBuilds: 0, unknownImports: 0, slotRecords: 0,
++        droppedBuilds: 0, droppedUnits: 0, droppedExports: 0, droppedEdges: 0, droppedReports: 0, emittedReports: 0, observerFailures: 0};
++      let nextBuild = 0, nextAssignment = 0, sequence = 0, incomplete = false;
++      const issues = [];
++      const problem = reason => { incomplete = true; if (issues.length < 16) issues.push(reason); };
++      const safe = (fn, fallback = undefined) => { try { return fn(); } catch (_) { counts.observerFailures++; problem('observer exception'); return fallback; } };
++      const find = ref => ref && units.get(ref.unit)?.exports[ref.ordinal];
++      const same = (a, b) => a?.unit === b?.unit && a?.ordinal === b?.ordinal;
++      const unitOf = id => units.get(id);
++      function reserve(entry, method, gen, slot, fs, reason) {
++        if (incomplete) { counts.droppedBuilds++; return 0; }
++        if (builds.size >= buildLimit || nextBuild >= 2147483647) { counts.droppedBuilds++; problem('build capacity'); return 0; }
++        let assignment = assignments.get(entry);
++        if (!assignment || assignment.method !== method) {
++          assignment = {id: ++nextAssignment, method}; assignments.set(entry, assignment);
++        }
++        const build = {id: ++nextBuild, assignment: assignment.id, entry, method, gen: gen >>> 0,
++          reason, state: 'built', refs: []};
++        builds.set(build.id, build);
++        for (const [target, role] of [[slot, 'ordinary'], [fs, 'frameless']]) if (target > 0) {
++          if (reservations.has(target)) problem('duplicate reservation');
++          reservations.set(target, {build: build.id, role});
++        }
++        return build.id;
++      }
++      function begin(bytes, slots, kind, helpers) {
++        if (incomplete) { counts.droppedUnits++; return 0; }
++        if (!Number.isSafeInteger(bytes) || bytes < 0 || !Number.isSafeInteger(counts.attemptedBytes + bytes)) { problem('byte counter overflow'); return 0; }
++        if (units.size >= unitLimit || counts.slotRecords + slots.length > exportLimit) { counts.droppedUnits++; problem('unit/export capacity'); return 0; }
++        const id = ++counts.attempts; counts.attemptedBytes += bytes;
++        counts.slotRecords += slots.length;
++        units.set(id, {id, bytes, kind, helpers, imports: [], exports: [], module: false, instance: false,
++          published: 0, failed: false, slots: [...slots]});
++        return id;
++      }
++      function moduleCreated(id) { const u = unitOf(id); if (u) { u.module = true; counts.modules++; counts.moduleBytes += u.bytes; } }
++      function bind(id, ordinal, fn) {
++        const u = unitOf(id); if (!u) return;
++        if (counts.edges >= edgeLimit) { counts.droppedEdges++; problem('import edge capacity'); return; }
++        const ref = identities.get(fn);
++        if (!ref) { counts.unknownImports++; problem('unknown generated direct import'); }
++        u.imports.push({ordinal, target: ref ? {...ref} : null}); counts.edges++;
++      }
++      function instanceCreated(id) { const u = unitOf(id); if (u) { u.instance = true; counts.instances++; counts.instanceBytes += u.bytes; } }
++      function register(id, ordinal, slot, fn) {
++        const u = unitOf(id); if (!u) return;
++        if (counts.exports >= exportLimit) { counts.droppedExports++; problem('export capacity'); return; }
++        const reservation = reservations.get(slot);
++        const build = reservation && builds.get(reservation.build);
++        if (u.kind !== 'ffi' && !build) problem('export without build reservation');
++        const ref = {unit: id, ordinal};
++        const record = {ordinal, slot, build: build?.id || 0, assignment: build?.assignment || 0,
++          entry: build?.entry || 0, method: build?.method || 0, gen: build?.gen || 0,
++          role: u.kind === 'ffi' ? 'ffi' : reservation?.role || 'unknown', native: u.kind === 'ffi' ? 'permanent' : 'pending',
++          retireReason: null, retireUses: null};
++        u.exports[ordinal] = record; counts.exports++; identities.set(fn, ref);
++        if (build) build.refs.push(ref);
++      }
++      function written(id, ordinal, slot, previous) {
++        const u = unitOf(id), record = u?.exports[ordinal]; if (!record) return;
++        const old = roots.get(slot), actual = identities.get(previous);
++        if ((old || actual) && !same(old, actual)) problem('unobserved table root mutation');
++        if (old && ['current', 'permanent'].includes(find(old)?.native)) problem('overwrite of current/permanent export');
++        if (old && find(old)?.native === 'retired') counts.overwrittenRetired++;
++        roots.set(slot, {unit: id, ordinal}); u.published++;
++        if (u.published === 1) { counts.installedUnits++; counts.publishedBytes += u.bytes; }
++      }
++      function failed(id) {
++        const u = unitOf(id); if (!u) return;
++        u.failed = true; counts.failures++; if (u.published) counts.partialFailures++;
++      }
++      function finish(buildId, installed, flInstalled, gen) {
++        const build = builds.get(buildId); if (!build) return;
++        build.state = installed ? 'visible' : 'refused'; build.gen = gen >>> 0;
++        for (const ref of build.refs) {
++          const x = find(ref); if (!x) continue;
++          const current = same(roots.get(x.slot), ref) && installed && (x.role === 'ordinary' || flInstalled);
++          x.native = current ? 'current' : 'not-current'; if (current) x.gen = gen >>> 0;
++        }
++        for (const [slot, r] of reservations) if (r.build === buildId) reservations.delete(slot);
++      }
++      function retire(entry, method, gen, slot, fs, reason, uses) {
++        counts.retireEvents++;
++        for (const target of [slot, fs]) if (target > 0) {
++          const x = find(roots.get(target));
++          if (!x || x.entry !== entry || x.method !== method || x.gen !== (gen >>> 0) || x.native !== 'current') { problem('retire identity mismatch'); continue; }
++          x.native = 'retired'; x.retireReason = reason; x.retireUses = uses >>> 0;
++        }
++      }
++      function drop(buildId, slot = 0) {
++        const build = builds.get(buildId); if (!build) return;
++        if (!slot) { build.state = 'abandoned'; counts.abandonedBuilds++; }
++        for (const [target, r] of reservations) if (r.build === buildId && (!slot || target === slot)) reservations.delete(target);
++      }
++      const closure = seeds => {
++        const reached = new Set(), pending = [...seeds];
++        while (pending.length) {
++          const id = pending.pop(); if (reached.has(id)) continue;
++          const u = units.get(id); if (!u) { problem('missing unit in closure'); continue; }
++          reached.add(id); for (const edge of u.imports) if (edge.target) pending.push(edge.target.unit);
++        }
++        return reached;
++      };
++      const bytesOf = ids => [...ids].reduce((n, id) => n + units.get(id).bytes, 0);
++      function snapshot(tag = 'manual', details = false) {
++        const table = new Set(), nonRetiredRootUnits = new Set(), mixed = new Set(), fullyRetired = new Set(), importOnly = new Set(), retiredTable = new Set();
++        let retiredRoots = 0, currentRoots = 0, ffiRoots = 0, pendingRoots = 0, notCurrentRoots = 0;
++        for (const ref of roots.values()) {
++          table.add(ref.unit); const x = find(ref);
++          if (x?.native === 'current') { currentRoots++; nonRetiredRootUnits.add(ref.unit); }
++          else if (x?.native === 'permanent') { ffiRoots++; nonRetiredRootUnits.add(ref.unit); }
++          else if (x?.native === 'pending') { pendingRoots++; nonRetiredRootUnits.add(ref.unit); }
++          else if (x?.native === 'retired') retiredRoots++;
++          else { notCurrentRoots++; nonRetiredRootUnits.add(ref.unit); }
++        }
++        const reached = closure(table), withoutRetiredRoots = closure(nonRetiredRootUnits);
++        let importOnlyUnits = 0, retiredTableUnits = 0;
++        const retiredBodies = new Set(), retiredBuilds = new Set();
++        for (const id of reached) {
++          const u = units.get(id);
++          if (!table.has(id)) { importOnlyUnits++; importOnly.add(id); }
++          if (u.exports.length && u.exports.every(x => ['retired', 'not-current'].includes(x.native))) fullyRetired.add(id);
++          if (u.exports.some(x => x.native === 'retired')) {
++            for (const x of u.exports) if (x.native === 'retired') { retiredBodies.add(x.build + ':' + x.role); retiredBuilds.add(x.build); }
++            if (u.exports.some(x => x.native === 'current' && same(roots.get(x.slot), {unit: id, ordinal: x.ordinal}))) mixed.add(id);
++            if (table.has(id)) { retiredTableUnits++; retiredTable.add(id); }
++          }
++        }
++        const result = {schema: 1, realm, worker: worker >>> 0, sequence: ++sequence, tag, incomplete,
++          issues: [...issues], cumulative: {...counts}, records: {units: units.size, builds: builds.size, assignments: assignments.size,
++            exports: counts.exports, edges: counts.edges, reservations: reservations.size, limits: {unitLimit, exportLimit, edgeLimit, buildLimit, reportLimit}},
++          knownReachability: {tableSlots: roots.size, currentRoots, retiredRoots, notCurrentRoots, pendingRoots, ffiRoots,
++            tableUnits: table.size, tableEncodedBytes: bytesOf(table), units: reached.size, encodedBytes: bytesOf(reached),
++            retiredBodyGenerations: retiredBodies.size, retiredBuildGenerations: retiredBuilds.size,
++            fullyRetiredUnits: fullyRetired.size, fullyRetiredEncodedBytes: bytesOf(fullyRetired),
++            importOnlyUnits, importOnlyEncodedBytes: bytesOf(importOnly), retiredTableUnits, retiredTableEncodedBytes: bytesOf(retiredTable),
++            mixedSiblingUnits: mixed.size, mixedSiblingEncodedBytes: bytesOf(mixed),
++            withoutRetiredRootsUnits: withoutRetiredRoots.size, withoutRetiredRootsEncodedBytes: bytesOf(withoutRetiredRoots),
++            tableLagMarginalUnits: reached.size - withoutRetiredRoots.size, tableLagMarginalEncodedBytes: bytesOf(reached) - bytesOf(withoutRetiredRoots)},
++          limits: ['Known table/import reachability only; executing bodies and engine caches are unmeasured.',
++            'Outside table writes are checked only when an observed installer overwrites that slot; snapshots do not rescan the table.',
++            'Encoded module bytes are not executable memory or RSS. Sibling/direct/table categories overlap.',
++            'Generation execution and direct uses-hole counters are not enabled by this ledger.']};
++        if (details) result.units = [...units.values()].map(u => ({...u, slots: [...u.slots], exports: u.exports.map(x => ({...x})), imports: u.imports.map(x => ({...x, target: x.target && {...x.target}}))}));
++        return result;
++      }
++      function report(tag) {
++        if (counts.emittedReports >= reportLimit) { counts.droppedReports++; problem('report capacity'); return null; }
++        counts.emittedReports++;
++        if (counts.emittedReports === reportLimit) problem('report capacity reached; further automatic reports suppressed');
++        const result = snapshot(tag); safe(() => emit(result)); return result;
++      }
++      function nativeFinished(buildId, installed, flInstalled, gen) {
++        finish(buildId, installed, flInstalled, gen);
++        if (buildId > 0 && (buildId === 1 || buildId % 1024 === 0)) report('publication');
++      }
++      return {safe, problem, reserve, begin, moduleCreated, bind, instanceCreated, register, written, failed,
++        finish: nativeFinished, retire, drop, snapshot, report,
++        pending: id => { const b = builds.get(id); if (b) b.state = 'pending'; },
++        sweep: phase => { if (phase === 0) counts.sweepEvents++; if (phase === 1) counts.sweepsCompleted++;
++          report(phase === 0 ? 'sweep-before' : phase === 1 ? 'sweep-after' : 'sweep-aborted'); }};
++    };
++    // MCWEB_RESIDENCE_FACTORY_END
++    globalThis.__zwcResidence = makeResidenceLedger({worker, emit: record => err('[zwc-residence] ' + JSON.stringify(record))});
++  } catch (_) { try { err('[zwc-residence] {"schema":1,"incomplete":true,"issues":["initialization failed"]}'); } catch (_) {} }
++});
++
++EM_JS(int, zwc_residence_build, (int entry, int method, int gen, int slot, int fs, int reason), {
++  let r;
++  try { r = globalThis.__zwcResidence; return r ? r.safe(() => r.reserve(entry, method, gen, slot, fs, reason), 0) : 0; }
++  catch (_) { try { r.problem('native observer exception'); } catch (_) {} return 0; }
++});
++EM_JS(void, zwc_residence_finish, (int id, int installed, int fl_installed, int gen), {
++  let r;
++  try { r = globalThis.__zwcResidence; if (r) r.safe(() => r.finish(id, !!installed, !!fl_installed, gen)); }
++  catch (_) { try { r.problem('native observer exception'); } catch (_) {} }
++});
++EM_JS(void, zwc_residence_retire, (int entry, int method, int gen, int slot, int fs, int reason, int uses), {
++  let r;
++  try { r = globalThis.__zwcResidence; if (r) r.safe(() => r.retire(entry, method, gen, slot, fs, reason, uses)); }
++  catch (_) { try { r.problem('native observer exception'); } catch (_) {} }
++});
++EM_JS(void, zwc_residence_drop, (int id, int slot), {
++  let r;
++  try { r = globalThis.__zwcResidence; if (r) r.safe(() => r.drop(id, slot)); }
++  catch (_) { try { r.problem('native observer exception'); } catch (_) {} }
++});
++EM_JS(void, zwc_residence_pending, (int id), {
++  let r;
++  try { r = globalThis.__zwcResidence; if (r) r.safe(() => r.pending(id)); }
++  catch (_) { try { r.problem('native observer exception'); } catch (_) {} }
++});
++EM_JS(void, zwc_residence_sweep, (int phase), {
++  let r;
++  try { r = globalThis.__zwcResidence; if (r) r.safe(() => r.sweep(phase)); }
++  catch (_) { try { r.problem('native observer exception'); } catch (_) {} }
++});
++
++#endif

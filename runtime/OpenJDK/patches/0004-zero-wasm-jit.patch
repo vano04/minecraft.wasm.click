@@ -1,0 +1,3428 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index 76f9692e2..bf79fbab7 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -88,7 +88,50 @@ define_pd_global(bool, CompactStrings, true);
+                                                                             \
+   product(bool, DecodeErrorContext, false, DIAGNOSTIC,                      \
+           "Try to decode the architecture-specific context for better "     \
+-          "diagnostics")
++          "diagnostics")                                                    \
++                                                                            \
++  product(bool, UseZeroWasmJIT, false, EXPERIMENTAL,                        \
++          "Compile hot bytecode to wasm modules at runtime and call them "  \
++          "through the indirect function table (Emscripten only)")          \
++                                                                            \
++  product(uintx, ZeroWasmJITThreshold, 200, EXPERIMENTAL,                   \
++          "Method entries before the wasm JIT compiles a method")           \
++                                                                            \
++  product(uintx, ZeroWasmJITBackedgeBudget, 10000, EXPERIMENTAL,            \
++          "Back-edges compiled code may take before returning to the "      \
++          "interpreter, which is what keeps safepoints reachable")          \
++          range(1, 1000000)                                                 \
++                                                                            \
++  product(bool, ZeroWasmJITVerbose, false, EXPERIMENTAL,                    \
++          "Report every method the wasm JIT compiles or refuses, and why")   \
++                                                                            \
++  product(uintx, ZeroWasmJITStopAt, 100000, EXPERIMENTAL,                   \
++          "Refuse to compile past this bci, to bisect a miscompile inside "  \
++          "one method")                                                      \
++          range(0, 100000)                                                   \
++                                                                             \
++  product(uintx, ZeroWasmJITDisable, 0, EXPERIMENTAL,                       \
++          "Bitmask of wasm JIT features to leave out, for bisecting a "      \
++          "miscompile: 1 out-of-line calls, 2 allocation, 4 type checks, "   \
++          "8 switches, 16 float, 32 reference field stores, 64 stack "       \
++          "shuffles, 128 on-stack replacement, 256 inlining, "               \
++          "512 non-zero merge depths")                                       \
++          range(0, 1023)                                                     \
++                                                                             \
++  product(uintx, ZeroWasmJITMinBytecodes, 8, EXPERIMENTAL,                 \
++          "Skip the JIT entirely for methods smaller than this. The check "  \
++          "runs at every method entry, so it must stay cheaper than a hash") \
++                                                                            \
++  product(ccstr, ZeroWasmJITDump, nullptr, EXPERIMENTAL,                    \
++          "Write each generated wasm module to this directory, for wasm-dis")\
++                                                                            \
++  product(ccstr, ZeroWasmJITOnly, nullptr, EXPERIMENTAL,                    \
++          "Only compile methods whose class or name contains this string")  \
++                                                                            \
++  product(uintx, ZeroWasmJITMaxInlineTargets, 48, EXPERIMENTAL,              \
++          "Branch targets allowed inside an inlined callee. 0 restricts "   \
++          "inlining to straight-line bodies")                               \
++          range(0, 48)
+ 
+ // end of ARCH_FLAGS
+ 
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 07ec57a6f..d4a460fd1 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -32,6 +32,7 @@
+ #include "interpreter/zero/bytecodeInterpreter.inline.hpp"
+ #include "interpreter/interpreter.hpp"
+ #include "interpreter/interpreterRuntime.hpp"
++#include "interpreter/zero/zeroWasmCompiler.hpp"
+ #include "jvm_io.h"
+ #include "logging/log.hpp"
+ #include "memory/resourceArea.hpp"
+@@ -100,6 +112,8 @@
+  * force the prefetch. Solaris gcc seems to do better, but cc does worse.
+  */
+ #undef PREFETCH_OPCCODE
++// Measured on wasm: prefetching the next opcode is worth 20% with the
++// switch dispatch below (219ms vs 274ms on the Bench int loop). Keep it.
+ #define PREFETCH_OPCCODE
+ 
+ JRT_ENTRY(void, at_safepoint(JavaThread* current)) {}
+@@ -302,7 +316,23 @@ JRT_END
+ 
+ #define METHOD istate->method()
+ #define GET_METHOD_COUNTERS(res)
++// Zero has no back-edge check of its own -- there is no compiler for it to
++// trigger. The wasm JIT is one, and a loop is the shape it most wants: a
++// method entered once but looping thousands of times is invisible to an
++// entry counter. One decrement per back-edge is all this costs when the JIT
++// is off or the loop is cold.
++#ifdef __EMSCRIPTEN__
++#define DO_BACKEDGE_CHECKS(skip, branch_pc)                                    \
++  if (UseZeroWasmJIT && (skip) < 0                                             \
++      && --ZeroWasmCompiler::_osr_countdown <= 0) {                            \
++    DECACHE_TOS();                                                             \
++    if (ZeroWasmCompiler::maybe_run_osr(METHOD, locals, &pc, &topOfStack, istate)) { \
++      if (THREAD->has_pending_exception()) { DECACHE_PC(); goto handle_exception; } \
++    }                                                                          \
++  }
++#else
+ #define DO_BACKEDGE_CHECKS(skip, branch_pc)
++#endif
+ 
+ /*
+  * For those opcodes that need to have a GC point on a backwards branch
+@@ -755,6 +785,30 @@ void BytecodeInterpreter::run(interpreterState istate) {
+ 
+ run:
+ 
++#ifdef __EMSCRIPTEN__
++  // The wasm JIT's only entry point. Everything it needs is established here
++  // and nowhere else: pc, topOfStack and locals are all live, the prologue has
++  // run, and the state is exactly what the interpreter would dispatch from.
++  // It runs a trace of compiled bytecode and hands back a coherent frame at
++  // the first thing it does not implement, so the loop below simply continues.
++  // The guards are here rather than inside maybe_run because this runs on
++  // every method entry and resume: a call plus a hash lookup per entry
++  // measured 13.6% on call-heavy code even when nothing compiled. Both
++  // remaining tests are loads the interpreter has already made.
++  if (UseZeroWasmJIT
++      && pc == METHOD->code_base()
++      && (uintx)METHOD->code_size() >= ZeroWasmJITMinBytecodes) {
++    ZeroWasmCompiler::maybe_run(METHOD, locals, METHOD->code_base(), &pc, &topOfStack, istate);
++    // Compiled code can now make calls of its own, so it can come back with an
++    // exception pending. It leaves pc at the bytecode that threw, which is
++    // where the handler search has to start from.
++    if (THREAD->has_pending_exception()) {
++      DECACHE_PC();
++      goto handle_exception;
++    }
++  }
++#endif
++
+   DO_UPDATE_INSTRUCTION_COUNT(*pc)
+   DEBUGGER_SINGLE_STEP_NOTIFY();
+ #ifdef PREFETCH_OPCCODE
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+new file mode 100644
+index 000000000..7fe979ff1
+--- /dev/null
++++ b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+@@ -0,0 +1,3212 @@
++/*
++ * Copyright (c) 2026. DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This code is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 only, as
++ * published by the Free Software Foundation.
++ */
++
++#include "interpreter/zero/zeroWasmCompiler.hpp"
++
++#ifdef __EMSCRIPTEN__
++
++#include "interpreter/bytecodes.hpp"
++#include "oops/constantPool.inline.hpp"
++#include "oops/arrayOop.hpp"
++#include "utilities/constantTag.hpp"
++#include "oops/instanceKlass.hpp"
++#include "oops/objArrayKlass.hpp"
++#include "oops/typeArrayKlass.hpp"
++#include "oops/oop.inline.hpp"
++#include "oops/cpCache.hpp"
++#include "gc/shared/barrierSet.hpp"
++#include "gc/shared/cardTable.hpp"
++#include "gc/shared/cardTableBarrierSet.hpp"
++#include "gc/shared/threadLocalAllocBuffer.inline.hpp"
++#include "runtime/javaThread.hpp"
++#include "interpreter/zero/zeroInterpreter.hpp"
++#include "interpreter/interpreter.hpp"
++#include "oops/cpCache.inline.hpp"
++#include "oops/klass.inline.hpp"
++#include "oops/klassVtable.hpp"
++#include "oops/instanceKlass.inline.hpp"
++#include "memory/universe.hpp"
++#include "oops/method.hpp"
++#include "oops/method.inline.hpp"
++#include "oops/resolvedFieldEntry.hpp"
++#include "oops/resolvedMethodEntry.hpp"
++#include "prims/jvmtiExport.hpp"
++#include "runtime/globals.hpp"
++#include "utilities/bytes.hpp"
++#include "utilities/globalDefinitions.hpp"
++#include "memory/resourceArea.hpp"
++#include "utilities/ostream.hpp"
++
++#include <emscripten.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++// ---------------------------------------------------------------------------
++// Installing generated code
++//
++// The only runtime code path a browser offers: build a Module, import the
++// JVM's own linear memory into it, grow the indirect function table and put
++// the export there. The index that comes back IS a C function pointer.
++//
++// Returns -1 if the engine rejects the module, which must stay survivable: a
++// refused compile has to leave the interpreter running, not abort the VM.
++// ---------------------------------------------------------------------------
++// Emscripten's dynamic linker owns the indirect function table: every side
++// module is placed at a table base that must be identical on every thread, so
++// a JIT that grows the table makes the next dlopen land somewhere else and
++// libnio.so fails to load with "unexpected table size".
++//
++// So generated code is not installed in the table at all. It is kept in a
++// per-thread JS array -- each pthread has its own JS context, which is exactly
++// the per-thread scope the code cache wants anyway -- and called through an
++// import. That costs an extra wasm->JS crossing per call, which does not
++// matter: the JIT is entered once per *trace*, and a trace can run a loop
++// thousands of iterations deep before it hands back.
++// ---------------------------------------------------------------------------
++// Out-of-line calls
++//
++// Without this a compiled trace stops at its first invoke, and real code is
++// call-dense enough that "its first invoke" is usually within a few bytecodes.
++// Handing back there costs a boundary crossing and buys almost nothing.
++//
++// So generated code calls this instead, through the JVM's own indirect
++// function table -- a wasm->wasm call of a couple of nanoseconds, against the
++// ~9 ns a return to the interpreter and a re-entry would cost. It does exactly
++// what BytecodeInterpreter's invoke cases and ZeroInterpreter::main_loop's
++// call_method arm do between them, and nothing else.
++//
++// Returns 1 if the call completed, 0 if the whole bytecode must go back to the
++// interpreter (unresolved, null receiver, a dispatch shape not handled here),
++// and -1 if the callee left an exception pending.
++extern "C" EMSCRIPTEN_KEEPALIVE int zwc_invoke(int istate_i, int bci, int tos_i) {
++  interpreterState istate = (interpreterState)(intptr_t)istate_i;
++  intptr_t* tos = (intptr_t*)(intptr_t)tos_i;
++  JavaThread* thread = istate->thread();
++  Method* method = istate->method();
++  address pc = method->code_base() + bci;
++  Bytecodes::Code opcode = (Bytecodes::Code)*pc;
++  Bytecodes::Code as = (opcode == Bytecodes::_fast_invokevfinal)
++                     ? Bytecodes::_invokevirtual : opcode;
++
++  ConstantPoolCache* cp = istate->constants();
++  if (cp == nullptr) return 0;
++  ResolvedMethodEntry* entry =
++      cp->constant_pool()->resolved_method_entry_at((int)Bytes::get_native_u2(pc + 1));
++  if (entry == nullptr || !entry->is_resolved(as)) return 0;
++  // Interp-only mode wants an entry point this does not pick, and every event
++  // it exists to post would be missed.
++  if (JvmtiExport::can_post_interpreter_events() && thread->is_interp_only_mode()) return 0;
++
++  int parms = entry->number_of_parameters();
++  Method* callee = nullptr;
++  switch (opcode) {
++    case Bytecodes::_invokestatic:
++      callee = entry->method();
++      break;
++    case Bytecodes::_invokespecial:
++    case Bytecodes::_fast_invokevfinal:
++      if (tos[parms] == 0) return 0;               // null receiver: the interpreter throws
++      callee = entry->method();
++      break;
++    case Bytecodes::_invokevirtual: {
++      if (tos[parms] == 0) return 0;
++      if (entry->is_vfinal()) { callee = entry->method(); break; }
++      oop rcvr = cast_to_oop((void*)tos[parms]);
++      callee = (Method*)rcvr->klass()->method_at_vtable(entry->table_index());
++      break;
++    }
++    case Bytecodes::_invokeinterface: {
++      if (tos[parms] == 0) return 0;
++      oop rcvr = cast_to_oop((void*)tos[parms]);
++      // java.lang.Object's methods called through an interface are a plain
++      // vtable dispatch; cpCache marks them.
++      if (entry->is_forced_virtual()) {
++        callee = entry->is_vfinal() ? entry->method()
++               : (Method*)rcvr->klass()->method_at_vtable(entry->table_index());
++        break;
++      }
++      // A private interface method needs a receiver subtype check that can
++      // throw; leave that to the interpreter.
++      if (entry->is_vfinal()) return 0;
++      if (!rcvr->klass()->is_instance_klass()) return 0;
++      Method* iface_method = entry->method();
++      InstanceKlass* iclass = iface_method->method_holder();
++      InstanceKlass* rk = (InstanceKlass*)rcvr->klass();
++      // The itable scan, and both of its failures -- a class that does not
++      // implement the interface and an abstract target -- handed back so the
++      // interpreter raises the right linkage error with the right message.
++      Klass* refc = entry->interface_klass();
++      itableOffsetEntry* scan = (itableOffsetEntry*)rk->start_of_itable();
++      bool refc_ok = false;
++      for (; scan->interface_klass() != nullptr; scan++) {
++        if (scan->interface_klass() == refc) { refc_ok = true; break; }
++      }
++      if (!refc_ok) return 0;
++      itableOffsetEntry* ki = (itableOffsetEntry*)rk->start_of_itable();
++      int i = 0;
++      for (; i < rk->itable_length(); i++, ki++) {
++        if (ki->interface_klass() == iclass) break;
++      }
++      if (i == rk->itable_length()) return 0;
++      callee = ki->first_method_entry(rcvr->klass())[iface_method->itable_index()].method();
++      if (callee == nullptr) return 0;
++      break;
++    }
++    default:
++      return 0;
++  }
++  if (callee == nullptr) return 0;
++
++  istate->set_bcp(pc);
++  istate->set_stack(tos);
++  istate->set_callee(callee);
++  istate->set_callee_entry_point(callee->from_interpreted_entry());
++  istate->set_msg(BytecodeInterpreter::call_method);
++
++  // From here down this is main_loop's call_method arm verbatim, including the
++  // frame anchor: our caller set it before entering the interpreter, and the
++  // callee must not see a stale one.
++  ZeroStack* stack = thread->zero_stack();
++  thread->reset_last_Java_frame();
++  stack->set_sp(istate->stack() + 1);
++  ZeroInterpreter::invoke_method(callee, istate->callee_entry_point(), thread);
++  istate->set_stack(stack->sp() - 1);
++  stack->set_sp(istate->stack_limit() + 1);
++  thread->set_last_Java_frame();
++  istate->set_msg(BytecodeInterpreter::method_resume);
++
++  // Compiled code computed the post-call stack pointer itself, from the
++  // parameter count and the return type in the same resolved entry. If the
++  // two ever disagree the operand stack silently slides, which shows up
++  // somewhere else entirely -- so check it while the evidence is here.
++  if (ZeroWasmJITVerbose) {
++    TosState ts = (TosState)entry->tos_state();
++    int rs = (ts == vtos) ? 0 : (ts == ltos || ts == dtos) ? 2 : 1;
++    intptr_t* expect = tos + parms - rs;
++    if (istate->stack() != expect) {
++      ResourceMark rm;
++      tty->print_cr("[zwc] CALL MISMATCH in %s @%d: parms=%d rs=%d off-by %d slots",
++                    method->name_and_sig_as_C_string(), bci, parms, rs,
++                    (int)(istate->stack() - expect));
++    }
++  }
++
++  return thread->has_pending_exception() ? -1 : 1;
++}
++
++EM_JS(int, zwc_install, (const unsigned char* bytes, int len), {
++  try {
++    const mod = new WebAssembly.Module(HEAPU8.subarray(bytes, bytes + len));
++    const inst = new WebAssembly.Instance(mod, { env: {
++      memory: wasmMemory,
++      __indirect_function_table: wasmTable
++    } });
++    globalThis.__zwcFns ||= [null];        // index 0 means "not compiled"
++    return globalThis.__zwcFns.push(inst.exports.f) - 1;
++  } catch (e) {
++    if (!globalThis.__zwcErr) { globalThis.__zwcErr = 1; err('[zwc] install failed: ' + e); }
++    return -1;
++  }
++});
++
++EM_JS(int, zwc_call, (int idx, int locals, int tos, int out, int istate, int entry), {
++  return globalThis.__zwcFns[idx](locals, tos, out, istate, entry);
++});
++
++// ---------------------------------------------------------------------------
++// A very small wasm module writer
++// ---------------------------------------------------------------------------
++class WasmBuf {
++ private:
++  unsigned char* _data;
++  int _len;
++  int _cap;
++
++  void ensure(int extra) {
++    if (_len + extra <= _cap) return;
++    int want = (_cap == 0 ? 256 : _cap * 2);
++    while (want < _len + extra) want *= 2;
++    _data = (unsigned char*)::realloc(_data, want);
++    _cap = want;
++  }
++
++ public:
++  WasmBuf() : _data(nullptr), _len(0), _cap(0) {}
++  ~WasmBuf() { ::free(_data); }
++
++  const unsigned char* data() const { return _data; }
++  int length() const { return _len; }
++  bool overflowed() const { return _data == nullptr && _len > 0; }
++
++  void u8(int b) { ensure(1); _data[_len++] = (unsigned char)b; }
++  void bytes(const void* p, int n) { ensure(n); memcpy(_data + _len, p, n); _len += n; }
++  void append(const WasmBuf& o) { bytes(o.data(), o.length()); }
++
++  void uleb(unsigned v) {
++    do {
++      unsigned char b = v & 0x7f;
++      v >>= 7;
++      if (v) b |= 0x80;
++      u8(b);
++    } while (v);
++  }
++
++  void sleb64(jlong v) {
++    for (;;) {
++      unsigned char b = (unsigned char)(v & 0x7f);
++      v >>= 7;
++      if ((v == 0 && !(b & 0x40)) || (v == -1 && (b & 0x40))) { u8(b); return; }
++      u8(b | 0x80);
++    }
++  }
++
++  void sleb(int v) {
++    for (;;) {
++      unsigned char b = v & 0x7f;
++      v >>= 7;
++      if ((v == 0 && !(b & 0x40)) || (v == -1 && (b & 0x40))) { u8(b); return; }
++      u8(b | 0x80);
++    }
++  }
++
++  // id + size + body, so no section length is ever counted by hand.
++  void section(int id, const WasmBuf& body) {
++    u8(id);
++    uleb((unsigned)body.length());
++    append(body);
++  }
++};
++
++// wasm opcodes used here
++enum {
++  WOP_BLOCK = 0x02, WOP_LOOP = 0x03, WOP_BR = 0x0c, WOP_BR_IF = 0x0d,
++  WOP_BR_TABLE = 0x0e, WOP_RETURN = 0x0f, WOP_END = 0x0b, WOP_DROP = 0x1a,
++  WOP_LOCAL_GET = 0x20, WOP_LOCAL_SET = 0x21, WOP_LOCAL_TEE = 0x22,
++  WOP_I32_LOAD = 0x28, WOP_I32_STORE = 0x36, WOP_I32_CONST = 0x41,
++  WOP_I32_LOAD8_S = 0x2c, WOP_I32_LOAD8_U = 0x2d,
++  WOP_I32_LOAD16_S = 0x2e, WOP_I32_LOAD16_U = 0x2f,
++  WOP_I32_STORE8 = 0x3a, WOP_I32_STORE16 = 0x3b,
++  WOP_IF = 0x04,
++  WT_I32 = 0x7f, WT_I64 = 0x7e, WT_F32 = 0x7d, WT_F64 = 0x7c,
++  WOP_I64_LOAD = 0x29, WOP_F32_LOAD = 0x2a, WOP_F64_LOAD = 0x2b,
++  WOP_I64_STORE = 0x37, WOP_F32_STORE = 0x38, WOP_F64_STORE = 0x39,
++  WOP_I64_CONST = 0x42, WOP_F64_CONST = 0x44,
++  WOP_I64_EQ = 0x51, WOP_I64_LT_S = 0x53, WOP_I64_GT_S = 0x55,
++  WOP_F64_EQ = 0x61, WOP_F64_LT = 0x63, WOP_F64_GT = 0x64,
++  WOP_I64_ADD = 0x7c, WOP_I64_SUB = 0x7d, WOP_I64_MUL = 0x7e,
++  WOP_I64_AND = 0x83, WOP_I64_OR = 0x84, WOP_I64_XOR = 0x85,
++  WOP_I64_SHL = 0x86, WOP_I64_SHR_S = 0x87, WOP_I64_SHR_U = 0x88,
++  WOP_F64_ADD = 0xa0, WOP_F64_SUB = 0xa1, WOP_F64_MUL = 0xa2, WOP_F64_DIV = 0xa3,
++  WOP_F64_NEG = 0x9a,
++  WOP_I32_WRAP_I64 = 0xa7, WOP_I64_EXTEND_I32_S = 0xac,
++  WOP_F64_CONVERT_I32_S = 0xb7, WOP_F64_CONVERT_I64_S = 0xb9,
++  WOP_I32_EQZ = 0x45, WOP_I32_EQ = 0x46, WOP_I32_NE = 0x47,
++  WOP_I32_LT_S = 0x48, WOP_I32_GT_S = 0x4a, WOP_I32_LE_S = 0x4c, WOP_I32_GE_S = 0x4e,
++  WOP_I32_GE_U = 0x4f, WOP_I32_MUL_ = 0x6c,
++  WOP_I32_ADD = 0x6a, WOP_I32_SUB = 0x6b, WOP_I32_MUL = 0x6c,
++  WOP_I32_AND = 0x71, WOP_I32_OR = 0x72, WOP_I32_XOR = 0x73,
++  WOP_I32_SHL = 0x74, WOP_I32_SHR_S = 0x75, WOP_I32_SHR_U = 0x76,
++  WOP_I32_EXTEND8_S = 0xc0, WOP_I32_EXTEND16_S = 0xc1,
++  WOP_SELECT = 0x1b,
++  WOP_F32_CONST = 0x43,
++  WOP_I64_NE = 0x52, WOP_F64_NE = 0x62,
++  WOP_F32_EQ = 0x5b, WOP_F32_LT = 0x5d, WOP_F32_GT = 0x5e,
++  WOP_F32_NEG = 0x8c,
++  WOP_F32_ADD = 0x92, WOP_F32_SUB = 0x93, WOP_F32_MUL = 0x94, WOP_F32_DIV = 0x95,
++  WOP_I32_DIV_S = 0x6d, WOP_I32_REM_S = 0x6f,
++  WOP_I64_DIV_S = 0x7f, WOP_I64_REM_S = 0x81,
++  WOP_F32_DEMOTE_F64 = 0xb6, WOP_F64_PROMOTE_F32 = 0xbb,
++  WOP_F32_CONVERT_I32_S = 0xb2, WOP_F32_CONVERT_I64_S = 0xb4,
++  WOP_I64_EXTEND_I32_U = 0xad
++};
++
++// Slots are intptr_t, which is 4 bytes on wasm32. The whole address model
++// below assumes that, so say so once rather than in every offset.
++STATIC_ASSERT(sizeof(intptr_t) == 4);
++static const int SLOT = 4;
++
++// -XX:ZeroWasmJITDisable is a bisection tool, not a tuning knob: with a dozen
++// independent emitters a single wrong byte anywhere shows up as a corrupt
++// class file three subsystems away, and turning them off one at a time is the
++// only way to find which one.
++enum {
++  NO_CALLS = 1, NO_ALLOC = 2, NO_TYPECHECK = 4, NO_SWITCH = 8, NO_FLOAT = 16,
++  NO_OOPSTORE = 32, NO_SHUFFLE = 64, NO_OSR = 128, NO_INLINE = 256,
++  NO_DEEPMERGE = 512
++};
++static bool disabled(int f) { return (ZeroWasmJITDisable & (uintx)f) != 0; }
++
++// ---------------------------------------------------------------------------
++// The compiler
++// ---------------------------------------------------------------------------
++class Codegen {
++ public:
++  const char* _why = "ok";
++  // Reported with the refusal so "the trace was too short" is followed by the
++  // opcode that ended it -- which is the whole roadmap for what to add next.
++  // Where emit_range gave up outright: the opcode it could not model and the
++  // bci, which is the difference between "this method is call-dense" and
++  // "there is a shape here worth implementing".
++  const char* fail_where() {
++    if (_fail_bci < 0) return "";
++    jio_snprintf(_fail_buf, sizeof(_fail_buf), " [refused %s @%d]",
++                 _fail_op >= 0 && _fail_op < Bytecodes::number_of_codes
++                     ? Bytecodes::name((Bytecodes::Code)_fail_op) : "?", _fail_bci);
++    return _fail_buf;
++  }
++  char _fail_buf[64];
++  int  osr_count() const { return _nosr; }
++  int  osr_bci(int i) const { return _osr_bci[i]; }
++  int  osr_blk(int i) const { return _osr_blk[i]; }
++  const char* bail_op_name() const {
++    return _first_bail_op >= 0 && _first_bail_op < Bytecodes::number_of_codes
++        ? Bytecodes::name((Bytecodes::Code)_first_bail_op) : "-";
++  }
++
++ private:
++  Method* const _method;
++  address const _code;
++  const int _len;
++
++  // Basic blocks: bci -> block number, or -1. Built from branch targets.
++  int* _block_of;
++  int  _blocks;
++  // Operand-stack depth on entry to each block, -1 until an edge into it is
++  // seen. javac leaves values on the stack across a merge for every ternary
++  // and every short-circuit operator, so assuming zero here refused most real
++  // methods outright.
++  // Back-edge targets, in bci order: the only bcis on-stack replacement may
++  // enter at. Each one is a block leader whose entry depth was proved to be
++  // zero, which is what makes entering there the same as entering at the top.
++  static const int MAX_OSR = 16;
++  int _osr_bci[MAX_OSR];
++  int _osr_blk[MAX_OSR];
++  int _nosr;
++
++  int* _entry_depth;
++  // ...and what kind each of those slots holds. Two edges only merge if they
++  // agree, because a long at depth 3 and an int at depth 3 live in different
++  // wasm locals -- but two longs live in the same one, so requiring "all int"
++  // here threw away every ternary sitting on top of a long.
++  unsigned char* _entry_kind;
++  bool _fell_through;
++  int  _last_exit_depth;
++  int  _last_bci;
++
++  // Work done before the trace first hands back, in bci order. A body that
++  // bails after two bytecodes costs a 9 ns crossing and saves nothing, so it
++  // must not be installed at all.
++  int  _ops_before_bail;
++  int  _inlined_before_bail;
++  bool _loop_before_bail;
++  bool _bailed;
++
++  // wasm locals: 0..2 are the parameters, then $blk, $budget, then the
++  // operand stack. Keeping the stack in locals is the whole point -- V8's
++  // register allocator then sees ordinary SSA values, not memory traffic.
++  int _stack_base_local;
++  int _max_stack;
++
++  static const int L_LOCALS = 0, L_TOS = 1, L_OUT = 2, L_ISTATE = 3, L_ENTRY = 4;
++  static const int L_BLK = 5, L_BUDGET = 6;
++  static const int FIRST_STACK_LOCAL = 7;
++  static const int NPARAMS = 5;
++  // Operand-stack slots get a fixed reservation so that locals belonging to
++  // inlined callees can be numbered above them without a second pass. A method
++  // that needs a deeper stack than this is refused.
++  static const int MAX_DEPTH = 64;
++  static const int MAX_INLINE_DEPTH = 6;
++  static const int MAX_INLINE_BYTECODES = 180;
++
++  // Inlining context. _local_base >= 0 means "we are inside an inlined callee,
++  // whose locals are wasm locals rather than slots in a Zero frame" -- which is
++  // the entire point: an inlined call builds no interpreter frame at all.
++  int _local_base;
++  int _next_local;
++
++  // Java slot kinds. A long or double takes two Java slots but one wasm local,
++  // so the upper slot is simply never named.
++  // A float occupies one Java slot like an int, but it needs its own wasm
++  // local: keeping it as raw bits in an i32 would put a reinterpret on every
++  // use, and V8 would then have to move between register banks each time.
++  enum Kind { K_I32 = 0, K_I64 = 1, K_F64 = 2, K_F32 = 3, K_COUNT = 4, K_TOP = 4 };
++  static bool is_wide(int kind) { return kind == K_I64 || kind == K_F64; }
++  static int wasm_type_of(int kind) {
++    return kind == K_I64 ? WT_I64 : kind == K_F64 ? WT_F64
++         : kind == K_F32 ? WT_F32 : WT_I32;
++  }
++
++  // Every declared local carries its own type. wasm's local vector is a list
++  // of (count, type) runs, so emitting one run per local lets indices be handed
++  // out in first-use order and keeps a function from declaring wide locals it
++  // never touches.
++  static const int MAX_LOCALS = 400;
++  unsigned char _local_kind[MAX_LOCALS];
++  int _wide_map[K_COUNT][MAX_DEPTH];
++  // What each operand-stack slot holds, so a bail can spill it with the right
++  // width. K_TOP marks the upper half of a long or double, which its lower
++  // half has already written.
++  unsigned char _stack_kind[MAX_DEPTH];
++  int _inline_depth;
++  int _inlined;
++  int _bad_op;        // opcode that made the last callee un-inlinable
++  int _fail_bci;      // where emit_range gave up outright, as opposed to bailing
++  int _fail_op;
++  int _first_bail_op; // opcode the outer trace first handed back on
++  int _first_bail_bci;
++  const char* _shape = "shape";
++
++  // Control flow inside an inlined callee. Its forward branch targets become
++  // nested wasm blocks opened at the top of the splice and closed as each
++  // target is reached, so a branch is a `br` outwards. That is only valid for
++  // a forward-only, properly nested CFG -- which is what javac emits for
++  // if/else, ternaries and short-circuit operators -- and inline_cfg() proves
++  // it before a byte is emitted.
++  static const int MAX_TARGETS = 48;
++  int  _inl_targets[MAX_TARGETS];
++  int  _inl_ntargets;
++  int  _inl_next;
++  int* _inl_depth_at;
++  int  _inl_result_slot;
++  // Where a bail inside an inlined body must actually land: the caller's
++  // invoke bci, with the caller's stack as it was before the call. A callee
++  // bci would resume the interpreter at a nonsense offset in the caller's
++  // method. Re-executing the whole invoke is correct because inlinable()
++  // admits no callee that writes to the heap.
++  int  _inl_bail_bci;
++  int  _inl_bail_depth;
++  // A bail inside an inlined body hands back at the caller's invoke, so the
++  // caller's arguments must still be on its operand stack -- but the callee's
++  // own operand stack starts exactly there and overwrites them the moment it
++  // pushes anything. These hold the originals.
++  int  _inl_save_base;
++  int  _inl_save_n;
++  // A non-guard bail can stop emit_range before it reaches forward targets.
++  // Those targets still have to land at the caller's invoke, rather than
++  // falling through the splice as though the callee had returned normally.
++  bool _inl_body_bailed;
++  // inline_cfg() measures the callee's stack depth from zero, but stack_local()
++  // indexes the caller's slots, so the callee's operand stack starts wherever
++  // the caller's happened to be. Without this offset a branch target reads the
++  // slot below the one the value was written to.
++  int  _inl_base_depth;
++
++  // Baked at construction: this thread's TLAB and the heap's card table. Both
++  // are stable addresses, and the code cache is thread-local, so neither can
++  // be stale by the time the generated code runs.
++  address _tlab_top_addr;
++  address _tlab_end_addr;
++  address _card_base;
++  bool    _can_alloc;         // header layout is the one emit_object_init writes
++  bool    _can_store_oop;     // a card-table barrier set is in use
++
++  WasmBuf _code_buf;
++  bool _failed;
++
++  void fail() { _failed = true; }
++
++  void emit(int op) { _code_buf.u8(op); }
++  void emit_const(int v) { _code_buf.u8(WOP_I32_CONST); _code_buf.sleb(v); }
++  void emit_f32_const(jfloat v) {
++    jint bits; memcpy(&bits, &v, sizeof(bits));
++    _code_buf.u8(WOP_F32_CONST);
++    for (int i = 0; i < 4; i++) _code_buf.u8((int)((bits >> (8 * i)) & 0xff));
++  }
++  void local_get(int i) { _code_buf.u8(WOP_LOCAL_GET); _code_buf.uleb((unsigned)i); }
++  void local_set(int i) { _code_buf.u8(WOP_LOCAL_SET); _code_buf.uleb((unsigned)i); }
++  void br(int depth) { _code_buf.u8(WOP_BR); _code_buf.uleb((unsigned)depth); }
++  void br_if(int depth) { _code_buf.u8(WOP_BR_IF); _code_buf.uleb((unsigned)depth); }
++  // align=2 (4-byte), offset=0
++  void i32_load() { _code_buf.u8(WOP_I32_LOAD); _code_buf.uleb(2); _code_buf.uleb(0); }
++  void i32_store() { _code_buf.u8(WOP_I32_STORE); _code_buf.uleb(2); _code_buf.uleb(0); }
++  // Field access bakes the offset into the load/store immediate. It is a
++  // compile-time constant because the JIT only ever sees a method HotSpot has
++  // already rewritten to _fast_*, which means the field is already resolved.
++  void mem_op(int op, int align, int offset) {
++    _code_buf.u8(op); _code_buf.uleb((unsigned)align); _code_buf.uleb((unsigned)offset);
++  }
++
++  // A compiled loop must not outrun a safepoint. Every back-edge spends one
++  // unit of budget and hands back when it runs out, which costs no call out of
++  // wasm at all: the interpreter's own check runs the moment we return.
++  void emit_backedge_budget(bool backward, int resume_bci, int resume_depth) {
++    if (!backward) return;
++    if (!_bailed) _loop_before_bail = true;
++    local_get(L_BUDGET); emit_const(1); emit(WOP_I32_SUB); local_set(L_BUDGET);
++    local_get(L_BUDGET); emit(WOP_I32_EQZ);
++    emit(WOP_IF); emit(0x40);
++    emit_bail(resume_bci, resume_depth, true);
++    emit(WOP_END);
++  }
++
++  // Null check that hands back at the *same* bci with the stack untouched, so
++  // the interpreter re-executes the bytecode and throws the real NPE. No
++  // exception machinery in generated code at all.
++  void guard_nonnull(int obj_local, int bci, int depth) {
++    local_get(obj_local);
++    emit(WOP_I32_EQZ);
++    emit(WOP_IF); emit(0x40);
++    emit_bail(bci, depth, true);
++    emit(WOP_END);
++  }
++
++  // Plain getfield, resolved through the same entry the _fast_ form uses.
++  // HotSpot does not always rewrite a getfield to _fast_igetfield -- the
++  // measured blocker for inlining a trivial final getter was exactly this --
++  // so both spellings have to be understood.
++  bool getfield_shape(Method* m, int cp_index, Bytecodes::Code as,
++                      int* offset, int* load_op, int* align) {
++    ConstantPoolCache* cache = m->constants()->cache();
++    if (cache == nullptr) return false;
++    ResolvedFieldEntry* e = m->constants()->resolved_field_entry_at(cp_index);
++    if (e == nullptr || !e->is_resolved(as) || e->is_volatile()) return false;
++    int off = e->field_offset();
++    if (off <= 0) return false;
++    switch (e->tos_state()) {
++      case btos: case ztos: *load_op = WOP_I32_LOAD8_S;  *align = 0; break;
++      case stos:            *load_op = WOP_I32_LOAD16_S; *align = 1; break;
++      case ctos:            *load_op = WOP_I32_LOAD16_U; *align = 1; break;
++      case itos: case atos: *load_op = WOP_I32_LOAD;     *align = 2; break;
++      default:              return false;   // long, float, double not yet emitted
++    }
++    *offset = off;
++    return true;
++  }
++
++  // Null and bounds checks for an array access. Both hand back at this very
++  // bci with the stack untouched, so the interpreter re-executes the bytecode
++  // and raises the correct NullPointerException or
++  // ArrayIndexOutOfBoundsException. Generated code never throws anything.
++  void guard_array(int arr, int idx, int bci, int depth) {
++    guard_nonnull(arr, bci, depth);
++    local_get(idx);
++    local_get(arr);
++    mem_op(WOP_I32_LOAD, 2, arrayOopDesc::length_offset_in_bytes());
++    emit(WOP_I32_GE_U);
++    emit(WOP_IF); emit(0x40);
++    emit_bail(bci, depth, true);
++    emit(WOP_END);
++  }
++
++  // address = array + base + index * scale
++  void emit_element_addr(int arr, int idx, BasicType t) {
++    local_get(arr);
++    local_get(idx);
++    int scale = type2aelembytes(t);
++    if (scale != 1) { emit_const(scale); emit(WOP_I32_MUL); }
++    emit(WOP_I32_ADD);
++  }
++
++  // Resolved field offset, or -1 if this entry must not be compiled.
++  int field_offset_at(Method* m, int cp_index) {
++    ConstantPoolCache* cache = m->constants()->cache();
++    if (cache == nullptr) return -1;
++    ResolvedFieldEntry* e = m->constants()->resolved_field_entry_at(cp_index);
++    if (e == nullptr) return -1;
++    if (e->is_volatile()) return -1;      // needs ordering this does not emit
++    int off = e->field_offset();
++    return off > 0 ? off : -1;
++  }
++
++  int u2_at(address code, int bci) {
++    return (int)Bytes::get_native_u2((address)(code + bci));
++  }
++
++  // Branch offsets and switch tables are always big-endian in the class file
++  // and are never rewritten, unlike the constant-pool indices above.
++  static int s2_at(address code, int bci) {
++    return (int)(short)(((unsigned char)code[bci] << 8) | (unsigned char)code[bci + 1]);
++  }
++  static int s2u_at(address code, int bci) {
++    return (((unsigned char)code[bci]) << 8) | (unsigned char)code[bci + 1];
++  }
++  static int s4_at(address code, int bci) {
++    return (int)(((unsigned)(unsigned char)code[bci]     << 24)
++               | ((unsigned)(unsigned char)code[bci + 1] << 16)
++               | ((unsigned)(unsigned char)code[bci + 2] << 8)
++               |  (unsigned)(unsigned char)code[bci + 3]);
++  }
++
++  // tableswitch/lookupswitch pad to a 4-byte boundary measured from the start
++  // of the code, so their length depends on both the bci and the table.
++  struct SwitchInfo { int pad, def, lo, hi, npairs, size; };
++  static bool switch_info(address code, int bci, int code_len, SwitchInfo* si) {
++    Bytecodes::Code c = (Bytecodes::Code)(unsigned char)code[bci];
++    int pad = (4 - ((bci + 1) & 3)) & 3;
++    int base = bci + 1 + pad;
++    if (base + 8 > code_len) return false;
++    si->pad = pad;
++    si->def = s4_at(code, base);
++    if (c == Bytecodes::_tableswitch) {
++      si->lo = s4_at(code, base + 4);
++      si->hi = s4_at(code, base + 8);
++      if (si->hi < si->lo) return false;
++      int64_t n = (int64_t)si->hi - (int64_t)si->lo + 1;
++      if (n > 4096) return false;
++      si->npairs = (int)n;
++      si->size = 1 + pad + 12 + (int)n * 4;
++    } else {
++      si->lo = si->hi = 0;
++      si->npairs = s4_at(code, base + 4);
++      if (si->npairs < 0 || si->npairs > 4096) return false;
++      si->size = 1 + pad + 8 + si->npairs * 8;
++    }
++    return bci + si->size <= code_len;
++  }
++  // Branch target of entry i (0-based) of an already-decoded switch.
++  static int switch_target(address code, int bci, const SwitchInfo& si, int i) {
++    Bytecodes::Code c = (Bytecodes::Code)(unsigned char)code[bci];
++    int base = bci + 1 + si.pad;
++    return bci + (c == Bytecodes::_tableswitch ? s4_at(code, base + 12 + i * 4)
++                                               : s4_at(code, base + 8 + i * 8 + 4));
++  }
++  static int switch_key(address code, int bci, const SwitchInfo& si, int i) {
++    int base = bci + 1 + si.pad;
++    return s4_at(code, base + 8 + i * 8);
++  }
++
++  // Bytecodes::length_for() returns 0 for everything whose length is not in
++  // the table. Those are exactly wide, the two switches and the wide gotos,
++  // and all four have to be *scannable* or a single one of them refuses the
++  // whole method rather than merely ending the trace.
++  static int insn_length(address code, int bci, int code_len) {
++    Bytecodes::Code c = (Bytecodes::Code)(unsigned char)code[bci];
++    int size = Bytecodes::length_for(c);
++    if (size > 0) return size;
++    switch (c) {
++      case Bytecodes::_wide: {
++        if (bci + 1 >= code_len) return 0;
++        return ((Bytecodes::Code)(unsigned char)code[bci + 1] == Bytecodes::_iinc) ? 6 : 4;
++      }
++      case Bytecodes::_goto_w: case Bytecodes::_jsr_w:
++        return 5;
++      case Bytecodes::_tableswitch: case Bytecodes::_lookupswitch: {
++        SwitchInfo si;
++        return switch_info(code, bci, code_len, &si) ? si.size : 0;
++      }
++      default:
++        return 0;
++    }
++  }
++
++  int stack_local(int depth) { return FIRST_STACK_LOCAL + depth; }
++
++  void set_slot(int depth, int kind) {
++    if (depth >= 0 && depth < MAX_DEPTH) _stack_kind[depth] = (unsigned char)kind;
++  }
++  int slot_kind(int depth) {
++    return (depth >= 0 && depth < MAX_DEPTH) ? _stack_kind[depth] : K_I32;
++  }
++
++  // Every narrow push must stamp the slot kind too: a slot that previously
++  // held a double would otherwise still be spilled as f64 at a bail while the
++  // value now lives in the i32 local.
++  void set_i32(int depth) { local_set(stack_local(depth)); set_slot(depth, K_I32); }
++
++  // Pushes a long or double: one wasm local, two Java slots.
++  void push_wide(int kind, int depth) {
++    local_set(wide_local(kind, depth));
++    set_slot(depth, kind);
++    set_slot(depth + 1, K_TOP);
++  }
++  void get_wide(int kind, int depth) { local_get(wide_local(kind, depth)); }
++
++  // The same two operations for a value of any kind, so the shuffles and the
++  // conversions do not each need their own four-way switch.
++  void push_val(int kind, int depth) {
++    if (kind == K_F32 && disabled(NO_FLOAT)) fail();
++    if (kind == K_I32) { local_set(stack_local(depth)); set_slot(depth, K_I32); }
++    else if (kind == K_F32) { local_set(wide_local(K_F32, depth)); set_slot(depth, K_F32); }
++    else push_wide(kind, depth);
++  }
++  void get_val(int kind, int depth) {
++    if (kind == K_I32) local_get(stack_local(depth)); else local_get(wide_local(kind, depth));
++  }
++
++  // Copies one operand-stack slot to another, carrying its kind. The upper
++  // half of a long or double holds no value of its own, so it is only a mark.
++  void move_slot(int from, int to) {
++    int k = slot_kind(from);
++    if (k == K_TOP) { set_slot(to, K_TOP); return; }
++    get_val(k, from);
++    if (k == K_I32) local_set(stack_local(to)); else local_set(wide_local(k, to));
++    set_slot(to, k);
++    if (is_wide(k)) set_slot(to + 1, K_TOP);
++  }
++
++  // The whole dup/swap family as one operation: take the top `n` slots and
++  // re-insert a copy `m` slots down. dup is (1,1), dup_x2 is (1,3),
++  // dup2_x2 is (2,4). Working downwards keeps every read ahead of its write.
++  bool dup_slots(int n, int m, int& depth) {
++    if (disabled(NO_SHUFFLE) && m != n) return false;
++    if (depth < m || depth + n >= MAX_DEPTH) return false;
++    // A category-2 value must not be split by either boundary.
++    if (slot_kind(depth - m) == K_TOP || slot_kind(depth - n) == K_TOP) return false;
++    for (int i = 0; i < n; i++) move_slot(depth - n + i, depth + i);
++    if (m > n) {
++      for (int i = m - n - 1; i >= 0; i--) move_slot(depth - m + i, depth - m + n + i);
++      for (int i = 0; i < n; i++) move_slot(depth + i, depth - m + i);
++    }
++    depth += n;
++    return true;
++  }
++
++  // LOCALS_LONG(k) and the operand-stack equivalent both address the *upper*
++  // slot: Zero stores a 64-bit value at &slots[-(k+1)].
++  void push_wide_local_addr(int index) {
++    local_get(L_LOCALS);
++    emit_const((index + 1) * SLOT);
++    emit(WOP_I32_SUB);
++  }
++
++  // LOCALS_INT(k) lives at locals - 4k: Zero's locals array is indexed
++  // downwards from the pointer it hands the interpreter.
++  void push_local_addr(int index) {
++    local_get(L_LOCALS);
++    emit_const(index * SLOT);
++    emit(WOP_I32_SUB);
++  }
++
++  // A local read. In the outer method that is a load from the real frame, so
++  // the interpreter can take over at any bail. Inside an inlined callee there
++  // is no frame, and the local is simply a wasm local.
++  void emit_local_load(int k) {
++    if (_local_base >= 0) { local_get(_local_base + k); }
++    else { push_local_addr(k); i32_load(); }
++  }
++
++  void emit_local_store(int k, int src) {
++    if (_local_base >= 0) { local_get(src); local_set(_local_base + k); }
++    else { push_local_addr(k); local_get(src); i32_store(); }
++  }
++
++  void emit_local_inc(int k, int inc) {
++    if (_local_base >= 0) {
++      local_get(_local_base + k); emit_const(inc); emit(WOP_I32_ADD);
++      local_set(_local_base + k);
++    } else {
++      push_local_addr(k); push_local_addr(k); i32_load();
++      emit_const(inc); emit(WOP_I32_ADD); i32_store();
++    }
++  }
++
++  int alloc_locals(int n) {
++    int b = _next_local;
++    for (int i = 0; i < n; i++) set_kind(_next_local++, K_I32);
++    return b;
++  }
++
++  void set_kind(int idx, int kind) {
++    int slot = idx - NPARAMS;                 // the parameters come first
++    if (slot >= 0 && slot < MAX_LOCALS) _local_kind[slot] = (unsigned char)kind;
++  }
++
++  // The wasm local holding a long or double sitting at this stack depth.
++  int wide_local(int kind, int depth) {
++    if (depth < 0 || depth >= MAX_DEPTH) return -1;
++    int& slot = _wide_map[kind][depth];
++    if (slot == 0) {
++      slot = _next_local++;
++      set_kind(slot, kind);
++    }
++    return slot;
++  }
++
++
++  // ---- typed field access -------------------------------------------------
++  // The kind a resolved field entry's tos_state means, plus the load and store
++  // for it. One place, so getfield, putfield, their _fast_ spellings and
++  // getstatic can never disagree about a width.
++  static bool tos_shape(TosState t, int* kind, int* load_op, int* store_op, int* align) {
++    switch (t) {
++      case btos: case ztos: *kind=K_I32; *load_op=WOP_I32_LOAD8_S;  *store_op=WOP_I32_STORE8;  *align=0; return true;
++      case stos:            *kind=K_I32; *load_op=WOP_I32_LOAD16_S; *store_op=WOP_I32_STORE16; *align=1; return true;
++      case ctos:            *kind=K_I32; *load_op=WOP_I32_LOAD16_U; *store_op=WOP_I32_STORE16; *align=1; return true;
++      case itos: case atos: *kind=K_I32; *load_op=WOP_I32_LOAD;     *store_op=WOP_I32_STORE;   *align=2; return true;
++      case ftos:            *kind=K_F32; *load_op=WOP_F32_LOAD;     *store_op=WOP_F32_STORE;   *align=2; return true;
++      // A long or double field is only 4-byte aligned on a 32-bit heap, so the
++      // hint must stay at 2: wasm rejects a hint wider than the real alignment.
++      case ltos:            *kind=K_I64; *load_op=WOP_I64_LOAD;     *store_op=WOP_I64_STORE;   *align=2; return true;
++      case dtos:            *kind=K_F64; *load_op=WOP_F64_LOAD;     *store_op=WOP_F64_STORE;   *align=2; return true;
++      default: return false;
++    }
++  }
++
++  bool field_shape(Method* m, int cp_index, Bytecodes::Code as, bool need_resolved,
++                   int* offset, int* kind, int* load_op, int* store_op, int* align,
++                   bool* is_oop) {
++    if (m->constants()->cache() == nullptr) return false;
++    ResolvedFieldEntry* e = m->constants()->resolved_field_entry_at(cp_index);
++    if (e == nullptr) return false;
++    if (need_resolved && !e->is_resolved(as)) return false;
++    if (e->is_volatile()) return false;         // needs ordering this cannot emit
++    int off = e->field_offset();
++    if (off <= 0) return false;
++    if (!tos_shape((TosState)e->tos_state(), kind, load_op, store_op, align)) return false;
++    *offset = off;
++    *is_oop = ((TosState)e->tos_state() == atos);
++    return true;
++  }
++
++  // ---- write barrier ------------------------------------------------------
++  // Serial and Parallel both use a card table, and its post-barrier is a single
++  // byte store. That is the whole reason reference stores can be compiled at
++  // all: without it every putfield of an object would end the trace.
++  void emit_card_mark(int addr_local, int offset) {
++    emit_const((int)(intptr_t)_card_base);
++    local_get(addr_local);
++    if (offset != 0) { emit_const(offset); emit(WOP_I32_ADD); }
++    emit_const((int)CardTable::card_shift());
++    emit(WOP_I32_SHR_U);
++    emit(WOP_I32_ADD);
++    emit_const((int)CardTable::dirty_card_val());
++    mem_op(WOP_I32_STORE8, 0, 0);
++  }
++
++  // ---- allocation ---------------------------------------------------------
++  // The code cache is per-thread, so this thread's TLAB pointers are compile-
++  // time constants. If the bump does not fit, hand back and let the interpreter
++  // run the whole bytecode -- that is the only path that can refill or GC, and
++  // it is reached with a frame the collector already understands.
++  void emit_tlab_alloc(int size_bytes, int dst, int bci, int depth) {
++    emit_const((int)(intptr_t)_tlab_top_addr); i32_load(); local_set(dst);
++    emit_const((int)(intptr_t)_tlab_end_addr); i32_load();
++    local_get(dst);
++    emit(WOP_I32_SUB);
++    emit_const(size_bytes);
++    _code_buf.u8(0x49);                          // i32.lt_u
++    emit(WOP_IF); emit(0x40);
++    emit_bail(bci, depth, true);
++    emit(WOP_END);
++    emit_const((int)(intptr_t)_tlab_top_addr);
++    local_get(dst); emit_const(size_bytes); emit(WOP_I32_ADD);
++    i32_store();
++  }
++
++  // mark word, klass word, then zeroed fields -- the same order MemAllocator
++  // uses, followed by the same store-store fence, because another thread may
++  // see this object as soon as it is published.
++  void emit_object_init(int dst, Klass* k, int size_bytes) {
++    local_get(dst);
++    emit_const((int)(intptr_t)markWord::prototype().value());
++    mem_op(WOP_I32_STORE, 2, oopDesc::mark_offset_in_bytes());
++    local_get(dst);
++    emit_const((int)(intptr_t)k);
++    mem_op(WOP_I32_STORE, 2, oopDesc::klass_offset_in_bytes());
++    int hdr = oopDesc::header_size() * HeapWordSize;
++    for (int off = hdr; off < size_bytes; off += 4) {
++      local_get(dst); emit_const(0); mem_op(WOP_I32_STORE, 2, off);
++    }
++    _code_buf.u8(0xfe); _code_buf.u8(0x03); _code_buf.u8(0x00);   // atomic.fence
++  }
++
++  // ---- out-of-line calls --------------------------------------------------
++  // Spills the operand stack, calls zwc_invoke through the table, and reloads
++  // everything that is still live. The reload is not optional: a call can
++  // collect, and every oop the trace was holding in a wasm local moved while
++  // the frame's copy was updated in place.
++  void emit_spill(int depth) {
++    for (int i = 0; i < depth; i++) {
++      int k = slot_kind(i);
++      if (k == K_TOP) continue;
++      local_get(L_TOS);
++      emit_const((is_wide(k) ? (i + 1) : i) * SLOT);
++      emit(WOP_I32_SUB);
++      get_val(k, i);
++      mem_op(k == K_I32 ? WOP_I32_STORE : k == K_F32 ? WOP_F32_STORE
++           : k == K_I64 ? WOP_I64_STORE : WOP_F64_STORE, 2, 0);
++    }
++  }
++  void emit_reload(int depth) {
++    for (int i = 0; i < depth; i++) {
++      int k = slot_kind(i);
++      if (k == K_TOP) continue;
++      local_get(L_TOS);
++      emit_const((is_wide(k) ? (i + 1) : i) * SLOT);
++      emit(WOP_I32_SUB);
++      mem_op(k == K_I32 ? WOP_I32_LOAD : k == K_F32 ? WOP_F32_LOAD
++           : k == K_I64 ? WOP_I64_LOAD : WOP_F64_LOAD, 2, 0);
++      if (k == K_I32) local_set(stack_local(i)); else local_set(wide_local(k, i));
++    }
++  }
++
++  static int result_kind_of(BasicType t) {
++    switch (t) {
++      case T_FLOAT:  return K_F32;
++      case T_LONG:   return K_I64;
++      case T_DOUBLE: return K_F64;
++      default:       return K_I32;
++    }
++  }
++
++  bool emit_call_out(Method* m, address code, int bci, int& depth) {
++    if (disabled(NO_CALLS)) return false;
++    ConstantPool* cp = m->constants();
++    if (cp->cache() == nullptr) return false;
++    ResolvedMethodEntry* e = cp->resolved_method_entry_at(u2_at(code, bci + 1));
++    if (e == nullptr) return false;
++    Bytecodes::Code c = (Bytecodes::Code)(unsigned char)code[bci];
++    Bytecodes::Code as = (c == Bytecodes::_fast_invokevfinal) ? Bytecodes::_invokevirtual : c;
++    if (!e->is_resolved(as)) return false;
++    Method* sig = e->method();
++    if (sig == nullptr) return false;
++    int nargs = e->number_of_parameters();
++    BasicType rt = sig->result_type();
++    int rslots = (rt == T_VOID) ? 0 : (rt == T_LONG || rt == T_DOUBLE) ? 2 : 1;
++    if (depth < nargs) return false;
++    int after = depth - nargs + rslots;
++    if (after >= MAX_DEPTH || _next_local >= 500) return false;
++
++    emit_spill(depth);
++    int st = alloc_locals(1);
++    local_get(L_ISTATE);
++    emit_const(bci);
++    local_get(L_TOS); emit_const(depth * SLOT); emit(WOP_I32_SUB);
++    emit_const((int)(intptr_t)&zwc_invoke);
++    emit(0x11); _code_buf.uleb(1); _code_buf.uleb(0);      // call_indirect type 1, table 0
++    local_set(st);
++
++    local_get(st);
++    emit_const(1);
++    emit(WOP_I32_NE);
++    emit(WOP_IF); emit(0x40);
++      local_get(st);
++      emit(WOP_I32_EQZ);
++      emit(WOP_IF); emit(0x40);
++        emit_bail(bci, depth, true);       // nothing ran: re-execute the invoke
++      emit(WOP_END);
++      // The callee threw. The frame is already coherent and the interpreter
++      // looks the handler up from the bcp, which is this invoke.
++      local_get(L_OUT);
++      local_get(L_TOS); emit_const(after * SLOT); emit(WOP_I32_SUB);
++      i32_store();
++      emit_const(bci);
++      emit(WOP_RETURN);
++    emit(WOP_END);
++
++    depth -= nargs;
++    if (rslots > 0) {
++      set_slot(depth, result_kind_of(rt));
++      if (rslots == 2) set_slot(depth + 1, K_TOP);
++      depth += rslots;
++    }
++    emit_reload(depth);
++    return true;
++  }
++
++  // ---- type checks --------------------------------------------------------
++  // HotSpot's own fast subtype test: one word at a fixed offset in the
++  // subject's Klass either is the target (primary supers, and the secondary
++  // cache when it hits) or the answer needs the slow path, which is a bail.
++  void emit_klass_of(int obj_local) {
++    local_get(obj_local);
++    mem_op(WOP_I32_LOAD, 2, oopDesc::klass_offset_in_bytes());
++  }
++  // Leaves 1 on the stack if obj is certainly an instance of `target`, 0 if
++  // the answer needs the interpreter. super_check_offset belongs to the
++  // target: at that offset in any subtype's Klass sits the target itself,
++  // and when it is the secondary-super cache a hit is still an answer.
++  void emit_is_subtype(int obj_local, Klass* target) {
++    int scoff = (int)target->super_check_offset();
++    emit_klass_of(obj_local);
++    emit_const((int)(intptr_t)target);
++    emit(WOP_I32_EQ);
++    emit_klass_of(obj_local);
++    mem_op(WOP_I32_LOAD, 2, scoff);
++    emit_const((int)(intptr_t)target);
++    emit(WOP_I32_EQ);
++    emit(WOP_I32_OR);
++  }
++
++  // The resolved Klass* behind a cp index, or null if this site must not be
++  // compiled. Klass metadata does not move, so the pointer can be baked in.
++  Klass* resolved_klass(Method* m, int cp_index) {
++    ConstantPool* cp = m->constants();
++    if (cp_index <= 0 || cp_index >= cp->length()) return nullptr;
++    if (cp->tag_at(cp_index).is_unresolved_klass()) return nullptr;
++    if (!cp->tag_at(cp_index).is_klass()) return nullptr;
++    return cp->resolved_klass_at(cp_index);
++  }
++
++  // Fixes the depth a block must be entered with. Both edges into a merge use
++  // the same wasm locals for the operand stack, so the values transfer for
++  // free -- but only if they agree on depth, and only for plain 32-bit slots,
++  // since a long and a double at the same depth live in different locals.
++  bool record_entry(int target_bci, int d) {
++    if (target_bci < 0 || target_bci >= _len) return false;
++    int b = _block_of[target_bci];
++    if (b < 0 || d < 0 || d > MAX_DEPTH) return false;
++    unsigned char* k = &_entry_kind[b * MAX_DEPTH];
++    if (d > 0 && disabled(NO_DEEPMERGE)) return false;
++    if (_entry_depth[b] < 0) {
++      _entry_depth[b] = d;
++      for (int i = 0; i < d; i++) k[i] = (unsigned char)slot_kind(i);
++      return true;
++    }
++    if (_entry_depth[b] != d) return false;
++    for (int i = 0; i < d; i++) if (k[i] != (unsigned char)slot_kind(i)) return false;
++    return true;
++  }
++
++  // Relative wasm depth of an inlined callee's branch target. Open blocks run
++  // innermost-first from _inl_next upwards, with $inline_exit just outside.
++  int inl_target_depth(int t) {
++    for (int i = _inl_next; i < _inl_ntargets; i++) {
++      if (_inl_targets[i] == t) return i - _inl_next;
++    }
++    return -1;
++  }
++  int inl_exit_depth() { return _inl_ntargets - _inl_next; }
++
++  // The callee of a statically bound invoke, or null. Used by both the
++  // inlinability scan and the emitter so they can never disagree.
++  Method* static_callee(Method* m, address code, int bci) {
++    ConstantPoolCache* cache = m->constants()->cache();
++    if (cache == nullptr) return nullptr;
++    Bytecodes::Code c = (Bytecodes::Code)(unsigned char)code[bci];
++    Bytecodes::Code as = (c == Bytecodes::_fast_invokevfinal) ? Bytecodes::_invokevirtual : c;
++    ResolvedMethodEntry* e = m->constants()->resolved_method_entry_at(u2_at(code, bci + 1));
++    if (e == nullptr || !e->is_resolved(as)) return nullptr;
++    return e->method();
++  }
++
++  // A static field lives in the holder's mirror, which is an ordinary heap oop
++  // and therefore moves under GC -- so its address must never be baked into
++  // generated code. The OopHandle's storage slot does not move, so load the
++  // mirror from there at runtime and index the field off that.
++  bool getstatic_shape(Method* m, int cp_index, Bytecodes::Code as, address* handle,
++                       int* offset, int* kind, int* load_op, int* store_op, int* align) {
++    ConstantPoolCache* cache = m->constants()->cache();
++    if (cache == nullptr) return false;
++    ResolvedFieldEntry* e = m->constants()->resolved_field_entry_at(cp_index);
++    if (e == nullptr || !e->is_resolved(as) || e->is_volatile()) return false;
++    InstanceKlass* holder = e->field_holder();
++    if (holder == nullptr || !holder->is_initialized()) return false;
++    oop* slot = holder->java_mirror_handle().ptr_raw();
++    if (slot == nullptr) return false;
++    if (!tos_shape((TosState)e->tos_state(), kind, load_op, store_op, align)) return false;
++    if (as == Bytecodes::_putstatic && (TosState)e->tos_state() == atos) return false;
++    *handle = (address)slot;
++    *offset = e->field_offset();
++    return true;
++  }
++
++ public:
++  Codegen(Method* m)
++    : _method(m), _code(m->code_base()), _len(m->code_size()),
++      _block_of(nullptr), _blocks(0), _entry_depth(nullptr), _entry_kind(nullptr),
++      _nosr(0), _fell_through(false), _last_exit_depth(0), _last_bci(0),
++      _ops_before_bail(0), _inlined_before_bail(0),
++      _loop_before_bail(false), _bailed(false),
++      _local_base(-1), _next_local(FIRST_STACK_LOCAL + MAX_DEPTH),
++      _inline_depth(0), _inlined(0), _bad_op(-1), _fail_bci(-1), _fail_op(-1),
++      _first_bail_op(-1), _first_bail_bci(-1),
++      _inl_ntargets(0), _inl_next(0), _inl_depth_at(nullptr), _inl_result_slot(0),
++      _inl_bail_bci(-1), _inl_bail_depth(0),
++      _inl_save_base(0), _inl_save_n(0), _inl_body_bailed(false), _inl_base_depth(0),
++      _stack_base_local(FIRST_STACK_LOCAL), _max_stack(m->max_stack()),
++      _failed(false) {
++    // These are read before they are written -- wide_local() treats 0 as "not
++    // allocated yet" and the operand-stack reservation is never set_kind()'d,
++    // so it has to already say K_I32. A Codegen lives on the C stack, where
++    // none of that is true by default.
++    memset(_local_kind, 0, sizeof(_local_kind));
++    memset(_wide_map,   0, sizeof(_wide_map));
++    memset(_stack_kind, 0, sizeof(_stack_kind));
++
++    JavaThread* self = JavaThread::current();
++    ThreadLocalAllocBuffer& tlab = self->tlab();
++    _tlab_top_addr = (address)&tlab + in_bytes(ThreadLocalAllocBuffer::top_offset());
++    _tlab_end_addr = (address)&tlab + in_bytes(ThreadLocalAllocBuffer::end_offset());
++    // emit_object_init writes a full-width mark word followed by a full-width
++    // Klass*. That is the layout on a 32-bit heap; anything else must not be
++    // allocated from generated code.
++    _can_alloc = UseTLAB && !ZeroTLAB && !UseCompactObjectHeaders
++              && !UseCompressedClassPointers && !oopDesc::has_klass_gap()
++              && oopDesc::header_size() * HeapWordSize == 8
++              && oopDesc::mark_offset_in_bytes() == 0
++              && oopDesc::klass_offset_in_bytes() == 4;
++    _card_base = nullptr;
++    BarrierSet* bs = BarrierSet::barrier_set();
++    if (bs != nullptr && bs->is_a(BarrierSet::CardTableBarrierSet)) {
++      _card_base = (address)((CardTableBarrierSet*)bs)->card_table()->byte_map_base();
++    }
++    _can_store_oop = (_card_base != nullptr);
++  }
++
++  ~Codegen() { ::free(_block_of); ::free(_entry_depth); ::free(_entry_kind); }
++
++  bool compile(WasmBuf& module);
++
++ private:
++  bool discover_blocks();
++  bool emit_body();
++  bool emit_block(int b, int start, int end, int nesting_to_loop);
++  bool emit_range(Method* m, address code, int start, int end, int& depth,
++                  int nesting_to_loop, bool allow_branches);
++  bool try_inline(Method* m, address code, int bci, int& depth);
++  bool inlinable(Method* callee, int nest = 0);
++  bool inline_cfg(Method* callee, int nest, int* targets, int* ntargets, int* depth_at);
++  // is_guard: a null/bounds check that only fires on the exception path.
++  // It must not count as the end of the trace, or every method with a
++  // field access looks like it stops at its first guard.
++  void emit_bail(int bci, int depth, bool is_guard = false);
++};
++
++// Marks every branch target and every instruction after a branch as a leader,
++// then numbers the leaders. Refuses anything it does not understand, so an
++// unsupported opcode can never be silently skipped over.
++bool Codegen::discover_blocks() {
++  _why = "unsupported opcode in block scan";
++  _block_of = (int*)::calloc(_len + 1, sizeof(int));
++  if (_block_of == nullptr) return false;
++  bool* leader = (bool*)::calloc(_len + 1, sizeof(bool));
++  if (leader == nullptr) return false;
++  leader[0] = true;
++  int* backward = (int*)::calloc(_len + 1, sizeof(int));
++  if (backward == nullptr) { ::free(leader); return false; }
++  int nbackward = 0;
++
++  int bci = 0;
++  bool ok = true;
++  while (bci < _len && ok) {
++    // HotSpot rewrites getfield/invoke/ldc to _fast_* variants before a method
++    // is ever hot enough to reach the JIT, so refusing them outright refused
++    // 78% of all candidates. They only need to be *scannable* here -- their
++    // lengths are in the same table -- and emit_block turns each one into a
++    // bail. Variable-length codes (wide, the switches) still have no static
++    // length, so those still refuse the method.
++    int raw = (unsigned char)_code[bci];
++    if (raw >= Bytecodes::number_of_codes) { _why = "illegal opcode"; ok = false; break; }
++    Bytecodes::Code c = (Bytecodes::Code)raw;
++    int size = insn_length(_code, bci, _len);
++    if (size <= 0) { ok = false; break; }
++    switch (c) {
++      case Bytecodes::_goto_w: case Bytecodes::_jsr_w: {
++        int target = bci + s4_at(_code, bci + 1);
++        if (target < 0 || target >= _len) { ok = false; break; }
++        leader[target] = true;
++        if (target < bci) backward[nbackward++] = target;
++        if (bci + size < _len) leader[bci + size] = true;
++        break;
++      }
++      case Bytecodes::_tableswitch: case Bytecodes::_lookupswitch: {
++        SwitchInfo si;
++        if (!switch_info(_code, bci, _len, &si)) { ok = false; break; }
++        int d = bci + si.def;
++        if (d < 0 || d >= _len) { ok = false; break; }
++        leader[d] = true;
++        if (d < bci) backward[nbackward++] = d;
++        for (int i = 0; i < si.npairs && ok; i++) {
++          int t = switch_target(_code, bci, si, i);
++          if (t < 0 || t >= _len) { ok = false; break; }
++          leader[t] = true;
++          if (t < bci) backward[nbackward++] = t;
++        }
++        if (bci + size < _len) leader[bci + size] = true;
++        break;
++      }
++      case Bytecodes::_goto:
++      case Bytecodes::_ifeq: case Bytecodes::_ifne:
++      case Bytecodes::_iflt: case Bytecodes::_ifge:
++      case Bytecodes::_ifgt: case Bytecodes::_ifle:
++      case Bytecodes::_ifnull: case Bytecodes::_ifnonnull:
++      case Bytecodes::_if_acmpeq: case Bytecodes::_if_acmpne:
++      case Bytecodes::_if_icmpeq: case Bytecodes::_if_icmpne:
++      case Bytecodes::_if_icmplt: case Bytecodes::_if_icmpge:
++      case Bytecodes::_if_icmpgt: case Bytecodes::_if_icmple: {
++        int off = (int)(short)(((unsigned char)_code[bci + 1] << 8) | (unsigned char)_code[bci + 2]);
++        int target = bci + off;
++        if (target < 0 || target >= _len) { ok = false; break; }
++        leader[target] = true;
++        if (target < bci) backward[nbackward++] = target;
++        if (bci + size < _len) leader[bci + size] = true;
++        break;
++      }
++      default:
++        break;
++    }
++    bci += size;
++  }
++  if (!ok) { ::free(leader); ::free(backward); return false; }
++
++  // A handler is never branched to from compiled code -- the interpreter
++  // performs the throw -- but its body is still walked linearly, and it starts
++  // with the exception on the stack. Without a leader here the walk falls into
++  // it at the wrong depth and the whole method is refused.
++  if (_method->has_exception_handler()) {
++    ExceptionTable et(_method);
++    for (int i = 0; i < et.length(); i++) {
++      int h = et.handler_pc(i);
++      if (h >= 0 && h < _len) leader[h] = true;
++    }
++  }
++
++  _blocks = 0;
++  for (int i = 0; i <= _len; i++) {
++    _block_of[i] = leader[i] ? _blocks++ : -1;
++  }
++  ::free(leader);
++  if (_blocks <= 0) { ::free(backward); return false; }
++
++  _entry_depth = (int*)::calloc(_blocks, sizeof(int));
++  _entry_kind  = (unsigned char*)::calloc((size_t)_blocks * MAX_DEPTH, 1);
++  if (_entry_depth == nullptr || _entry_kind == nullptr) return false;
++  for (int i = 0; i < _blocks; i++) _entry_depth[i] = -1;
++  _entry_depth[0] = 0;
++  // A back-edge is emitted after its target block, so without this the loop
++  // body looks unreachable when it is emitted. javac always closes a loop with
++  // an empty stack; if some class file does not, the back-edge refuses then.
++  for (int i = 0; i < nbackward; i++) {
++    int b = _block_of[backward[i]];
++    if (b >= 0) _entry_depth[b] = 0;
++  }
++  if (_method->has_exception_handler()) {
++    ExceptionTable et(_method);
++    for (int i = 0; i < et.length(); i++) {
++      int h = et.handler_pc(i);
++      if (h >= 0 && h < _len && _block_of[h] >= 0) {
++        int b = _block_of[h];
++        _entry_depth[b] = 1;
++        _entry_kind[b * MAX_DEPTH] = K_I32;
++      }
++    }
++  }
++  for (int i = 0; i < nbackward && _nosr < MAX_OSR; i++) {
++    int b = _block_of[backward[i]];
++    bool seen = false;
++    for (int j = 0; j < _nosr; j++) if (_osr_blk[j] == b) seen = true;
++    if (!seen) { _osr_bci[_nosr] = backward[i]; _osr_blk[_nosr] = b; _nosr++; }
++  }
++  ::free(backward);
++  return true;
++}
++
++// Spill the operand stack to the real frame and hand control back. Everything
++// the interpreter needs must be true here: values in memory where Zero's
++// macros expect them, and topOfStack consistent with the depth.
++//
++// Zero pushes downwards: with entry tos T0 and depth d, the i'th value from
++// the bottom sits at T0 - 4i and topOfStack is T0 - 4d.
++void Codegen::emit_bail(int bci, int depth, bool is_guard) {
++  if (!is_guard && _local_base >= 0 && _inl_bail_bci >= 0) {
++    // emit_range() may return as soon as an unsupported opcode is reached.
++    // Remember that this happened inside an inline splice; try_inline() adds
++    // a landing bail after the splice so forward branch targets cannot skip
++    // the one already emitted at that opcode.
++    _inl_body_bailed = true;
++  }
++  int from_save = -1;
++  if (_local_base >= 0 && _inl_bail_bci >= 0) {
++    bci = _inl_bail_bci;
++    depth = _inl_bail_depth;
++    from_save = depth - _inl_save_n;   // slots at or above this are the args
++  }
++  if (!is_guard && !_bailed && bci >= 0 && bci < _len) {
++    _first_bail_op = (unsigned char)_code[bci];
++    _first_bail_bci = bci;
++  }
++  if (!is_guard) _bailed = true;
++  for (int i = 0; i < depth; i++) {
++    if (from_save >= 0 && i >= from_save) {
++      // The caller's argument, taken from the copy made before the callee was
++      // spliced in. Arguments are always plain slots -- try_inline refuses a
++      // callee whose arguments are not.
++      local_get(L_TOS);
++      emit_const(i * SLOT);
++      emit(WOP_I32_SUB);
++      local_get(_inl_save_base + (i - from_save));
++      i32_store();
++      continue;
++    }
++    int k = slot_kind(i);
++    if (k == K_TOP) continue;                 // written by its lower half
++    if (k == K_I32 || k == K_F32) {
++      local_get(L_TOS);
++      emit_const(i * SLOT);
++      emit(WOP_I32_SUB);
++      get_val(k, i);
++      if (k == K_I32) i32_store(); else mem_op(WOP_F32_STORE, 2, 0);
++    } else {
++      local_get(L_TOS);
++      emit_const((i + 1) * SLOT);
++      emit(WOP_I32_SUB);
++      local_get(wide_local(k, i));
++      mem_op(k == K_I64 ? WOP_I64_STORE : WOP_F64_STORE, 2, 0);
++    }
++  }
++  local_get(L_OUT);
++  local_get(L_TOS);
++  emit_const(depth * SLOT);
++  emit(WOP_I32_SUB);
++  i32_store();
++  emit_const(bci);
++  emit(WOP_RETURN);
++}
++
++bool Codegen::compile(WasmBuf& module) {
++  if (_len <= 0) { _why = "empty"; return false; }
++  if (_method->is_synchronized()) { _why = "synchronized"; return false; }
++  // A method with exception handlers is fine. Every bail leaves the frame
++  // exactly as the interpreter would have left it at that bytecode, and every
++  // guard bails *before* the effect it guards, so the interpreter re-executes
++  // the throwing bytecode and finds the handler itself. Nothing here has to
++  // know the handler table exists.
++  if (JvmtiExport::can_post_field_access() || JvmtiExport::can_post_field_modification()) {
++    _why = "JVMTI field watches active"; return false;
++  }
++  if (!discover_blocks()) return false;
++  _why = "codegen refused";
++  if (!emit_body() || _failed) return false;
++  // Worth installing? A trace that hands back after a few bytecodes saves
++  // less than the 9 ns crossing costs. But an *inlined* call is worth ~23 ns
++  // on its own -- a whole interpreter frame that never gets built -- so a
++  // three-line method that inlines three getters is one of the best things
++  // this compiler can do, and counting only bytecodes threw it away.
++  if (!_loop_before_bail && _inlined_before_bail == 0 && _ops_before_bail < 20) {
++    _why = "trace too short";
++    return false;
++  }
++  _why = "ok";
++
++  // ---- assemble the module ----
++  WasmBuf b;
++
++  module.u8(0x00); module.u8(0x61); module.u8(0x73); module.u8(0x6d);
++  module.u8(0x01); module.u8(0x00); module.u8(0x00); module.u8(0x00);
++
++  // type 0: the compiled body, (locals, tos, out, istate) -> resume bci
++  // type 1: zwc_invoke, (istate, bci, tos) -> status
++  b.uleb(2);
++  b.u8(0x60); b.uleb(5);
++  b.u8(0x7f); b.u8(0x7f); b.u8(0x7f); b.u8(0x7f); b.u8(0x7f);
++  b.uleb(1); b.u8(0x7f);
++  b.u8(0x60); b.uleb(3); b.u8(0x7f); b.u8(0x7f); b.u8(0x7f);
++  b.uleb(1); b.u8(0x7f);
++  module.section(1, b);
++
++  // Imports: the JVM's own memory, and its indirect function table. The table
++  // is what makes an out-of-line call a wasm->wasm call: a C function pointer
++  // is an index into it, so call_indirect reaches zwc_invoke directly. It is
++  // imported, never grown -- growing it moves every side module's table base
++  // and the next dlopen fails.
++  WasmBuf imp;
++  imp.uleb(2);
++  imp.uleb(3); imp.bytes("env", 3);
++  imp.uleb(6); imp.bytes("memory", 6);
++  imp.u8(0x02); imp.u8(0x03); imp.uleb(0); imp.uleb(65536);
++  imp.uleb(3); imp.bytes("env", 3);
++  imp.uleb(25); imp.bytes("__indirect_function_table", 25);
++  imp.u8(0x01); imp.u8(0x70); imp.u8(0x00); imp.uleb(0);
++  module.section(2, imp);
++
++  WasmBuf fn; fn.uleb(1); fn.uleb(0);
++  module.section(3, fn);
++
++  WasmBuf ex; ex.uleb(1); ex.uleb(1); ex.bytes("f", 1); ex.u8(0x00); ex.uleb(0);
++  module.section(7, ex);
++
++  // code: one body, locals = $blk, $budget and the operand stack
++  WasmBuf body;
++  // One run per local: $blk, $budget, the operand-stack reservation, one slot
++  // per local of every inlined callee, and any wide locals that were needed.
++  int extra_locals = _next_local - NPARAMS;
++  if (extra_locals > MAX_LOCALS) { _why = "too many locals"; return false; }
++  body.uleb((unsigned)extra_locals);
++  for (int i = 0; i < extra_locals; i++) {
++    body.uleb(1);
++    body.u8(wasm_type_of(_local_kind[i]));
++  }
++  body.bytes(_code_buf.data(), _code_buf.length());
++  body.u8(WOP_END);
++
++  WasmBuf codesec;
++  codesec.uleb(1);
++  codesec.uleb((unsigned)body.length());
++  codesec.append(body);
++  module.section(10, codesec);
++  return true;
++}
++
++bool Codegen::emit_body() {
++  // $budget bounds how many back-edges compiled code may take before handing
++  // control back. That is what keeps safepoints reachable: a compiled loop
++  // cannot spin forever, and the interpreter's own back-edge check runs when
++  // we return. No call out of wasm is needed to stay safe.
++  emit_const((int)ZeroWasmJITBackedgeBudget);
++  local_set(L_BUDGET);
++  // Entry block, not always zero: on-stack replacement enters at a loop header
++  // when the method itself is only ever called once, which is exactly the
++  // shape of every "do this for all 4096 blocks in the section" loop.
++  local_get(L_ENTRY);
++  local_set(L_BLK);
++
++  // block $exit { loop $L { block $B(n-1) ... block $B0 { br_table } ... } }
++  emit(WOP_BLOCK); emit(0x40);           // $exit, void
++  emit(WOP_LOOP);  emit(0x40);           // $L
++  for (int i = _blocks - 1; i >= 0; i--) { emit(WOP_BLOCK); emit(0x40); }
++
++  // Inside $B0: depth k reaches $Bk, depth _blocks reaches $L, +1 reaches $exit.
++  local_get(L_BLK);
++  emit(WOP_BR_TABLE);
++  _code_buf.uleb((unsigned)_blocks);
++  for (int i = 0; i < _blocks; i++) _code_buf.uleb((unsigned)i);
++  _code_buf.uleb((unsigned)_blocks + 1);   // default -> $exit
++
++  // Walk the bytecode once, closing a block's `end` as each leader arrives.
++  int block = 0;
++  int bci = 0;
++  int next_leader = 0;
++  while (bci < _len) {
++    if (_block_of[bci] >= 0) {
++      emit(WOP_END);                       // closes $B(block), code follows
++      block = _block_of[bci];
++      int end = _len;
++      for (int j = bci + 1; j <= _len; j++) {
++        if (_block_of[j] >= 0) { end = j; break; }
++      }
++      if (!emit_block(block, bci, end, _blocks - 1 - block)) return false;
++      // Falling out of a block hands its stack to the next one; a block that
++      // ended in a branch, a switch or a bail hands over nothing.
++      if (_fell_through && end < _len) {
++        if (!record_entry(end, _last_exit_depth)) {
++          _why = "merge depth conflict";
++          if (ZeroWasmJITVerbose) {
++            tty->print_cr("[zwc]   merge @%d: block %d wants %d, edge from [%d,%d) "
++                          "last=%s brings %d",
++                          end, _block_of[end], _entry_depth[_block_of[end]],
++                          bci, end,
++                          Bytecodes::name((Bytecodes::Code)(unsigned char)_code[_last_bci]),
++                          _last_exit_depth);
++          }
++          return false;
++        }
++      }
++      bci = end;
++      next_leader = end;
++      continue;
++    }
++    // discover_blocks guarantees leaders line up with instruction starts
++    return false;
++  }
++  (void)next_leader;
++
++  emit(WOP_END);                           // loop $L
++  emit(WOP_END);                           // block $exit
++  // Falling out of $exit means a bail already returned; be explicit anyway.
++  emit_bail(0, 0);
++  return true;
++}
++
++// Emits one basic block. `nesting_to_loop` is the relative depth of $L from
++// inside this block's code: after $B0's end we are inside $B1..$B(n-1), then
++// $L, then $exit.
++bool Codegen::emit_block(int b, int start, int end, int nesting_to_loop) {
++  int depth = _entry_depth[b];
++  if (depth < 0) {
++    // No edge reaches this block: every branch records its target before it is
++    // emitted, and back-edge targets were seeded during the scan. It is code
++    // after a bail, so it is dead here -- but it still has to be emitted,
++    // because the dispatch table has a slot for it.
++    _fell_through = false;
++    emit_bail(start, 0);
++    return true;
++  }
++  unsigned char* k = &_entry_kind[b * MAX_DEPTH];
++  for (int i = 0; i < depth; i++) set_slot(i, k[i]);
++  bool ok = emit_range(_method, _code, start, end, depth, nesting_to_loop, true);
++  _last_exit_depth = depth;
++  return ok;
++}
++
++// Emits a run of bytecode. Used both for a top-level basic block and for the
++// body of an inlined callee, which is why the method and code base are
++// explicit rather than taken from the fields.
++bool Codegen::emit_range(Method* m, address code, int start, int end,
++                         int& depth, int nesting_to_loop, bool allow_branches) {
++  // Refusing outright is different from bailing: it throws the whole method
++  // away, so it has to say where. Every one of these is a shape the emitter
++  // does not model, and each one is a lead.
++  #define REFUSE() do { if (_fail_bci < 0) { _fail_bci = bci; _fail_op = raw; } \
++                        return false; } while (0)
++  const int L_DEPTH = nesting_to_loop;
++  const int EXIT_DEPTH = nesting_to_loop + 1;
++
++  if (allow_branches) _fell_through = false;
++  // A goto or a switch ends the block: control leaves through the loop
++  // dispatch, so nothing is handed to the block that happens to follow it in
++  // bci order.
++  bool terminal = false;
++  int bci = start;
++  while (bci < end) {
++    int raw = (unsigned char)code[bci];
++    if (raw >= Bytecodes::number_of_codes) { emit_bail(bci, depth); return true; }
++    Bytecodes::Code c = (Bytecodes::Code)raw;
++    int size = insn_length(code, bci, allow_branches ? _len : m->code_size());
++    if (size <= 0) { emit_bail(bci, depth); return true; }
++
++    if (!allow_branches) {
++      // A target reached: close its block, and adopt the depth the CFG check
++      // proved every incoming edge agrees on.
++      while (_inl_next < _inl_ntargets && _inl_targets[_inl_next] == bci) {
++        emit(WOP_END);
++        _inl_next++;
++        if (_inl_depth_at != nullptr && _inl_depth_at[bci] >= 0) {
++          depth = _inl_base_depth + _inl_depth_at[bci];
++        }
++      }
++    }
++
++    if (!_bailed) _ops_before_bail++;
++    if (allow_branches) _last_bci = bci;
++    if (allow_branches && (uintx)bci >= ZeroWasmJITStopAt) {
++      emit_bail(bci, depth); return true;
++    }
++
++    switch (c) {
++      case Bytecodes::_nop: break;
++
++      case Bytecodes::_iconst_m1: case Bytecodes::_iconst_0:
++      case Bytecodes::_iconst_1:  case Bytecodes::_iconst_2:
++      case Bytecodes::_iconst_3:  case Bytecodes::_iconst_4:
++      case Bytecodes::_iconst_5:
++        emit_const((int)c - (int)Bytecodes::_iconst_0);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_bipush:
++        emit_const((int)(signed char)code[bci + 1]);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_sipush:
++        emit_const((int)(short)(((unsigned char)code[bci+1] << 8) | (unsigned char)code[bci+2]));
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_iload_0: case Bytecodes::_iload_1:
++      case Bytecodes::_iload_2: case Bytecodes::_iload_3:
++        emit_local_load((int)c - (int)Bytecodes::_iload_0);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_iload:
++        emit_local_load((unsigned char)code[bci + 1]);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_istore_0: case Bytecodes::_istore_1:
++      case Bytecodes::_istore_2: case Bytecodes::_istore_3:
++        if (depth < 1) REFUSE();
++        emit_local_store((int)c - (int)Bytecodes::_istore_0, stack_local(depth - 1)); depth--;
++        break;
++
++      case Bytecodes::_istore:
++        if (depth < 1) REFUSE();
++        emit_local_store((unsigned char)code[bci + 1], stack_local(depth - 1));
++        depth--;
++        break;
++
++      case Bytecodes::_iinc:
++        emit_local_inc((unsigned char)code[bci + 1], (int)(signed char)code[bci + 2]);
++        break;
++
++      case Bytecodes::_pop:
++        if (depth < 1) REFUSE();
++        depth--;
++        break;
++
++      case Bytecodes::_dup:
++        if (!dup_slots(1, 1, depth)) REFUSE();
++        break;
++
++      case Bytecodes::_ineg:
++        if (depth < 1) REFUSE();
++        emit_const(0);
++        local_get(stack_local(depth - 1));
++        emit(WOP_I32_SUB);
++        set_i32(depth - 1);
++        break;
++
++      case Bytecodes::_i2b: case Bytecodes::_i2s:
++        if (depth < 1) REFUSE();
++        local_get(stack_local(depth - 1));
++        emit(c == Bytecodes::_i2b ? WOP_I32_EXTEND8_S : WOP_I32_EXTEND16_S);
++        set_i32(depth - 1);
++        break;
++
++      case Bytecodes::_iadd: case Bytecodes::_isub: case Bytecodes::_imul:
++      case Bytecodes::_iand: case Bytecodes::_ior:  case Bytecodes::_ixor:
++      case Bytecodes::_ishl: case Bytecodes::_ishr: case Bytecodes::_iushr: {
++        if (depth < 2) REFUSE();
++        local_get(stack_local(depth - 2));
++        local_get(stack_local(depth - 1));
++        int op;
++        switch (c) {
++          case Bytecodes::_iadd:  op = WOP_I32_ADD;   break;
++          case Bytecodes::_isub:  op = WOP_I32_SUB;   break;
++          case Bytecodes::_imul:  op = WOP_I32_MUL;   break;
++          case Bytecodes::_iand:  op = WOP_I32_AND;   break;
++          case Bytecodes::_ior:   op = WOP_I32_OR;    break;
++          case Bytecodes::_ixor:  op = WOP_I32_XOR;   break;
++          case Bytecodes::_ishl:  op = WOP_I32_SHL;   break;
++          case Bytecodes::_ishr:  op = WOP_I32_SHR_S; break;
++          default:                op = WOP_I32_SHR_U; break;
++        }
++        // Java masks the shift count to 5 bits; wasm does the same for i32,
++        // so no explicit mask is needed.
++        emit(op);
++        set_i32(depth - 2); depth--;
++        break;
++      }
++
++
++      // Reference loads/stores. On wasm32 an oop is a 4-byte address and the
++      // slot is 4 bytes, so these are the same move as the int forms. An oop
++      // may sit in a wasm local because a trace contains no safepoint: the
++      // only ways out are a bail (which spills the stack to the frame first)
++      // and the back-edge budget (where the stack is empty).
++      case Bytecodes::_aload_0: case Bytecodes::_aload_1:
++      case Bytecodes::_aload_2: case Bytecodes::_aload_3:
++        emit_local_load((int)c - (int)Bytecodes::_aload_0);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_fast_aload_0:
++        emit_local_load(0);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_aload:
++        emit_local_load((unsigned char)code[bci + 1]);
++        set_i32(depth); depth++;
++        break;
++
++      case Bytecodes::_astore_0: case Bytecodes::_astore_1:
++      case Bytecodes::_astore_2: case Bytecodes::_astore_3:
++        if (depth < 1) REFUSE();
++        emit_local_store((int)c - (int)Bytecodes::_astore_0, stack_local(depth - 1)); depth--;
++        break;
++
++      case Bytecodes::_fast_iload:
++        emit_local_load((unsigned char)code[bci + 1]);
++        set_i32(depth); depth++;
++        break;
++
++      // getfield of any width. _fast_agetfield loads a reference, which is a
++      // plain load: reading an oop needs no barrier in these collectors.
++      case Bytecodes::_fast_igetfield: case Bytecodes::_fast_agetfield:
++      case Bytecodes::_fast_bgetfield: case Bytecodes::_fast_sgetfield:
++      case Bytecodes::_fast_cgetfield: case Bytecodes::_fast_lgetfield:
++      case Bytecodes::_fast_fgetfield: case Bytecodes::_fast_dgetfield: {
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        int off, kind, lop, sop, align; bool is_oop;
++        if (!field_shape(m, u2_at(code, bci + 1), Bytecodes::_getfield, false,
++                         &off, &kind, &lop, &sop, &align, &is_oop)) {
++          emit_bail(bci, depth); return true;
++        }
++        guard_nonnull(stack_local(depth - 1), bci, depth);
++        local_get(stack_local(depth - 1));
++        mem_op(lop, align, off);
++        depth--;
++        push_val(kind, depth);
++        depth += is_wide(kind) ? 2 : 1;
++        break;
++      }
++
++      // putfield of any width, references included. A reference store needs
++      // the collector's post-barrier, which for a card table is one byte
++      // store -- and without it every object field assignment would end the
++      // trace, which is most of what real code does.
++      case Bytecodes::_fast_iputfield: case Bytecodes::_fast_bputfield:
++      case Bytecodes::_fast_zputfield: case Bytecodes::_fast_sputfield:
++      case Bytecodes::_fast_cputfield: case Bytecodes::_fast_lputfield:
++      case Bytecodes::_fast_fputfield: case Bytecodes::_fast_dputfield:
++      case Bytecodes::_fast_aputfield:
++      case Bytecodes::_putfield: case Bytecodes::_nofast_putfield: {
++        bool slow_form = (c == Bytecodes::_putfield || c == Bytecodes::_nofast_putfield);
++        int off, kind, lop, sop, align; bool is_oop;
++        if (!field_shape(m, u2_at(code, bci + 1), Bytecodes::_putfield, slow_form,
++                         &off, &kind, &lop, &sop, &align, &is_oop)) {
++          emit_bail(bci, depth); return true;
++        }
++        if (is_oop && (!_can_store_oop || disabled(NO_OOPSTORE))) {
++          emit_bail(bci, depth); return true;
++        }
++        int vs = is_wide(kind) ? 2 : 1;
++        if (depth < 1 + vs) REFUSE();
++        int objd = depth - vs - 1;
++        if (slot_kind(objd) != K_I32 || slot_kind(depth - vs) != kind) REFUSE();
++        guard_nonnull(stack_local(objd), bci, depth);
++        local_get(stack_local(objd));
++        get_val(kind, depth - vs);
++        mem_op(sop, align, off);
++        if (is_oop) emit_card_mark(stack_local(objd), off);
++        depth -= (vs + 1);
++        break;
++      }
++
++      case Bytecodes::_getfield: case Bytecodes::_nofast_getfield: {
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        int off, kind, lop, sop, align; bool is_oop;
++        if (!field_shape(m, u2_at(code, bci + 1), Bytecodes::_getfield, true,
++                         &off, &kind, &lop, &sop, &align, &is_oop)) {
++          emit_bail(bci, depth); return true;
++        }
++        guard_nonnull(stack_local(depth - 1), bci, depth);
++        local_get(stack_local(depth - 1));
++        mem_op(lop, align, off);
++        depth--;
++        push_val(kind, depth);
++        depth += is_wide(kind) ? 2 : 1;
++        break;
++      }
++
++
++      // ---- long and double ----
++      // wasm has i64 and f64 natively, so the arithmetic the in-world profile
++      // is made of (LegacyRandomSource.next, Mth.floor) becomes single
++      // instructions instead of Zero's software long routines.
++      case Bytecodes::_lconst_0: case Bytecodes::_lconst_1:
++        _code_buf.u8(WOP_I64_CONST); _code_buf.sleb((int)c - (int)Bytecodes::_lconst_0);
++        push_wide(K_I64, depth); depth += 2;
++        break;
++
++      case Bytecodes::_dconst_0: case Bytecodes::_dconst_1: {
++        double v = (c == Bytecodes::_dconst_0) ? 0.0 : 1.0;
++        jlong bits; memcpy(&bits, &v, sizeof(bits));
++        _code_buf.u8(WOP_F64_CONST);
++        for (int i = 0; i < 8; i++) _code_buf.u8((int)((bits >> (8 * i)) & 0xff));
++        push_wide(K_F64, depth); depth += 2;
++        break;
++      }
++
++      case Bytecodes::_ldc2_w: {
++        // Not a rewritten index: ldc keeps the class file's big-endian
++        // constant-pool index, unlike every getfield and invoke.
++        int idx = s2u_at(code, bci + 1);
++        if (idx <= 0 || idx >= m->constants()->length()) { emit_bail(bci, depth); return true; }
++        constantTag tag = m->constants()->tag_at(idx);
++        if (tag.is_long()) {
++          jlong v = m->constants()->long_at(idx);
++          _code_buf.u8(WOP_I64_CONST); _code_buf.sleb64(v);
++          push_wide(K_I64, depth);
++        } else if (tag.is_double()) {
++          jdouble d = m->constants()->double_at(idx);
++          jlong bits; memcpy(&bits, &d, sizeof(bits));
++          _code_buf.u8(WOP_F64_CONST);
++          for (int i = 0; i < 8; i++) _code_buf.u8((int)((bits >> (8 * i)) & 0xff));
++          push_wide(K_F64, depth);
++        } else {
++          emit_bail(bci, depth); return true;
++        }
++        depth += 2;
++        break;
++      }
++
++      case Bytecodes::_lload: case Bytecodes::_lload_0: case Bytecodes::_lload_1:
++      case Bytecodes::_lload_2: case Bytecodes::_lload_3:
++      case Bytecodes::_dload: case Bytecodes::_dload_0: case Bytecodes::_dload_1:
++      case Bytecodes::_dload_2: case Bytecodes::_dload_3: {
++        bool is_d = (c == Bytecodes::_dload) || (c >= Bytecodes::_dload_0 && c <= Bytecodes::_dload_3);
++        int k = is_d ? K_F64 : K_I64;
++        int index = (c == Bytecodes::_lload || c == Bytecodes::_dload)
++            ? (unsigned char)code[bci + 1]
++            : (is_d ? (int)c - (int)Bytecodes::_dload_0 : (int)c - (int)Bytecodes::_lload_0);
++        if (_local_base >= 0) REFUSE();    // inlined wide locals not modelled
++        push_wide_local_addr(index);
++        mem_op(is_d ? WOP_F64_LOAD : WOP_I64_LOAD, 2, 0);
++        push_wide(k, depth); depth += 2;
++        break;
++      }
++
++      case Bytecodes::_lstore: case Bytecodes::_lstore_0: case Bytecodes::_lstore_1:
++      case Bytecodes::_lstore_2: case Bytecodes::_lstore_3:
++      case Bytecodes::_dstore: case Bytecodes::_dstore_0: case Bytecodes::_dstore_1:
++      case Bytecodes::_dstore_2: case Bytecodes::_dstore_3: {
++        bool is_d = (c == Bytecodes::_dstore) || (c >= Bytecodes::_dstore_0 && c <= Bytecodes::_dstore_3);
++        int k = is_d ? K_F64 : K_I64;
++        if (depth < 2 || slot_kind(depth - 2) != k) REFUSE();
++        int index = (c == Bytecodes::_lstore || c == Bytecodes::_dstore)
++            ? (unsigned char)code[bci + 1]
++            : (is_d ? (int)c - (int)Bytecodes::_dstore_0 : (int)c - (int)Bytecodes::_lstore_0);
++        if (_local_base >= 0) REFUSE();
++        push_wide_local_addr(index);
++        get_wide(k, depth - 2);
++        mem_op(is_d ? WOP_F64_STORE : WOP_I64_STORE, 2, 0);
++        depth -= 2;
++        break;
++      }
++
++      case Bytecodes::_ladd: case Bytecodes::_lsub: case Bytecodes::_lmul:
++      case Bytecodes::_land: case Bytecodes::_lor:  case Bytecodes::_lxor: {
++        if (depth < 4 || slot_kind(depth - 4) != K_I64 || slot_kind(depth - 2) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 4);
++        get_wide(K_I64, depth - 2);
++        int op = (c == Bytecodes::_ladd) ? WOP_I64_ADD : (c == Bytecodes::_lsub) ? WOP_I64_SUB
++               : (c == Bytecodes::_lmul) ? WOP_I64_MUL : (c == Bytecodes::_land) ? WOP_I64_AND
++               : (c == Bytecodes::_lor)  ? WOP_I64_OR  : WOP_I64_XOR;
++        emit(op);
++        depth -= 2;
++        push_wide(K_I64, depth - 2);
++        break;
++      }
++
++      case Bytecodes::_lshl: case Bytecodes::_lshr: case Bytecodes::_lushr: {
++        // The shift count is an int; wasm wants both operands the same width,
++        // and Java masks it to 6 bits exactly as i64 shifts do.
++        if (depth < 3 || slot_kind(depth - 3) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 3);
++        local_get(stack_local(depth - 1));
++        emit(WOP_I64_EXTEND_I32_S);
++        emit(c == Bytecodes::_lshl ? WOP_I64_SHL
++           : c == Bytecodes::_lshr ? WOP_I64_SHR_S : WOP_I64_SHR_U);
++        depth -= 1;
++        push_wide(K_I64, depth - 2);
++        break;
++      }
++
++      case Bytecodes::_lneg: {
++        if (depth < 2 || slot_kind(depth - 2) != K_I64) REFUSE();
++        _code_buf.u8(WOP_I64_CONST); _code_buf.sleb(0);
++        get_wide(K_I64, depth - 2);
++        emit(WOP_I64_SUB);
++        push_wide(K_I64, depth - 2);
++        break;
++      }
++
++      case Bytecodes::_dadd: case Bytecodes::_dsub:
++      case Bytecodes::_dmul: case Bytecodes::_ddiv: {
++        if (depth < 4 || slot_kind(depth - 4) != K_F64 || slot_kind(depth - 2) != K_F64) REFUSE();
++        get_wide(K_F64, depth - 4);
++        get_wide(K_F64, depth - 2);
++        emit(c == Bytecodes::_dadd ? WOP_F64_ADD : c == Bytecodes::_dsub ? WOP_F64_SUB
++           : c == Bytecodes::_dmul ? WOP_F64_MUL : WOP_F64_DIV);
++        depth -= 2;
++        push_wide(K_F64, depth - 2);
++        break;
++      }
++
++      case Bytecodes::_dneg:
++        if (depth < 2 || slot_kind(depth - 2) != K_F64) REFUSE();
++        get_wide(K_F64, depth - 2);
++        emit(WOP_F64_NEG);
++        push_wide(K_F64, depth - 2);
++        break;
++
++      case Bytecodes::_i2l:
++        if (depth < 1) REFUSE();
++        local_get(stack_local(depth - 1));
++        emit(WOP_I64_EXTEND_I32_S);
++        depth -= 1;
++        push_wide(K_I64, depth); depth += 2;
++        break;
++
++      case Bytecodes::_l2i:
++        if (depth < 2 || slot_kind(depth - 2) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 2);
++        emit(WOP_I32_WRAP_I64);
++        depth -= 2;
++        set_i32(depth); set_slot(depth, K_I32); depth += 1;
++        break;
++
++      case Bytecodes::_i2d:
++        if (depth < 1) REFUSE();
++        local_get(stack_local(depth - 1));
++        emit(WOP_F64_CONVERT_I32_S);
++        depth -= 1;
++        push_wide(K_F64, depth); depth += 2;
++        break;
++
++      case Bytecodes::_l2d:
++        if (depth < 2 || slot_kind(depth - 2) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 2);
++        emit(WOP_F64_CONVERT_I64_S);
++        push_wide(K_F64, depth - 2);
++        break;
++
++      case Bytecodes::_d2i: {
++        // Java saturates and maps NaN to 0; wasm's plain trunc traps, so this
++        // must be the saturating form (0xfc 0x02).
++        if (depth < 2 || slot_kind(depth - 2) != K_F64) REFUSE();
++        get_wide(K_F64, depth - 2);
++        emit(0xfc); _code_buf.uleb(2);
++        depth -= 2;
++        set_i32(depth); set_slot(depth, K_I32); depth += 1;
++        break;
++      }
++
++      case Bytecodes::_d2l: {
++        if (depth < 2 || slot_kind(depth - 2) != K_F64) REFUSE();
++        get_wide(K_F64, depth - 2);
++        emit(0xfc); _code_buf.uleb(6);        // i64.trunc_sat_f64_s
++        push_wide(K_I64, depth - 2);
++        break;
++      }
++
++      case Bytecodes::_lcmp: {
++        // -1, 0 or 1. Built as (a > b) - (a < b), which is branch-free.
++        if (depth < 4 || slot_kind(depth - 4) != K_I64 || slot_kind(depth - 2) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 4); get_wide(K_I64, depth - 2); emit(WOP_I64_GT_S);
++        get_wide(K_I64, depth - 4); get_wide(K_I64, depth - 2); emit(WOP_I64_LT_S);
++        emit(WOP_I32_SUB);
++        depth -= 4;
++        set_i32(depth); set_slot(depth, K_I32); depth += 1;
++        break;
++      }
++
++      case Bytecodes::_dcmpl: case Bytecodes::_dcmpg: {
++        // NaN gives -1 for dcmpl and 1 for dcmpg. (a>b)-(a<b) yields 0 for NaN,
++        // so add the NaN case explicitly via an equality test on both operands.
++        if (depth < 4 || slot_kind(depth - 4) != K_F64 || slot_kind(depth - 2) != K_F64) REFUSE();
++        // ordered ? (a>b) - (a<b) : (dcmpg ? 1 : -1), via select.
++        get_wide(K_F64, depth - 4); get_wide(K_F64, depth - 2); emit(WOP_F64_GT);
++        get_wide(K_F64, depth - 4); get_wide(K_F64, depth - 2); emit(WOP_F64_LT);
++        emit(WOP_I32_SUB);
++        emit_const(c == Bytecodes::_dcmpg ? 1 : -1);
++        // NaN is the only value not equal to itself, so this is the ordered test
++        get_wide(K_F64, depth - 4); get_wide(K_F64, depth - 4); emit(WOP_F64_EQ);
++        get_wide(K_F64, depth - 2); get_wide(K_F64, depth - 2); emit(WOP_F64_EQ);
++        emit(WOP_I32_AND);
++        emit(0x1b);                           // select
++        depth -= 4;
++        set_i32(depth); set_slot(depth, K_I32); depth += 1;
++        break;
++      }
++
++      case Bytecodes::_getstatic: {
++        address handle; int off, kind, lop, sop, align;
++        if (!getstatic_shape(m, u2_at(code, bci + 1), Bytecodes::_getstatic,
++                             &handle, &off, &kind, &lop, &sop, &align)) {
++          emit_bail(bci, depth); return true;
++        }
++        emit_const((int)(intptr_t)handle);
++        i32_load();                       // the mirror, read fresh every time
++        mem_op(lop, align, off);
++        push_val(kind, depth);
++        depth += is_wide(kind) ? 2 : 1;
++        break;
++      }
++
++      // putstatic of a primitive. The mirror is an ordinary heap object, so a
++      // reference store into it would need the barrier plus the mirror's own
++      // address, and it is rare enough not to be worth it.
++      case Bytecodes::_putstatic: {
++        address handle; int off, kind, lop, sop, align;
++        if (!getstatic_shape(m, u2_at(code, bci + 1), Bytecodes::_putstatic,
++                             &handle, &off, &kind, &lop, &sop, &align)) {
++          emit_bail(bci, depth); return true;
++        }
++        int vs = is_wide(kind) ? 2 : 1;
++        if (depth < vs || slot_kind(depth - vs) != kind) REFUSE();
++        emit_const((int)(intptr_t)handle);
++        i32_load();
++        get_val(kind, depth - vs);
++        mem_op(sop, align, off);
++        depth -= vs;
++        break;
++      }
++
++      // Array element loads. On wasm32 a reference is 4 bytes, so aaload is
++      // the same load as iaload; reading an oop needs no barrier here.
++      case Bytecodes::_iaload: case Bytecodes::_aaload: case Bytecodes::_baload:
++      case Bytecodes::_caload: case Bytecodes::_saload: {
++        if (depth < 2) REFUSE();
++        BasicType t = (c == Bytecodes::_iaload) ? T_INT
++                    : (c == Bytecodes::_aaload) ? T_OBJECT
++                    : (c == Bytecodes::_baload) ? T_BYTE
++                    : (c == Bytecodes::_caload) ? T_CHAR : T_SHORT;
++        int arr = stack_local(depth - 2), idx = stack_local(depth - 1);
++        guard_array(arr, idx, bci, depth);
++        emit_element_addr(arr, idx, t);
++        int op = (t == T_BYTE) ? WOP_I32_LOAD8_S
++               : (t == T_CHAR) ? WOP_I32_LOAD16_U
++               : (t == T_SHORT) ? WOP_I32_LOAD16_S : WOP_I32_LOAD;
++        int align = (t == T_BYTE) ? 0 : (t == T_INT || t == T_OBJECT) ? 2 : 1;
++        mem_op(op, align, arrayOopDesc::base_offset_in_bytes(t));
++        set_i32(depth - 2); depth--;
++        break;
++      }
++
++      // Primitive element stores. aastore is absent on purpose: an oop store
++      // into an array needs both a store-check and the GC's write barrier.
++      case Bytecodes::_iastore: case Bytecodes::_bastore:
++      case Bytecodes::_castore: case Bytecodes::_sastore: {
++        if (depth < 3) REFUSE();
++        BasicType t = (c == Bytecodes::_iastore) ? T_INT
++                    : (c == Bytecodes::_bastore) ? T_BYTE
++                    : (c == Bytecodes::_castore) ? T_CHAR : T_SHORT;
++        int arr = stack_local(depth - 3), idx = stack_local(depth - 2);
++        guard_array(arr, idx, bci, depth);
++        emit_element_addr(arr, idx, t);
++        local_get(stack_local(depth - 1));
++        int op = (t == T_BYTE) ? WOP_I32_STORE8
++               : (t == T_INT) ? WOP_I32_STORE : WOP_I32_STORE16;
++        int align = (t == T_BYTE) ? 0 : (t == T_INT) ? 2 : 1;
++        mem_op(op, align, arrayOopDesc::base_offset_in_bytes(t));
++        depth -= 3;
++        break;
++      }
++
++      // Integer and float constants only. A String or Class constant is an oop
++      // in the resolved-references array and can move, so it stays interpreted.
++      case Bytecodes::_ldc: case Bytecodes::_ldc_w: {
++        int idx = (c == Bytecodes::_ldc) ? (unsigned char)code[bci + 1]
++                                         : s2u_at(code, bci + 1);
++        if (idx <= 0 || idx >= m->constants()->length()) { emit_bail(bci, depth); return true; }
++        constantTag tag = m->constants()->tag_at(idx);
++        if (tag.is_int()) {
++          emit_const(m->constants()->int_at(idx));
++          set_i32(depth);
++        } else if (tag.is_float()) {
++          emit_f32_const(m->constants()->float_at(idx));
++          push_val(K_F32, depth);
++        } else {
++          emit_bail(bci, depth); return true;
++        }
++        depth++;
++        break;
++      }
++
++      case Bytecodes::_arraylength: {
++        if (depth < 1) REFUSE();
++        guard_nonnull(stack_local(depth - 1), bci, depth);
++        local_get(stack_local(depth - 1));
++        mem_op(WOP_I32_LOAD, 2, arrayOopDesc::length_offset_in_bytes());
++        set_i32(depth - 1);
++        break;
++      }
++
++      case Bytecodes::_i2c:
++        if (depth < 1) REFUSE();
++        local_get(stack_local(depth - 1));
++        emit_const(0xffff);
++        emit(WOP_I32_AND);
++        set_i32(depth - 1);
++        break;
++
++      // aload_0 + getfield fused. The cp index sits at pc+2, not pc+1.
++      case Bytecodes::_fast_iaccess_0: case Bytecodes::_fast_aaccess_0: {
++        int off = field_offset_at(m, u2_at(code, bci + 2));
++        if (off < 0) { emit_bail(bci, depth); return true; }
++        emit_local_load(0);
++        set_i32(depth);
++        guard_nonnull(stack_local(depth), bci, depth);
++        local_get(stack_local(depth));
++        mem_op(WOP_I32_LOAD, 2, off);
++        set_i32(depth); depth++;
++        break;
++      }
++
++
++      // Returns. In the outer method the interpreter performs them, so that
++      // none of the return protocol -- monitors, JVMTI, result narrowing -- is
++      // duplicated here. Inside an inlined body a return is simply the end of
++      // the splice, with the result already on the caller's stack.
++      case Bytecodes::_ireturn: case Bytecodes::_areturn: case Bytecodes::_return:
++        if (allow_branches) { emit_bail(bci, depth); return true; }
++        // Inlined: park the result where the caller expects it and jump to the
++        // end of the splice. A callee may return from several places.
++        if (c != Bytecodes::_return) {
++          if (depth < 1) REFUSE();
++          local_get(stack_local(depth - 1));
++          local_set(_inl_result_slot);
++          depth--;
++        }
++        br(inl_exit_depth());
++        break;
++
++      // Statically bound calls: invokestatic and invokespecial by definition,
++      // and _fast_invokevfinal because HotSpot only rewrites to it when the
++      // target is final. No class check is needed for any of them.
++      // Statically bound calls: invokestatic and invokespecial by definition,
++      // and _fast_invokevfinal because HotSpot only rewrites to it when the
++      // target is final. Inlining is much the better outcome -- it builds no
++      // interpreter frame at all -- so it is tried first; out-of-line keeps
++      // the trace alive when the callee is the wrong shape.
++      //
++      // Never out-of-line inside an inlined body: a bail there rewinds to the
++      // caller's invoke and re-executes it, which would run the call twice.
++      case Bytecodes::_fast_invokevfinal:
++      case Bytecodes::_invokestatic:
++      case Bytecodes::_invokespecial:
++        if (try_inline(m, code, bci, depth)) break;
++        if (allow_branches && emit_call_out(m, code, bci, depth)) break;
++        emit_bail(bci, depth); return true;
++
++      case Bytecodes::_invokevirtual:
++      case Bytecodes::_invokeinterface:
++        if (allow_branches && emit_call_out(m, code, bci, depth)) break;
++        emit_bail(bci, depth); return true;
++
++      case Bytecodes::_goto: {
++        int off = (int)(short)(((unsigned char)code[bci+1] << 8) | (unsigned char)code[bci+2]);
++        int target = bci + off;
++        if (!allow_branches) {
++          int d = inl_target_depth(target);
++          if (d < 0) REFUSE();
++          br(d);
++          break;
++        }
++        if (!record_entry(target, depth)) REFUSE();
++        emit_backedge_budget(off < 0, target, depth);
++        emit_const(_block_of[target]);
++        local_set(L_BLK);
++        br(L_DEPTH);
++        terminal = true;
++        break;
++      }
++
++      case Bytecodes::_ifeq: case Bytecodes::_ifne:
++      case Bytecodes::_iflt: case Bytecodes::_ifge:
++      case Bytecodes::_ifgt: case Bytecodes::_ifle:
++      case Bytecodes::_ifnull: case Bytecodes::_ifnonnull:
++      case Bytecodes::_if_icmpeq: case Bytecodes::_if_icmpne:
++      case Bytecodes::_if_icmplt: case Bytecodes::_if_icmpge:
++      case Bytecodes::_if_icmpgt: case Bytecodes::_if_icmple:
++      case Bytecodes::_if_acmpeq: case Bytecodes::_if_acmpne: {
++        // ifnull/ifnonnull compare a reference against zero and if_acmp*
++        // compare two references; on wasm32 both are the plain i32 tests.
++        bool two = (c >= Bytecodes::_if_icmpeq && c <= Bytecodes::_if_icmple)
++                 || c == Bytecodes::_if_acmpeq || c == Bytecodes::_if_acmpne;
++        int need = two ? 2 : 1;
++        int off = (int)(short)(((unsigned char)code[bci+1] << 8) | (unsigned char)code[bci+2]);
++        int target = bci + off;
++        int fall = bci + size;
++        if (depth < need) REFUSE();
++        if (slot_kind(depth - 1) != K_I32) REFUSE();
++        if (two && slot_kind(depth - 2) != K_I32) REFUSE();
++        if (allow_branches && (_block_of[target] < 0 || (fall < _len && _block_of[fall] < 0))) {
++          REFUSE();
++        }
++
++        if (two) {
++          local_get(stack_local(depth - 2));
++          local_get(stack_local(depth - 1));
++        } else {
++          local_get(stack_local(depth - 1));
++          emit_const(0);
++        }
++        int op;
++        switch (c) {
++          case Bytecodes::_ifeq: case Bytecodes::_if_icmpeq:
++          case Bytecodes::_ifnull: case Bytecodes::_if_acmpeq: op = WOP_I32_EQ; break;
++          case Bytecodes::_ifne: case Bytecodes::_if_icmpne:
++          case Bytecodes::_ifnonnull: case Bytecodes::_if_acmpne: op = WOP_I32_NE; break;
++          case Bytecodes::_iflt: case Bytecodes::_if_icmplt: op = WOP_I32_LT_S; break;
++          case Bytecodes::_ifge: case Bytecodes::_if_icmpge: op = WOP_I32_GE_S; break;
++          case Bytecodes::_ifgt: case Bytecodes::_if_icmpgt: op = WOP_I32_GT_S; break;
++          default:                                            op = WOP_I32_LE_S; break;
++        }
++        emit(op);
++
++        if (!allow_branches) {
++          // Inlined: the target is an enclosing wasm block, so the whole
++          // branch is one br_if outwards. inline_cfg() has already proved the
++          // stack depth agrees on both edges.
++          depth -= need;
++          int d = inl_target_depth(target);
++          if (d < 0) REFUSE();
++          br_if(d);
++          break;
++        }
++
++        depth -= need;
++        if (!record_entry(target, depth)) REFUSE();
++        if (fall < _len && !record_entry(fall, depth)) REFUSE();
++
++        emit(0x04); emit(0x40);               // if (taken)
++        emit_backedge_budget(off < 0, target, depth);
++        emit_const(_block_of[target]);
++        local_set(L_BLK);
++        br(L_DEPTH + 1);                      // +1: we are inside the `if`
++        emit(WOP_END);
++        // fall through to the next block naturally
++        break;
++      }
++
++
++      // ---- references, shuffles and the fused loads ----
++      case Bytecodes::_aconst_null:
++        emit_const(0); set_i32(depth); depth++; break;
++
++      case Bytecodes::_astore:
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        emit_local_store((unsigned char)code[bci + 1], stack_local(depth - 1));
++        depth--; break;
++
++      case Bytecodes::_nofast_aload_0:
++        emit_local_load(0); set_i32(depth); depth++; break;
++
++      case Bytecodes::_nofast_iload:
++        emit_local_load((unsigned char)code[bci + 1]); set_i32(depth); depth++; break;
++
++      // iload,iload fused: the second index is at pc+3, not pc+2.
++      case Bytecodes::_fast_iload2:
++        emit_local_load((unsigned char)code[bci + 1]); set_i32(depth); depth++;
++        emit_local_load((unsigned char)code[bci + 3]); set_i32(depth); depth++;
++        break;
++
++      // iload,caload fused: the array is already on the stack.
++      case Bytecodes::_fast_icaload: {
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        emit_local_load((unsigned char)code[bci + 1]);
++        set_i32(depth); depth++;
++        int arr = stack_local(depth - 2), idx = stack_local(depth - 1);
++        guard_array(arr, idx, bci, depth);
++        emit_element_addr(arr, idx, T_CHAR);
++        mem_op(WOP_I32_LOAD16_U, 1, arrayOopDesc::base_offset_in_bytes(T_CHAR));
++        set_i32(depth - 2); depth--;
++        break;
++      }
++
++      case Bytecodes::_pop2:
++        if (depth < 2) REFUSE();
++        depth -= 2; break;
++
++      case Bytecodes::_dup_x1:   if (!dup_slots(1, 2, depth)) REFUSE(); break;
++      case Bytecodes::_dup_x2:   if (!dup_slots(1, 3, depth)) REFUSE(); break;
++      case Bytecodes::_dup2:     if (!dup_slots(2, 2, depth)) REFUSE(); break;
++      case Bytecodes::_dup2_x1:  if (!dup_slots(2, 3, depth)) REFUSE(); break;
++      case Bytecodes::_dup2_x2:  if (!dup_slots(2, 4, depth)) REFUSE(); break;
++
++      case Bytecodes::_swap:
++        if (depth < 2 || depth >= MAX_DEPTH) REFUSE();
++        if (slot_kind(depth - 1) == K_TOP || slot_kind(depth - 2) == K_TOP) REFUSE();
++        move_slot(depth - 1, depth);
++        move_slot(depth - 2, depth - 1);
++        move_slot(depth, depth - 2);
++        break;
++
++      // ---- division ----
++      // wasm traps where Java throws or wraps, so both cases hand back and let
++      // the interpreter produce the ArithmeticException or the wrapped value.
++      case Bytecodes::_idiv: case Bytecodes::_irem: {
++        if (depth < 2 || slot_kind(depth - 2) != K_I32 || slot_kind(depth - 1) != K_I32) REFUSE();
++        local_get(stack_local(depth - 1));
++        emit(WOP_I32_EQZ);
++        if (c == Bytecodes::_idiv) {
++          local_get(stack_local(depth - 1)); emit_const(-1); emit(WOP_I32_EQ);
++          emit(WOP_I32_OR);
++        }
++        emit(WOP_IF); emit(0x40);
++        emit_bail(bci, depth, true);
++        emit(WOP_END);
++        local_get(stack_local(depth - 2));
++        local_get(stack_local(depth - 1));
++        emit(c == Bytecodes::_idiv ? WOP_I32_DIV_S : WOP_I32_REM_S);
++        set_i32(depth - 2); depth--;
++        break;
++      }
++
++      case Bytecodes::_ldiv: case Bytecodes::_lrem: {
++        if (depth < 4 || slot_kind(depth - 4) != K_I64 || slot_kind(depth - 2) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 2);
++        _code_buf.u8(0x50);                        // i64.eqz
++        if (c == Bytecodes::_ldiv) {
++          get_wide(K_I64, depth - 2);
++          _code_buf.u8(WOP_I64_CONST); _code_buf.sleb64(-1);
++          emit(WOP_I64_EQ);
++          emit(WOP_I32_OR);
++        }
++        emit(WOP_IF); emit(0x40);
++        emit_bail(bci, depth, true);
++        emit(WOP_END);
++        get_wide(K_I64, depth - 4);
++        get_wide(K_I64, depth - 2);
++        emit(c == Bytecodes::_ldiv ? WOP_I64_DIV_S : WOP_I64_REM_S);
++        depth -= 2;
++        push_wide(K_I64, depth - 2);
++        break;
++      }
++
++      // ---- float ----
++      // Minecraft's rendering, its matrices and every entity position are
++      // floats. Without these the whole client stays interpreted no matter
++      // how good the integer path is.
++      case Bytecodes::_fconst_0: case Bytecodes::_fconst_1: case Bytecodes::_fconst_2:
++        emit_f32_const((jfloat)((int)c - (int)Bytecodes::_fconst_0));
++        push_val(K_F32, depth); depth++;
++        break;
++
++      case Bytecodes::_fload: case Bytecodes::_fload_0: case Bytecodes::_fload_1:
++      case Bytecodes::_fload_2: case Bytecodes::_fload_3: {
++        if (_local_base >= 0) REFUSE();        // inlined locals are i32 only
++        int index = (c == Bytecodes::_fload) ? (unsigned char)code[bci + 1]
++                                             : (int)c - (int)Bytecodes::_fload_0;
++        push_local_addr(index);
++        mem_op(WOP_F32_LOAD, 2, 0);
++        push_val(K_F32, depth); depth++;
++        break;
++      }
++
++      case Bytecodes::_fstore: case Bytecodes::_fstore_0: case Bytecodes::_fstore_1:
++      case Bytecodes::_fstore_2: case Bytecodes::_fstore_3: {
++        if (_local_base >= 0) REFUSE();
++        if (depth < 1 || slot_kind(depth - 1) != K_F32) REFUSE();
++        int index = (c == Bytecodes::_fstore) ? (unsigned char)code[bci + 1]
++                                              : (int)c - (int)Bytecodes::_fstore_0;
++        push_local_addr(index);
++        get_val(K_F32, depth - 1);
++        mem_op(WOP_F32_STORE, 2, 0);
++        depth--;
++        break;
++      }
++
++      case Bytecodes::_fadd: case Bytecodes::_fsub:
++      case Bytecodes::_fmul: case Bytecodes::_fdiv:
++        if (depth < 2 || slot_kind(depth - 2) != K_F32 || slot_kind(depth - 1) != K_F32) REFUSE();
++        get_val(K_F32, depth - 2);
++        get_val(K_F32, depth - 1);
++        emit(c == Bytecodes::_fadd ? WOP_F32_ADD : c == Bytecodes::_fsub ? WOP_F32_SUB
++           : c == Bytecodes::_fmul ? WOP_F32_MUL : WOP_F32_DIV);
++        depth--;
++        push_val(K_F32, depth - 1);
++        break;
++
++      case Bytecodes::_fneg:
++        if (depth < 1 || slot_kind(depth - 1) != K_F32) REFUSE();
++        get_val(K_F32, depth - 1);
++        emit(WOP_F32_NEG);
++        push_val(K_F32, depth - 1);
++        break;
++
++      case Bytecodes::_i2f:
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        local_get(stack_local(depth - 1));
++        emit(WOP_F32_CONVERT_I32_S);
++        push_val(K_F32, depth - 1);
++        break;
++
++      case Bytecodes::_l2f:
++        if (depth < 2 || slot_kind(depth - 2) != K_I64) REFUSE();
++        get_wide(K_I64, depth - 2);
++        emit(WOP_F32_CONVERT_I64_S);
++        depth -= 2;
++        push_val(K_F32, depth); depth++;
++        break;
++
++      case Bytecodes::_d2f:
++        if (depth < 2 || slot_kind(depth - 2) != K_F64) REFUSE();
++        get_wide(K_F64, depth - 2);
++        emit(WOP_F32_DEMOTE_F64);
++        depth -= 2;
++        push_val(K_F32, depth); depth++;
++        break;
++
++      case Bytecodes::_f2d:
++        if (depth < 1 || slot_kind(depth - 1) != K_F32) REFUSE();
++        get_val(K_F32, depth - 1);
++        emit(WOP_F64_PROMOTE_F32);
++        depth--;
++        push_wide(K_F64, depth); depth += 2;
++        break;
++
++      case Bytecodes::_f2i:
++        if (depth < 1 || slot_kind(depth - 1) != K_F32) REFUSE();
++        get_val(K_F32, depth - 1);
++        emit(0xfc); _code_buf.uleb(0);             // i32.trunc_sat_f32_s
++        set_i32(depth - 1);
++        break;
++
++      case Bytecodes::_f2l:
++        if (depth < 1 || slot_kind(depth - 1) != K_F32) REFUSE();
++        get_val(K_F32, depth - 1);
++        emit(0xfc); _code_buf.uleb(4);             // i64.trunc_sat_f32_s
++        depth--;
++        push_wide(K_I64, depth); depth += 2;
++        break;
++
++      case Bytecodes::_fcmpl: case Bytecodes::_fcmpg: {
++        if (depth < 2 || slot_kind(depth - 2) != K_F32 || slot_kind(depth - 1) != K_F32) REFUSE();
++        get_val(K_F32, depth - 2); get_val(K_F32, depth - 1); emit(WOP_F32_GT);
++        get_val(K_F32, depth - 2); get_val(K_F32, depth - 1); emit(WOP_F32_LT);
++        emit(WOP_I32_SUB);
++        emit_const(c == Bytecodes::_fcmpg ? 1 : -1);
++        get_val(K_F32, depth - 2); get_val(K_F32, depth - 2); emit(WOP_F32_EQ);
++        get_val(K_F32, depth - 1); get_val(K_F32, depth - 1); emit(WOP_F32_EQ);
++        emit(WOP_I32_AND);
++        emit(WOP_SELECT);
++        depth--;
++        set_i32(depth - 1);
++        break;
++      }
++
++      // ---- wide array elements ----
++      case Bytecodes::_laload: case Bytecodes::_daload: case Bytecodes::_faload: {
++        if (depth < 2 || slot_kind(depth - 2) != K_I32 || slot_kind(depth - 1) != K_I32) REFUSE();
++        BasicType t = (c == Bytecodes::_laload) ? T_LONG
++                    : (c == Bytecodes::_daload) ? T_DOUBLE : T_FLOAT;
++        int kind = (c == Bytecodes::_laload) ? K_I64 : (c == Bytecodes::_daload) ? K_F64 : K_F32;
++        int arr = stack_local(depth - 2), idx = stack_local(depth - 1);
++        guard_array(arr, idx, bci, depth);
++        emit_element_addr(arr, idx, t);
++        mem_op(kind == K_I64 ? WOP_I64_LOAD : kind == K_F64 ? WOP_F64_LOAD : WOP_F32_LOAD,
++               2, arrayOopDesc::base_offset_in_bytes(t));
++        depth -= 2;
++        push_val(kind, depth);
++        depth += is_wide(kind) ? 2 : 1;
++        break;
++      }
++
++      case Bytecodes::_lastore: case Bytecodes::_dastore: case Bytecodes::_fastore: {
++        BasicType t = (c == Bytecodes::_lastore) ? T_LONG
++                    : (c == Bytecodes::_dastore) ? T_DOUBLE : T_FLOAT;
++        int kind = (c == Bytecodes::_lastore) ? K_I64 : (c == Bytecodes::_dastore) ? K_F64 : K_F32;
++        int vs = is_wide(kind) ? 2 : 1;
++        if (depth < 2 + vs) REFUSE();
++        if (slot_kind(depth - vs) != kind) REFUSE();
++        int arr = stack_local(depth - vs - 2), idx = stack_local(depth - vs - 1);
++        if (slot_kind(depth - vs - 2) != K_I32 || slot_kind(depth - vs - 1) != K_I32) REFUSE();
++        guard_array(arr, idx, bci, depth);
++        emit_element_addr(arr, idx, t);
++        get_val(kind, depth - vs);
++        mem_op(kind == K_I64 ? WOP_I64_STORE : kind == K_F64 ? WOP_F64_STORE : WOP_F32_STORE,
++               2, arrayOopDesc::base_offset_in_bytes(t));
++        depth -= (2 + vs);
++        break;
++      }
++
++      // ---- allocation ----
++      // The TLAB bump only; anything that would need a refill, a GC or a slow
++      // path hands back and lets the interpreter run the whole bytecode.
++      case Bytecodes::_new: {
++        if (!_can_alloc || disabled(NO_ALLOC) || _next_local >= 500) {
++          emit_bail(bci, depth); return true;
++        }
++        Klass* k = resolved_klass(m, s2u_at(code, bci + 1));
++        if (k == nullptr || !k->is_instance_klass()) { emit_bail(bci, depth); return true; }
++        InstanceKlass* ik = InstanceKlass::cast(k);
++        if (!ik->is_initialized() || !ik->can_be_fastpath_allocated()) {
++          emit_bail(bci, depth); return true;
++        }
++        int size_bytes = (int)ik->size_helper() * HeapWordSize;
++        if (size_bytes > 256 || depth >= MAX_DEPTH) { emit_bail(bci, depth); return true; }
++        int dst = alloc_locals(1);
++        emit_tlab_alloc(size_bytes, dst, bci, depth);
++        emit_object_init(dst, ik, size_bytes);
++        local_get(dst);
++        set_i32(depth); depth++;
++        break;
++      }
++
++      // ---- type checks ----
++      // The fast path is exact-or-primary-super; anything else is not "false",
++      // it is "ask the interpreter", so it bails.
++      case Bytecodes::_checkcast: {
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        Klass* k = disabled(NO_TYPECHECK) ? nullptr : resolved_klass(m, s2u_at(code, bci + 1));
++        if (k == nullptr) { emit_bail(bci, depth); return true; }
++        int obj = stack_local(depth - 1);
++        local_get(obj);
++        emit(WOP_IF); emit(0x40);
++        if (k->is_final()) { emit_klass_of(obj); emit_const((int)(intptr_t)k); emit(WOP_I32_EQ); }
++        else emit_is_subtype(obj, k);
++        emit(WOP_I32_EQZ);
++        emit(WOP_IF); emit(0x40);
++        emit_bail(bci, depth, true);
++        emit(WOP_END);
++        emit(WOP_END);
++        break;
++      }
++
++      case Bytecodes::_instanceof: {
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        Klass* k = disabled(NO_TYPECHECK) ? nullptr : resolved_klass(m, s2u_at(code, bci + 1));
++        if (k == nullptr) { emit_bail(bci, depth); return true; }
++        if (_next_local >= 500) { emit_bail(bci, depth); return true; }
++        int obj = stack_local(depth - 1);
++        // A final class has no subclasses, so the exact test is the whole
++        // answer and a false result needs no interpreter.
++        bool exact = k->is_final();
++        // The result goes to a scratch local first. It shares a slot with the
++        // receiver, and a bail has to hand the interpreter the receiver -- not
++        // a half-computed answer written over it.
++        int tmp = alloc_locals(1);
++        local_get(obj);
++        emit(WOP_IF); emit(0x40);
++        if (exact) { emit_klass_of(obj); emit_const((int)(intptr_t)k); emit(WOP_I32_EQ); }
++        else emit_is_subtype(obj, k);
++        local_set(tmp);
++        if (!exact) {
++          local_get(tmp);
++          emit(WOP_I32_EQZ);
++          emit(WOP_IF); emit(0x40);
++          emit_bail(bci, depth, true);
++          emit(WOP_END);
++        }
++        local_get(tmp);
++        local_set(stack_local(depth - 1));
++        emit(0x05);                                // else
++        emit_const(0);
++        local_set(stack_local(depth - 1));
++        emit(WOP_END);
++        set_slot(depth - 1, K_I32);
++        break;
++      }
++
++      // ---- resolved oop constants ----
++      // The array moves under GC but the OopHandle's storage slot does not, so
++      // the array is loaded fresh and the element indexed off it.
++      case Bytecodes::_fast_aldc: case Bytecodes::_fast_aldc_w: {
++        int index = (c == Bytecodes::_fast_aldc) ? (unsigned char)code[bci + 1]
++                                                 : u2_at(code, bci + 1);
++        ConstantPoolCache* cache = m->constants()->cache();
++        if (cache == nullptr) { emit_bail(bci, depth); return true; }
++        oop resolved = m->constants()->resolved_reference_at(index);
++        if (resolved == nullptr) { emit_bail(bci, depth); return true; }
++        if (resolved == Universe::the_null_sentinel()) {
++          emit_const(0); set_i32(depth); depth++; break;
++        }
++        oop* storage = *(oop**)((address)cache
++            + in_bytes(ConstantPoolCache::resolved_references_offset()));
++        if (storage == nullptr) { emit_bail(bci, depth); return true; }
++        emit_const((int)(intptr_t)storage);
++        i32_load();
++        mem_op(WOP_I32_LOAD, 2,
++               arrayOopDesc::base_offset_in_bytes(T_OBJECT) + index * (int)heapOopSize);
++        set_i32(depth); depth++;
++        break;
++      }
++
++      // ---- wide gotos and switches ----
++      case Bytecodes::_goto_w: {
++        int target = bci + s4_at(code, bci + 1);
++        if (!allow_branches) { int d = inl_target_depth(target); if (d < 0) REFUSE(); br(d); break; }
++        if (!record_entry(target, depth)) REFUSE();
++        emit_backedge_budget(target < bci, target, depth);
++        emit_const(_block_of[target]);
++        local_set(L_BLK);
++        br(L_DEPTH);
++        terminal = true;
++        break;
++      }
++
++      case Bytecodes::_tableswitch: case Bytecodes::_lookupswitch: {
++        if (!allow_branches) REFUSE();
++        if (disabled(NO_SWITCH)) { emit_bail(bci, depth); return true; }
++        if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++        int keyslot = stack_local(depth - 1);
++        depth--;
++        SwitchInfo si;
++        if (!switch_info(code, bci, _len, &si)) { emit_bail(bci, depth); return true; }
++        int limit = (c == Bytecodes::_tableswitch) ? 1024 : 64;
++        if (si.npairs > limit) { emit_bail(bci, depth); return true; }
++        int def_t = bci + si.def;
++        if (!record_entry(def_t, depth)) REFUSE();
++        bool backward = def_t < bci;
++        for (int i = 0; i < si.npairs; i++) {
++          int t = switch_target(code, bci, si, i);
++          if (!record_entry(t, depth)) REFUSE();
++          if (t < bci) backward = true;
++        }
++        emit_backedge_budget(backward, bci, depth + 1);
++        if (c == Bytecodes::_tableswitch) {
++          // block $sel(result i32) { block $c_n { ... block $c_0 { br_table } } }
++          emit(WOP_BLOCK); emit(WT_I32);
++          for (int i = 0; i <= si.npairs; i++) { emit(WOP_BLOCK); emit(0x40); }
++          local_get(keyslot);
++          emit_const(si.lo);
++          emit(WOP_I32_SUB);
++          emit(WOP_BR_TABLE);
++          _code_buf.uleb((unsigned)si.npairs);
++          for (int i = 0; i < si.npairs; i++) _code_buf.uleb((unsigned)i);
++          _code_buf.uleb((unsigned)si.npairs);
++          for (int i = 0; i <= si.npairs; i++) {
++            emit(WOP_END);
++            int t = (i == si.npairs) ? def_t : switch_target(code, bci, si, i);
++            emit_const(_block_of[t]);
++            br(si.npairs - i);
++          }
++          emit(WOP_END);
++          local_set(L_BLK);
++        } else {
++          emit_const(_block_of[def_t]);
++          local_set(L_BLK);
++          for (int i = 0; i < si.npairs; i++) {
++            local_get(keyslot);
++            emit_const(switch_key(code, bci, si, i));
++            emit(WOP_I32_EQ);
++            emit(WOP_IF); emit(0x40);
++            emit_const(_block_of[switch_target(code, bci, si, i)]);
++            local_set(L_BLK);
++            emit(WOP_END);
++          }
++        }
++        br(L_DEPTH);
++        terminal = true;
++        break;
++      }
++
++      // ---- wide-index locals ----
++      case Bytecodes::_wide: {
++        Bytecodes::Code sub = (Bytecodes::Code)(unsigned char)code[bci + 1];
++        int index = (((unsigned char)code[bci + 2]) << 8) | (unsigned char)code[bci + 3];
++        switch (sub) {
++          case Bytecodes::_iload: case Bytecodes::_aload:
++            emit_local_load(index); set_i32(depth); depth++; break;
++          case Bytecodes::_istore: case Bytecodes::_astore:
++            if (depth < 1 || slot_kind(depth - 1) != K_I32) REFUSE();
++            emit_local_store(index, stack_local(depth - 1)); depth--; break;
++          case Bytecodes::_fload:
++            if (_local_base >= 0) REFUSE();
++            push_local_addr(index); mem_op(WOP_F32_LOAD, 2, 0);
++            push_val(K_F32, depth); depth++; break;
++          case Bytecodes::_fstore:
++            if (_local_base >= 0) REFUSE();
++            if (depth < 1 || slot_kind(depth - 1) != K_F32) REFUSE();
++            push_local_addr(index); get_val(K_F32, depth - 1);
++            mem_op(WOP_F32_STORE, 2, 0); depth--; break;
++          case Bytecodes::_lload: case Bytecodes::_dload: {
++            if (_local_base >= 0) REFUSE();
++            int k = (sub == Bytecodes::_dload) ? K_F64 : K_I64;
++            push_wide_local_addr(index);
++            mem_op(k == K_F64 ? WOP_F64_LOAD : WOP_I64_LOAD, 2, 0);
++            push_wide(k, depth); depth += 2; break;
++          }
++          case Bytecodes::_lstore: case Bytecodes::_dstore: {
++            if (_local_base >= 0) REFUSE();
++            int k = (sub == Bytecodes::_dstore) ? K_F64 : K_I64;
++            if (depth < 2 || slot_kind(depth - 2) != k) REFUSE();
++            push_wide_local_addr(index);
++            get_wide(k, depth - 2);
++            mem_op(k == K_F64 ? WOP_F64_STORE : WOP_I64_STORE, 2, 0);
++            depth -= 2; break;
++          }
++          case Bytecodes::_iinc:
++            emit_local_inc(index, s2_at(code, bci + 4)); break;
++          default:
++            emit_bail(bci, depth); return true;
++        }
++        break;
++      }
++
++      // Object.<init> is one byte of this, and refusing it refused every
++      // constructor. It is a no-op unless the receiver's class has a
++      // finalizer, and that is a bit in the Klass.
++      case Bytecodes::_return_register_finalizer: {
++        if (allow_branches) { emit_bail(bci, depth); return true; }
++        if (_local_base < 0) REFUSE();
++        emit_klass_of(_local_base);
++        mem_op(WOP_I32_LOAD8_U, 0, (int)in_bytes(Klass::misc_flags_offset()));
++        emit_const(4);                             // KlassFlags::_misc_has_finalizer
++        emit(WOP_I32_AND);
++        emit(WOP_IF); emit(0x40);
++        emit_bail(bci, depth, true);
++        emit(WOP_END);
++        br(inl_exit_depth());
++        break;
++      }
++
++      default:
++        // Anything still not implemented -- the polymorphic calls, athrow,
++        // monitors -- ends the compiled trace with a coherent frame. The
++        // interpreter picks it up from exactly here.
++        emit_bail(bci, depth);
++        return true;
++    }
++    bci += size;
++  }
++
++  // Ran off the end of the block into the next one: nothing to emit, the
++  // nesting makes it fall through.
++  if (!allow_branches) return true;         // inlined body ended at its return
++  if (allow_branches) _fell_through = !terminal;
++  (void)EXIT_DEPTH;
++  return true;
++  #undef REFUSE
++}
++
++
++// Stack effect of the opcodes an inlined body may contain. Returns false for
++// anything not modelled, which is what keeps inline_cfg() honest.
++static bool stack_delta(Bytecodes::Code c, Method* m, address code, int bci, int* d) {
++  switch (c) {
++    case Bytecodes::_nop: case Bytecodes::_iinc:
++    case Bytecodes::_ineg: case Bytecodes::_i2b: case Bytecodes::_i2s:
++    case Bytecodes::_i2c: case Bytecodes::_arraylength:
++    case Bytecodes::_getfield: case Bytecodes::_fast_igetfield:
++    case Bytecodes::_fast_agetfield: case Bytecodes::_fast_bgetfield:
++    case Bytecodes::_fast_sgetfield: case Bytecodes::_fast_cgetfield:
++    case Bytecodes::_goto: case Bytecodes::_return:
++      *d = 0; return true;
++    case Bytecodes::_iaload: case Bytecodes::_aaload: case Bytecodes::_baload:
++    case Bytecodes::_caload: case Bytecodes::_saload:
++      *d = -1; return true;
++    case Bytecodes::_ldc: case Bytecodes::_ldc_w:
++      *d = 1; return true;
++    case Bytecodes::_iconst_m1: case Bytecodes::_iconst_0: case Bytecodes::_iconst_1:
++    case Bytecodes::_iconst_2:  case Bytecodes::_iconst_3: case Bytecodes::_iconst_4:
++    case Bytecodes::_iconst_5:  case Bytecodes::_bipush:   case Bytecodes::_sipush:
++    case Bytecodes::_iload: case Bytecodes::_iload_0: case Bytecodes::_iload_1:
++    case Bytecodes::_iload_2: case Bytecodes::_iload_3: case Bytecodes::_fast_iload:
++    case Bytecodes::_aload: case Bytecodes::_aload_0: case Bytecodes::_aload_1:
++    case Bytecodes::_aload_2: case Bytecodes::_aload_3: case Bytecodes::_fast_aload_0:
++    case Bytecodes::_dup: case Bytecodes::_getstatic:
++    case Bytecodes::_fast_iaccess_0: case Bytecodes::_fast_aaccess_0:
++      *d = 1; return true;
++    case Bytecodes::_istore: case Bytecodes::_istore_0: case Bytecodes::_istore_1:
++    case Bytecodes::_istore_2: case Bytecodes::_istore_3:
++    case Bytecodes::_astore_0: case Bytecodes::_astore_1:
++    case Bytecodes::_astore_2: case Bytecodes::_astore_3:
++    case Bytecodes::_pop:
++    case Bytecodes::_iadd: case Bytecodes::_isub: case Bytecodes::_imul:
++    case Bytecodes::_iand: case Bytecodes::_ior:  case Bytecodes::_ixor:
++    case Bytecodes::_ishl: case Bytecodes::_ishr: case Bytecodes::_iushr:
++    case Bytecodes::_ifeq: case Bytecodes::_ifne: case Bytecodes::_iflt:
++    case Bytecodes::_ifge: case Bytecodes::_ifgt: case Bytecodes::_ifle:
++    case Bytecodes::_ifnull: case Bytecodes::_ifnonnull:
++    case Bytecodes::_ireturn: case Bytecodes::_areturn:
++      *d = -1; return true;
++    case Bytecodes::_if_icmpeq: case Bytecodes::_if_icmpne:
++    case Bytecodes::_if_icmplt: case Bytecodes::_if_icmpge:
++    case Bytecodes::_if_icmpgt: case Bytecodes::_if_icmple:
++    case Bytecodes::_if_acmpeq: case Bytecodes::_if_acmpne:
++      *d = -2; return true;
++    default:
++      return false;
++  }
++}
++
++// Can this callee be spliced into its caller? The rules exist to make one
++// thing true: a guard that fires anywhere inside the inlined body may hand
++// back at the *caller's* invoke bci, and the interpreter will then re-execute
++// the whole call. That is only safe if the callee has done nothing observable
++// first -- hence "no stores". Straight-line only for now, so the body has a
++// single exit and needs no share of the caller's block dispatch.
++bool Codegen::inlinable(Method* callee, int nest) {
++  if (nest == 0) { _bad_op = -1; _shape = "shape"; }
++  if (callee == nullptr) { _shape = "null callee"; return false; }
++  if (callee->is_native())       { _shape = "native"; return false; }
++  if (callee->is_abstract())     { _shape = "abstract"; return false; }
++  if (callee->is_synchronized()) { _shape = "synchronized"; return false; }
++  int len = callee->code_size();
++  if (len <= 0)                     { _shape = "empty"; return false; }
++  if (len > MAX_INLINE_BYTECODES)   { _shape = "too big"; return false; }
++  if (callee->max_locals() + callee->max_stack() > MAX_DEPTH) {
++    _shape = "frame too wide"; return false;
++  }
++  return inline_cfg(callee, nest, nullptr, nullptr, nullptr);
++}
++
++// Walks the callee proving three things at once: every opcode is one we emit,
++// every branch goes forward (so the targets nest as wasm blocks), and the
++// operand stack depth at each target is the same on every path that reaches
++// it. Optionally records the targets and depths for the emitter, so the check
++// and the emission can never disagree about the shape.
++bool Codegen::inline_cfg(Method* callee, int nest,
++                         int* targets, int* ntargets, int* depth_at) {
++  address code = callee->code_base();
++  int len = callee->code_size();
++  int local_targets[MAX_TARGETS];
++  int local_depths[MAX_INLINE_BYTECODES + 1];
++  int n = 0;
++  for (int i = 0; i <= len; i++) local_depths[i] = -1;
++  local_depths[0] = 0;
++
++  int depth = 0;
++  bool reachable = true;
++  bool saw_return = false;
++
++  for (int bci = 0; bci < len; ) {
++    int raw = (unsigned char)code[bci];
++    if (raw >= Bytecodes::number_of_codes) { if (_bad_op < 0) _bad_op = raw; return false; }
++    Bytecodes::Code c = (Bytecodes::Code)raw;
++    int size = Bytecodes::length_for(c);
++    if (size <= 0) { if (_bad_op < 0) _bad_op = raw; return false; }
++
++    if (local_depths[bci] >= 0) {
++      if (reachable && depth != local_depths[bci]) return false;  // merge mismatch
++      depth = local_depths[bci];
++      reachable = true;
++    } else if (!reachable) {
++      return false;              // unreachable code we cannot type
++    } else {
++      local_depths[bci] = depth;
++    }
++
++    switch (c) {
++      case Bytecodes::_invokestatic: case Bytecodes::_invokespecial:
++      case Bytecodes::_fast_invokevfinal: {
++        if (nest + 1 >= MAX_INLINE_DEPTH) { if (_bad_op < 0) _bad_op = raw; return false; }
++        Method* target = static_callee(callee, code, bci);
++        if (target == nullptr || !inlinable(target, nest + 1)) {
++          if (_bad_op < 0) _bad_op = raw;
++          return false;
++        }
++        depth -= target->size_of_parameters();
++        if (target->result_type() != T_VOID) depth += 1;
++        if (target->result_type() == T_LONG || target->result_type() == T_DOUBLE) return false;
++        if (depth < 0) return false;
++        break;
++      }
++      case Bytecodes::_ireturn: case Bytecodes::_areturn:
++        saw_return = true; depth -= 1; reachable = false; break;
++      case Bytecodes::_return:
++      case Bytecodes::_return_register_finalizer:
++        saw_return = true; reachable = false; break;
++      default: {
++        int d;
++        if (!stack_delta(c, callee, code, bci, &d)) { if (_bad_op < 0) _bad_op = raw; return false; }
++        depth += d;
++        if (depth < 0) return false;
++        bool is_branch =
++            (c >= Bytecodes::_ifeq && c <= Bytecodes::_if_acmpne)
++            || c == Bytecodes::_ifnull || c == Bytecodes::_ifnonnull
++            || c == Bytecodes::_goto;
++        if (is_branch) {
++          int off = (int)(short)(((unsigned char)code[bci+1] << 8) | (unsigned char)code[bci+2]);
++          int t = bci + off;
++          if (off <= 0 || t > len) return false;      // forward only, no loops
++          if (local_depths[t] >= 0 && local_depths[t] != depth) return false;
++          local_depths[t] = depth;
++          bool seen = false;
++          for (int i = 0; i < n; i++) if (local_targets[i] == t) seen = true;
++          if (!seen) {
++            if (n >= MAX_TARGETS) return false;
++            if ((uintx)n >= ZeroWasmJITMaxInlineTargets) return false;
++            local_targets[n++] = t;
++          }
++          if (c == Bytecodes::_goto) reachable = false;
++        }
++        break;
++      }
++    }
++    bci += size;
++  }
++  if (!saw_return) { if (_bad_op < 0) _shape = "no single return"; return false; }
++
++  // ascending, so they close innermost-first as the walk passes each one
++  for (int i = 1; i < n; i++) {
++    int v = local_targets[i], j = i - 1;
++    while (j >= 0 && local_targets[j] > v) { local_targets[j+1] = local_targets[j]; j--; }
++    local_targets[j+1] = v;
++  }
++  if (targets != nullptr) {
++    for (int i = 0; i < n; i++) targets[i] = local_targets[i];
++    *ntargets = n;
++    for (int i = 0; i <= len; i++) depth_at[i] = local_depths[i];
++  }
++  return true;
++}
++
++// Splices the callee's body into the caller. Its locals become wasm locals and
++// its operand stack continues the caller's, so no Zero frame is built and no
++// interpreter entry happens -- which is where the win is, because a frame
++// build dwarfs the handful of bytecodes a getter actually executes.
++bool Codegen::try_inline(Method* m, address code, int bci, int& depth) {
++  #define INLINE_NO(reason) do { if (ZeroWasmJITVerbose) \
++      tty->print_cr("[zwc]   no-inline @%d: %s", bci, reason); return false; } while (0)
++  if (disabled(NO_INLINE)) INLINE_NO("disabled");
++  if (_inline_depth >= MAX_INLINE_DEPTH) INLINE_NO("nesting limit");
++  ConstantPoolCache* cache = m->constants()->cache();
++  if (cache == nullptr) INLINE_NO("no cpCache");
++  Method* callee = static_callee(m, code, bci);
++  if (callee == nullptr) INLINE_NO("unresolved or not statically bound");
++  if (!inlinable(callee)) {
++    if (ZeroWasmJITVerbose) { ResourceMark rm;
++      tty->print_cr("[zwc]   no-inline @%d: body %s (%d bytes) blocked by %s", bci,
++                    callee == nullptr ? "null" : callee->name_and_sig_as_C_string(),
++                    callee == nullptr ? 0 : callee->code_size(),
++                    _bad_op >= 0 ? Bytecodes::name((Bytecodes::Code)_bad_op) : _shape); }
++    return false;
++  }
++
++  int nargs = callee->size_of_parameters();     // includes the receiver
++  if (depth < nargs) INLINE_NO("args not on stack");
++  // The callee's locals become i32 wasm locals, so every argument slot has to
++  // already be one. A float or a long argument would be copied out of the
++  // wrong local entirely.
++  for (int k = 0; k < nargs; k++) {
++    if (slot_kind(depth - nargs + k) != K_I32) INLINE_NO("wide argument");
++  }
++  if (depth + callee->max_stack() >= MAX_DEPTH) INLINE_NO("stack too deep");
++
++  const int bail_bci = bci;                     // where a bail must resume
++  const int bail_depth = depth;                 // with the args still pushed
++
++  int base = alloc_locals(callee->max_locals());
++  if (_next_local > 512) INLINE_NO("too many locals");
++
++  // Only the outermost splice needs this: a bail anywhere inside, however
++  // deeply nested, unwinds to the outermost invoke and re-executes it, so it
++  // is that call's arguments that have to survive.
++  int save_base = 0;
++  if (_inl_bail_bci < 0 && nargs > 0) {
++    save_base = alloc_locals(nargs);
++    if (_next_local > 512) INLINE_NO("too many locals");
++    for (int k = 0; k < nargs; k++) {
++      local_get(stack_local(depth - nargs + k));
++      local_set(save_base + k);
++    }
++  }
++
++  for (int k = 0; k < nargs; k++) {
++    local_get(stack_local(depth - nargs + k));
++    local_set(base + k);
++  }
++  if (!callee->is_static()) {
++    // Receiver null check, handing back at the caller's invoke bci with the
++    // arguments still on the caller's stack, exactly as they were.
++    guard_nonnull(base, bci, depth);
++  }
++  depth -= nargs;
++
++  // Shape of the callee's control flow, recomputed here so the emitter uses
++  // exactly what the check approved.
++  int targets[MAX_TARGETS];
++  int ntargets = 0;
++  int depth_at[MAX_INLINE_BYTECODES + 1];
++  if (!inline_cfg(callee, _inline_depth, targets, &ntargets, depth_at)) {
++    INLINE_NO("cfg changed under us");
++  }
++
++  // Save the enclosing splice's state: inlining nests.
++  int s_targets[MAX_TARGETS];
++  for (int i = 0; i < _inl_ntargets; i++) s_targets[i] = _inl_targets[i];
++  int s_nt = _inl_ntargets, s_next = _inl_next, s_slot = _inl_result_slot;
++  int* s_da = _inl_depth_at;
++  int s_bbci = _inl_bail_bci, s_bdepth = _inl_bail_depth;
++  int s_save_base = _inl_save_base, s_save_n = _inl_save_n;
++  int s_base = _inl_base_depth;
++  bool s_body_bailed = _inl_body_bailed;
++
++  for (int i = 0; i < ntargets; i++) _inl_targets[i] = targets[i];
++  _inl_ntargets = ntargets;
++  _inl_next = 0;
++  _inl_depth_at = depth_at;
++  _inl_result_slot = stack_local(depth);
++  _inl_base_depth = depth;
++  // Nested splices keep the outermost landing site: unwinding to the top-level
++  // invoke re-executes everything, which is what the interpreter expects.
++  if (s_bbci < 0) {
++    _inl_bail_bci = bail_bci;
++    _inl_bail_depth = bail_depth;
++    _inl_save_base = save_base;
++    _inl_save_n = nargs;
++  }
++  _inl_body_bailed = false;
++
++  emit(WOP_BLOCK); emit(0x40);                  // $inline_exit
++  for (int i = ntargets - 1; i >= 0; i--) { emit(WOP_BLOCK); emit(0x40); }
++
++  int saved_base = _local_base;
++  _local_base = base;
++  _inline_depth++;
++  int cdepth = depth;
++  bool ok = emit_range(callee, callee->code_base(), 0, callee->code_size(),
++                       cdepth, -1, false);
++  _inline_depth--;
++
++  while (_inl_next < _inl_ntargets) { emit(WOP_END); _inl_next++; }
++  emit(WOP_END);                                // $inline_exit
++
++  // A non-guard bail can have truncated the linear walk before one of the
++  // callee's forward targets. A path that branches to such a target would
++  // otherwise leave the splice through $inline_exit with a stale result and
++  // continue in the caller. Re-execute the caller's invoke on every path
++  // reaching that exit; the saved arguments make this the same state as the
++  // original call. This is outside the target blocks, so it covers both the
++  // truncated fall-through and every bypassing branch.
++  bool body_bailed = _inl_body_bailed;
++  if (body_bailed) emit_bail(bail_bci, bail_depth);
++  _local_base = saved_base;
++
++  _inl_ntargets = s_nt; _inl_next = s_next; _inl_depth_at = s_da;
++  _inl_result_slot = s_slot;
++  _inl_bail_bci = s_bbci; _inl_bail_depth = s_bdepth;
++  _inl_save_base = s_save_base; _inl_save_n = s_save_n;
++  _inl_base_depth = s_base;
++  _inl_body_bailed = s_body_bailed;
++  for (int i = 0; i < s_nt; i++) _inl_targets[i] = s_targets[i];
++
++  if (!ok) { fail(); return true; }             // body was pre-verified; not a bail
++  if (callee->result_type() != T_VOID) { set_slot(depth, K_I32); depth += 1; }
++  _inlined++;
++  if (!_bailed) _inlined_before_bail++;
++  return true;
++  #undef INLINE_NO
++}
++
++// ---------------------------------------------------------------------------
++// Thread-local code cache
++//
++// The wasm table is per-thread, so an index is only meaningful on the thread
++// that installed it. Compiling is ~13 us, which is far cheaper than any scheme
++// for sharing entries between threads.
++// ---------------------------------------------------------------------------
++struct CacheEntry {
++  Method* method;
++  int     index;        // code index, -1 = refused
++  int     count;        // entries seen before compiling
++  int     nosr;         // loop headers compiled code may be entered at
++  int     osr_bci[8];
++  int     osr_blk[8];
++};
++
++// 3800 distinct methods produced 400k compile attempts on a real client run:
++// a 1024-entry table with straight eviction thrashes, and every eviction pays
++// for the whole scan again. Bigger, plus one extra probe so a collision
++// displaces nothing that already has a verdict.
++static const int CACHE_SIZE = 8192;
++static THREAD_LOCAL CacheEntry* _cache = nullptr;
++static THREAD_LOCAL int _compiled = 0;
++static THREAD_LOCAL int _refused = 0;
++
++static CacheEntry* cache_find(Method* m) {
++  if (_cache == nullptr) {
++    _cache = (CacheEntry*)::calloc(CACHE_SIZE, sizeof(CacheEntry));
++    if (_cache == nullptr) return nullptr;
++  }
++  unsigned h = (unsigned)((uintptr_t)m >> 3) & (CACHE_SIZE - 1);
++  for (int probe = 0; probe < 2; probe++) {
++    CacheEntry* e = &_cache[h ^ (unsigned)probe];
++    if (e->method == m) return e;
++    if (e->method == nullptr) { e->method = m; e->index = 0; e->count = 0; return e; }
++  }
++  // Both probes belong to other methods that already have a verdict. Leave
++  // them alone and interpret this one: losing a compile is a slowdown, and
++  // evicting a compiled entry to re-earn it is a worse one.
++  CacheEntry* e = &_cache[h];
++  if (e->index == 0) { e->method = m; e->count = 0; return e; }
++  return nullptr;
++}
++
++static bool compile_into(Method* method, CacheEntry* e);
++
++void ZeroWasmCompiler::print_statistics() {
++  tty->print_cr("[zwc] compiled=%d refused=%d", _compiled, _refused);
++}
++
++// The real entry point, called from the `run:` label with everything the
++// interpreter has established.
++bool ZeroWasmCompiler::maybe_run(Method* method, intptr_t* locals,
++                                 address code_base, address* pc, intptr_t** tos,
++                                 void* istate) {
++  // Entry conditions are checked by the caller, which can do it with loads it
++  // has already made.
++
++  CacheEntry* e = cache_find(method);
++  if (e == nullptr || e->index < 0) return false;
++
++  if (e->index == 0) {
++    if (++e->count < (int)ZeroWasmJITThreshold) return false;
++    if (!compile_into(method, e)) return false;
++  }
++
++  intptr_t out = 0;
++  int bci = zwc_call(e->index, (int)(intptr_t)locals, (int)(intptr_t)*tos,
++                     (int)(intptr_t)&out, (int)(intptr_t)istate, 0);
++  *pc = code_base + bci;
++  *tos = (intptr_t*)out;
++  return true;
++}
++
++// Compiles the method into this cache entry. Returns false if it was refused,
++// having marked the entry so it is never attempted again on this thread.
++static bool compile_into(Method* method, CacheEntry* e) {
++  {
++    // -XX:ZeroWasmJITOnly=Foo isolates a suspect method from everything the
++    // JDK compiles during boot, which is the only practical way to get a
++    // clean differential on a miscompile that breaks startup.
++    if (ZeroWasmJITOnly != nullptr) {
++      ResourceMark rm;
++      if (::strstr(method->name_and_sig_as_C_string(), ZeroWasmJITOnly) == nullptr) {
++        e->index = -1;
++        return false;
++      }
++    }
++    WasmBuf module;
++    Codegen gen(method);
++    bool built = gen.compile(module);
++    // Dumping the module is the only way to see what was actually emitted;
++    // reasoning about the encoding from the emitter is how a wrong br depth
++    // survives review. Disassemble with: wasm-dis <file>
++    if (built && ZeroWasmJITDump != nullptr) {
++      ResourceMark rm;
++      char path[512];
++      const char* n = method->name_and_sig_as_C_string();
++      char safe[256];
++      size_t i = 0;
++      for (; n[i] != '\0' && i < sizeof(safe) - 1; i++) {
++        char ch = n[i];
++        safe[i] = (ch == '/' || ch == '(' || ch == ')' || ch == ';' || ch == ' ') ? '_' : ch;
++      }
++      safe[i] = '\0';
++      jio_snprintf(path, sizeof(path), "%s/%s.wasm", ZeroWasmJITDump, safe);
++      FILE* f = ::fopen(path, "wb");
++      if (f != nullptr) {
++        ::fwrite(module.data(), 1, (size_t)module.length(), f);
++        ::fclose(f);
++      }
++    }
++    int idx = built ? zwc_install(module.data(), module.length()) : -1;
++    if (ZeroWasmJITVerbose) {
++      ResourceMark rm;
++      tty->print_cr("[zwc] %s %s (%d bytes bytecode): %s%s%s%s",
++                    idx > 0 ? "compiled" : "refused",
++                    method->name_and_sig_as_C_string(), method->code_size(),
++                    idx > 0 ? "ok" : (built ? "engine rejected module" : gen._why),
++                    idx > 0 ? "" : " at ", idx > 0 ? "" : gen.bail_op_name(),
++                    idx > 0 ? "" : gen.fail_where());
++    }
++    if (idx <= 0) { e->index = -1; _refused++; return false; }
++    e->index = idx;
++    e->nosr = gen.osr_count() < 8 ? gen.osr_count() : 8;
++    for (int i = 0; i < e->nosr; i++) {
++      e->osr_bci[i] = gen.osr_bci(i);
++      e->osr_blk[i] = gen.osr_blk(i);
++    }
++    _compiled++;
++  }
++  return true;
++}
++
++// ---------------------------------------------------------------------------
++// On-stack replacement
++//
++// A method is compiled when it has been *entered* often enough, which never
++// fires for a method that runs one long loop -- and a chunk mesher, a worldgen
++// pass and a benchmark's main() are all exactly that. This is the other
++// trigger: a back-edge taken often enough compiles the method and enters the
++// compiled body at the loop header instead of at bci 0.
++//
++// Safe because a back-edge target is a block leader whose entry depth the
++// compiler proved to be zero -- so the state the interpreter has at the branch
++// is the state compiled code expects at that block.
++THREAD_LOCAL int ZeroWasmCompiler::_osr_countdown = OSR_SAMPLE;
++
++bool ZeroWasmCompiler::maybe_run_osr(Method* method, intptr_t* locals,
++                                     address* pc, intptr_t** tos, void* istate) {
++  _osr_countdown = OSR_SAMPLE;
++  address code_base = method->code_base();
++  int bci = (int)(*pc - code_base);
++
++  CacheEntry* e = cache_find(method);
++  if (e == nullptr || e->index < 0) return false;
++  if (e->index == 0) {
++    // Each sample stands for OSR_SAMPLE back-edges, so this reaches the
++    // threshold after a few thousand iterations of a real loop.
++    if (++e->count < (int)ZeroWasmJITThreshold) return false;
++    if (!compile_into(method, e)) return false;
++  }
++  if (disabled(NO_OSR)) return false;
++  int blk = -1;
++  for (int i = 0; i < e->nosr; i++) if (e->osr_bci[i] == bci) blk = e->osr_blk[i];
++  if (blk < 0) return false;
++
++  intptr_t out = 0;
++  int at = zwc_call(e->index, (int)(intptr_t)locals, (int)(intptr_t)*tos,
++                    (int)(intptr_t)&out, (int)(intptr_t)istate, blk);
++  *pc = code_base + at;
++  *tos = (intptr_t*)out;
++  return true;
++}
++
++#endif // __EMSCRIPTEN__
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.hpp b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.hpp
+new file mode 100644
+index 000000000..b6a34b04c
+--- /dev/null
++++ b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.hpp
+@@ -0,0 +1,72 @@
++/*
++ * Copyright (c) 2026. DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This code is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 only, as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef SHARE_INTERPRETER_ZERO_ZEROWASMCOMPILER_HPP
++#define SHARE_INTERPRETER_ZERO_ZEROWASMCOMPILER_HPP
++
++#include "memory/allStatic.hpp"
++#include "utilities/globalDefinitions.hpp"
++
++#ifdef __EMSCRIPTEN__
++
++class Method;
++
++/*
++ * Compiles Java bytecode to wasm at runtime.
++ *
++ * wasm has no writable-executable memory, so this cannot emit into the code
++ * cache the way every other HotSpot compiler does. Instead each method becomes
++ * a small WebAssembly.Module which imports the JVM's own linear memory and is
++ * installed into the indirect function table, where the index *is* a callable
++ * function pointer. See docs/JIT-DESIGN.md and OpenJDK/jit-probe/.
++ *
++ * Two consequences shape the whole design:
++ *
++ *  - the table is per-thread, so the code cache is thread-local. Compiling is
++ *    ~13 us, which is cheaper than any scheme for sharing across threads.
++ *
++ *  - generated code operates on the *real* Zero frame in linear memory, so the
++ *    GC, stack walking and exception handling continue to see exactly what they
++ *    saw before. Nothing may live only in a wasm local across a safepoint.
++ *
++ * The entry point is called from the `run:` label of BytecodeInterpreter::run,
++ * where pc, topOfStack and locals are all established and the state is exactly
++ * defined. Everything with VM interaction -- method entry, returns, monitors,
++ * calls -- stays in the interpreter: compiled code covers the arithmetic
++ * interior and hands back a coherent istate at the first thing it does not
++ * implement.
++ */
++class ZeroWasmCompiler : AllStatic {
++ public:
++  // Runs compiled code for this method if there is any, compiling it first if
++  // it is hot enough. On true, *pc and *tos have been moved to wherever the
++  // compiled code stopped and the frame is coherent for the interpreter to
++  // continue from. On false nothing ran and nothing changed.
++  // istate is passed straight through to compiled code, which needs it to
++  // make a call without going back to the interpreter first.
++  static bool maybe_run(Method* method, intptr_t* locals, address code_base,
++                        address* pc, intptr_t** tos, void* istate);
++
++  // On-stack replacement, called from a back-edge. Compiles the method if the
++  // loop is hot enough and re-enters compiled code at the loop header, so a
++  // method that is only ever entered once still gets compiled.
++  //
++  // Sampled rather than checked every time: one decrement per back-edge is
++  // affordable, a hash probe per back-edge is not.
++  static bool maybe_run_osr(Method* method, intptr_t* locals,
++                            address* pc, intptr_t** tos, void* istate);
++  static const int OSR_SAMPLE = 64;
++  static THREAD_LOCAL int _osr_countdown;
++
++  // One-line summary for -Xlog:jit.
++  static void print_statistics();
++};
++
++#endif // __EMSCRIPTEN__
++
++#endif // SHARE_INTERPRETER_ZERO_ZEROWASMCOMPILER_HPP

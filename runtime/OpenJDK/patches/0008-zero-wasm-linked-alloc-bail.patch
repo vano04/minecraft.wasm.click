@@ -1,0 +1,184 @@
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 1001132..9a197be 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -793,7 +793,8 @@ void BytecodeInterpreter::run(interpreterState istate) {
+                                      &pc, &topOfStack, istate);
+     if (linked_group == ZeroWasmBaseline::Returned
+         || linked_group == ZeroWasmBaseline::DeoptResume
+-        || linked_group == ZeroWasmBaseline::ExceptionResume) {
++        || linked_group == ZeroWasmBaseline::ExceptionResume
++        || linked_group == ZeroWasmBaseline::InvokeResume) {
+       goto run;
+     }
+   }
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index c952ec4..ca17f17 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -42,7 +42,8 @@ enum FixtureMethod {
+   VirtualMethod,
+   SafeDivMethod,
+   StoreChildMethod,
+-  StoreChildCallerMethod
++  StoreChildCallerMethod,
++  AllocCallerMethod
+ };
+ 
+ enum ModuleFunction {
+@@ -532,6 +533,25 @@ static bool static_target_is(Method* method, const char* expected_name,
+       && name->equals(expected_name) && signature->equals(expected_signature);
+ }
+ 
++static bool alloc_caller_target_is(Method* method) {
++  const unsigned char* code = method->code_base();
++  if (method->code_size() != 6 || code[0] != 0x2a || code[1] != 0x1b
++      || code[2] != (unsigned char)Bytecodes::_invokestatic
++      || code[5] != 0xac) return false;
++  int index = Bytes::get_native_u2((address)(code + 3));
++  ConstantPool* constants = method->constants();
++  if (index < 0 || index >= constants->resolved_method_entries_length()) {
++    return false;
++  }
++  Symbol* owner = constants->klass_ref_at_noresolve(index, Bytecodes::_invokestatic);
++  Symbol* name = constants->name_ref_at(index, Bytecodes::_invokestatic);
++  Symbol* signature = constants->signature_ref_at(index, Bytecodes::_invokestatic);
++  return owner != nullptr && name != nullptr && signature != nullptr
++      && owner->equals("ZeroBaselineFixture")
++      && name->equals("allocLeaf")
++      && signature->equals("(LZeroBaselineFixture$Box;I)I");
++}
++
+ static bool virtual_code_is(Method* method) {
+   // The constant-pool index varies with javac's pool layout; the invoke
+   // opcode, count, zero byte, and return shape are the verified contract.
+@@ -795,6 +815,8 @@ static THREAD_LOCAL uint64_t _linked_deopt = 0;
+ static THREAD_LOCAL uint64_t _linked_exception = 0;
+ static THREAD_LOCAL uint64_t _linked_caller_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_store_entries = 0;
++static THREAD_LOCAL uint64_t _linked_alloc_bails = 0;
++static THREAD_LOCAL uint64_t _linked_alloc_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ 
+@@ -918,7 +940,8 @@ enum LinkedMethodKind {
+   LinkedVirtualMethod,
+   LinkedSafeDivMethod,
+   LinkedStoreChildMethod,
+-  LinkedStoreChildCallerMethod
++  LinkedStoreChildCallerMethod,
++  LinkedAllocCallerMethod
+ };
+ 
+ static int first_opcode(Method* method, unsigned char opcode) {
+@@ -944,7 +967,8 @@ static bool linked_safe_div_shape(Method* method, int* fault_bci) {
+ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* virtual_bci,
+                                              int* safe_div_bci,
+-                                             int* return_bci) {
++                                             int* return_bci,
++                                             int* alloc_bci) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -990,6 +1014,13 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     *return_bci = first_opcode(method, 0xac);
+     return LinkedStoreChildCallerMethod;
+   }
++  if (static_int(method, "allocCaller",
++                 "(LZeroBaselineFixture$Box;I)I")
++      && alloc_caller_target_is(method)) {
++    *alloc_bci = first_opcode(method, (unsigned char)Bytecodes::_invokestatic);
++    *return_bci = first_opcode(method, 0xac);
++    return *alloc_bci == 2 ? LinkedAllocCallerMethod : LinkedNoMethod;
++  }
+   return LinkedNoMethod;
+ }
+ 
+@@ -1094,6 +1125,8 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "virtualValue(LZeroBaselineFixture$Shape;I)I|safeDiv(II)I;"
+       "storeChild(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I|"
+       "storeChildCaller(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I;"
++      "allocLeaf(LZeroBaselineFixture$Box;I)I|"
++      "allocCaller(LZeroBaselineFixture$Box;I)I;"
+       "virtual-bci=%d;safe-div-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+       "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;"
+       "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+@@ -1129,9 +1162,11 @@ static ZeroWasmBaseline::Result run_linked_group(
+       || istate->thread()->has_pending_exception()) return ZeroWasmBaseline::NotRun;
+   int virtual_bci = -1;
+   int safe_div_bci = -1;
++  int alloc_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+-                                                &safe_div_bci, &return_bci);
++                                                &safe_div_bci, &return_bci,
++                                                &alloc_bci);
+   LinkedOopLayout oop_layout;
+   const LinkedOopLayout* install_oop_layout = nullptr;
+   if (kind != LinkedNoMethod) {
+@@ -1151,7 +1186,16 @@ static ZeroWasmBaseline::Result run_linked_group(
+                   locals == nullptr ? 0 : (jint)locals[-1]);
+     _linked_entry_diagnostics++;
+   }
+-  if (kind == LinkedNoMethod || return_bci < 0) return ZeroWasmBaseline::NotRun;
++  if (kind == LinkedNoMethod) {
++    if (ZeroWasmLinkedGroupVerbose
++        && method->name()->equals("allocLeaf")) {
++      _linked_alloc_interpreter_entries++;
++      tty->print_cr("[zbg] INTERPRETER_ALLOC_LEAF count=%llu",
++                    (unsigned long long)_linked_alloc_interpreter_entries);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (return_bci < 0) return ZeroWasmBaseline::NotRun;
+   if (_linked_module_id < 0
+       && !install_linked_group(method, virtual_bci, safe_div_bci,
+                                install_oop_layout)) {
+@@ -1294,6 +1338,31 @@ static ZeroWasmBaseline::Result run_linked_group(
+       _linked_store_entries++;
+       break;
+     }
++    case LinkedAllocCallerMethod: {
++      oop root = cast_to_oop((void*)locals[0]);
++      jint tag = (jint)locals[-1];
++      if (root == nullptr || alloc_bci != 2) return ZeroWasmBaseline::NotRun;
++      // The invoke is intentionally unexecuted here. Spill the live receiver
++      // and argument into the real downward-growing Zero operand stack, then
++      // re-enter the interpreter at invokestatic so it owns allocation,
++      // safepoints, and the subsequent field store.
++      if (!linked_validate_pre_push(istate, *tos, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      push_oop(tos, root);
++      push_int(tos, tag);
++      if (!linked_prepare_state(istate, tos, pc, code_base + alloc_bci, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      _linked_alloc_bails++;
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] ALLOC_BAIL allocCaller->allocLeaf reason=allocation "
++                      "resume-bci=%d depth=2 sp-offset=%ld root-spilled=1 pending=0",
++                      alloc_bci,
++                      (long)(istate->stack_base() - istate->stack()));
++      }
++      return ZeroWasmBaseline::InvokeResume;
++    }
+     default:
+       return ZeroWasmBaseline::NotRun;
+   }
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+index 557b3c4..9d4b2fd 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+@@ -24,7 +24,8 @@ class ZeroWasmBaseline : AllStatic {
+     NotRun = 0,
+     Returned = 1,
+     DeoptResume = 2,
+-    ExceptionResume = 3
++    ExceptionResume = 3,
++    InvokeResume = 4
+   };
+ 
+   // The adapter is called while a real Zero interpreter frame is live.  It
+

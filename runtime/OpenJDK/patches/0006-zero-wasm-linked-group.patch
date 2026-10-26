@@ -1,0 +1,704 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -131,7 +131,7 @@
+   product(uintx, ZeroWasmJITMaxInlineTargets, 48, EXPERIMENTAL,              \
+           "Branch targets allowed inside an inlined callee. 0 restricts "   \
+           "inlining to straight-line bodies")                               \
+-          range(0, 48)
++          range(0, 48)                                                        \
+                                                                             \
+   product(bool, UseZeroWasmBaseline, false, EXPERIMENTAL,                    \
+           "Run the opt-in OSS fixture method-at-a-time baseline ABI")       \
+@@ -149,7 +149,14 @@
+           "Exact local OSS fixture class hash for baseline cache identity")  \
+                                                                             \
+   product(ccstr, ZeroWasmBaselineDependencyHashes, nullptr, EXPERIMENTAL,     \
+-          "Exact local OSS fixture dependency hashes for baseline cache")
++          "Exact local OSS fixture dependency hashes for baseline cache")      \
++                                                                            \
++                                                                            \
++  product(bool, UseZeroWasmLinkedGroup, false, EXPERIMENTAL,                 \
++          "Run the opt-in OSS fixture linked group through Zero state")      \
++                                                                            \
++  product(bool, ZeroWasmLinkedGroupVerbose, false, EXPERIMENTAL,             \
++          "Report linked-group ABI and real Zero resume state")
+ 
+ // end of ARCH_FLAGS
+ 
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -787,6 +787,17 @@
+ run:
+ 
+ #ifdef __EMSCRIPTEN__
++  if (UseZeroWasmLinkedGroup && pc == METHOD->code_base()) {
++    ZeroWasmBaseline::Result linked_group =
++        ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
++                                     &pc, &topOfStack, istate);
++    if (linked_group == ZeroWasmBaseline::Returned
++        || linked_group == ZeroWasmBaseline::DeoptResume
++        || linked_group == ZeroWasmBaseline::ExceptionResume) {
++      goto run;
++    }
++  }
++
+   // Separate, opt-in method-at-a-time ABI lane.  It runs before the trace
+   // JIT and has its own result protocol: a complete return goes directly to
+   // the existing return machinery, while guard/exception resumes re-enter
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+@@ -14,6 +14,8 @@
+ 
+ #ifdef __EMSCRIPTEN__
+ 
++#include "interpreter/zero/bytecodeInterpreter.hpp"
++
+ class Method;
+ 
+ class ZeroWasmBaseline : AllStatic {
+@@ -29,7 +31,7 @@
+   // receives the real locals and expression-stack pointer, writes only Java
+   // slots visible to the frame manager, and returns a state transition.
+   static Result maybe_run(Method* method, intptr_t* locals, address code_base,
+-                          address* pc, intptr_t** tos, void* istate);
++                          address* pc, intptr_t** tos, interpreterState istate);
+ 
+   static void print_statistics();
+ };
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -12,8 +12,10 @@
+ #ifdef __EMSCRIPTEN__
+ 
+ #include "interpreter/zero/bytecodeInterpreter.hpp"
++#include "interpreter/bytecodes.hpp"
+ #include "jvm_io.h"
+ #include "memory/resourceArea.hpp"
++#include "oops/constantPool.inline.hpp"
+ #include "oops/instanceKlass.inline.hpp"
+ #include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
+@@ -85,6 +87,17 @@
+       u8(byte);
+     }
+   }
++  void sleb64(int64_t value) {
++    bool more = true;
++    while (more) {
++      unsigned byte = (unsigned)value & 0x7fu;
++      value >>= 7;
++      bool sign = (byte & 0x40u) != 0;
++      more = !((value == 0 && !sign) || (value == -1 && sign));
++      if (more) byte |= 0x80u;
++      u8(byte);
++    }
++  }
+   void string(const char* value) {
+     int length = (int)strlen(value);
+     uleb((unsigned)length);
+@@ -198,6 +211,138 @@
+   return module.length();
+ }
+ 
++// M1-A uses a separate result ABI from the historical raw-i32 baseline above.
++// The high 16 bits are a status, the next 16 bits are the resume BCI, and the
++// low 32 bits are the signed Java int result.  The module has no JVM imports:
++// caller -> leaf is a direct Wasm call inside this one linked group.
++enum LinkedFunction {
++  LinkedLeaf = 0,
++  LinkedCaller = 1,
++  LinkedVirtual = 2,
++  LinkedSafeDiv = 3
++};
++
++static const int LINKED_RETURN = 0;
++static const int LINKED_DEOPT = 1;
++static const int LINKED_EXCEPTION = 2;
++
++static jlong linked_status(int status, int bci) {
++  return ((jlong)(uint16_t)status << 48) | ((jlong)(uint16_t)bci << 32);
++}
++
++static void linked_type(WasmBuf& b, int params) {
++  b.u8(0x60);                         // func
++  b.uleb((unsigned)params);
++  for (int i = 0; i < params; i++) b.u8(0x7f); // i32 parameters
++  b.uleb(1);
++  b.u8(0x7e);                         // i64 packed result
++}
++
++static void linked_i64_const(WasmBuf& b, jlong value) {
++  b.u8(0x42);
++  b.sleb64((int64_t)value);
++}
++
++static void linked_extend_i32(WasmBuf& b) { b.u8(0xac); } // i64.extend_i32_s
++
++static void emit_linked_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(3);
++  body.u8(0x6a);
++  linked_extend_i32(body);
++  body.u8(0x0b);
++}
++
++static void emit_linked_caller(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(LinkedLeaf); // direct caller -> leaf
++  linked_i64_const(body, 2);
++  body.u8(0x7e);                       // i64.mul
++  body.u8(0x0b);
++}
++
++static void emit_linked_virtual(WasmBuf& body, int resume_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);          // synthetic Good guard tag
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x46);                       // i32.eq
++  body.u8(0x04); body.u8(0x7e);         // if (result i64)
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x41); body.sleb(11);
++  body.u8(0x6a);
++  linked_extend_i32(body);
++  body.u8(0x05);                       // guard miss: interpreter re-executes
++  linked_i64_const(body, linked_status(LINKED_DEOPT, resume_bci));
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
++static void emit_linked_safe_div(WasmBuf& body, int resume_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x45);                       // y == 0
++  body.u8(0x04); body.u8(0x7e);         // if (result i64)
++  linked_i64_const(body, linked_status(LINKED_EXCEPTION, resume_bci));
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x6d);                       // i32.div_s; MIN_VALUE/-1 is defined
++  linked_extend_i32(body);
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
++static void emit_linked_export(WasmBuf& body, const char* name, int index) {
++  body.string(name);
++  body.u8(0x00);
++  body.uleb((unsigned)index);
++}
++
++static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(2);
++  linked_type(types, 1);               // leaf/caller -> i64
++  linked_type(types, 2);               // virtual/safeDiv -> i64
++  module.section(1, types);
++
++  WasmBuf functions;
++  functions.uleb(4);
++  functions.uleb(0); functions.uleb(0);
++  functions.uleb(1); functions.uleb(1);
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(4);
++  emit_linked_export(exports, "leaf", LinkedLeaf);
++  emit_linked_export(exports, "caller", LinkedCaller);
++  emit_linked_export(exports, "virtualValue", LinkedVirtual);
++  emit_linked_export(exports, "safeDiv", LinkedSafeDiv);
++  module.section(7, exports);
++
++  WasmBuf code;
++  WasmBuf body;
++  code.uleb(4);
++  emit_linked_leaf(body);
++  code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  body = WasmBuf();
++  emit_linked_caller(body);
++  code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  body = WasmBuf();
++  emit_linked_virtual(body, virtual_bci);
++  code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  body = WasmBuf();
++  emit_linked_safe_div(body, safe_div_bci);
++  code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  module.section(10, code);
++  return module.length();
++}
++
+ static uint64_t fnv1a(const char* text) {
+   uint64_t hash = 1469598103934665603ULL;
+   for (const unsigned char* p = (const unsigned char*)text; *p != 0; p++) {
+@@ -255,12 +400,30 @@
+ }
+ 
+ static bool caller_code_is(Method* method) {
+-  // The cp index is deliberately ignored; the opcode/operand shape is fixed.
++  // The rewritten operand is a resolved-method-entry index, not a stable
++  // class-file constant-pool index. Verify the exact shape and resolve the
++  // target symbols through the rewritten ConstantPool view.
+   const unsigned char* b = method->code_base();
+   return method->code_size() == 7 && b[0] == 0x1a && b[1] == 0xb8
+       && b[4] == 0x05 && b[5] == 0x68 && b[6] == 0xac;
+ }
+ 
++static bool caller_target_is(Method* method) {
++  const unsigned char* code = method->code_base();
++  if (!caller_code_is(method)) return false;
++  int index = Bytes::get_native_u2((address)(code + 2));
++  ConstantPool* constants = method->constants();
++  if (index < 0 || index >= constants->resolved_method_entries_length()) {
++    return false;
++  }
++  Symbol* owner = constants->klass_ref_at_noresolve(index, Bytecodes::_invokestatic);
++  Symbol* name = constants->name_ref_at(index, Bytecodes::_invokestatic);
++  Symbol* signature = constants->signature_ref_at(index, Bytecodes::_invokestatic);
++  return owner != nullptr && name != nullptr && signature != nullptr
++      && owner->equals("ZeroBaselineFixture")
++      && name->equals("leaf") && signature->equals("(I)I");
++}
++
+ static bool virtual_code_is(Method* method) {
+   // The constant-pool index varies with javac's pool layout; the invoke
+   // opcode, count, zero byte, and return shape are the verified contract.
+@@ -336,6 +499,48 @@
+   }
+ });
+ 
++EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
++                                const char* key, int out_slots), {
++  globalThis.__mcwebZeroLinkedGroupCache ||= Object.create(null);
++  const metadata = UTF8ToString(key);
++  const cached = globalThis.__mcwebZeroLinkedGroupCache[metadata];
++  if (cached) {
++    HEAP32[(out_slots >> 2) + 0] = cached.slots[0];
++    HEAP32[(out_slots >> 2) + 1] = cached.slots[1];
++    HEAP32[(out_slots >> 2) + 2] = cached.slots[2];
++    HEAP32[(out_slots >> 2) + 3] = cached.slots[3];
++    return cached.id;
++  }
++  try {
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    if (!WebAssembly.validate(binary)) return -1;
++    const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {});
++    const slots = [
++      addFunction(instance.exports.leaf, "ji"),
++      addFunction(instance.exports.caller, "ji"),
++      addFunction(instance.exports.virtualValue, "jii"),
++      addFunction(instance.exports.safeDiv, "jii")
++    ];
++    const id = globalThis.__mcwebZeroLinkedGroupCache.__nextId || 1;
++    globalThis.__mcwebZeroLinkedGroupCache.__nextId = id + 1;
++    globalThis.__mcwebZeroLinkedGroupCache[metadata] = { id, instance, slots };
++    HEAP32[(out_slots >> 2) + 0] = slots[0];
++    HEAP32[(out_slots >> 2) + 1] = slots[1];
++    HEAP32[(out_slots >> 2) + 2] = slots[2];
++    HEAP32[(out_slots >> 2) + 3] = slots[3];
++    if (typeof err === "function") {
++      err("[zbg] JS_INSTALL linked-group direct-calls=caller->leaf status=i64 bytes=" + length);
++    }
++    return id;
++  } catch (error) {
++    if (!globalThis.__mcwebZeroLinkedGroupCache.__error) {
++      globalThis.__mcwebZeroLinkedGroupCache.__error = String(error);
++      if (typeof err === "function") err("[zbg] install failed: " + error);
++    }
++    return -1;
++  }
++});
++
+ static THREAD_LOCAL int _module_id = -1;
+ static THREAD_LOCAL int _table_slots[4] = {-1, -1, -1, -1};
+ static THREAD_LOCAL uint64_t _compiled = 0;
+@@ -345,8 +550,44 @@
+ static THREAD_LOCAL uint64_t _deopt = 0;
+ static THREAD_LOCAL uint64_t _exception_resume = 0;
+ 
++static THREAD_LOCAL int _linked_module_id = -1;
++static THREAD_LOCAL int _linked_table_slots[4] = {-1, -1, -1, -1};
++static THREAD_LOCAL uint64_t _linked_calls = 0;
++static THREAD_LOCAL uint64_t _linked_returned = 0;
++static THREAD_LOCAL uint64_t _linked_deopt = 0;
++static THREAD_LOCAL uint64_t _linked_exception = 0;
++static THREAD_LOCAL uint64_t _linked_caller_entries = 0;
++static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
++
+ typedef jint (*ZbbOneArg)(jint);
+ typedef jint (*ZbbTwoArg)(jint, jint);
++typedef jlong (*ZbgOneArg)(jint);
++typedef jlong (*ZbgTwoArg)(jint, jint);
++
++struct LinkedStatus {
++  int status;
++  int bci;
++  jint value;
++};
++
++static LinkedStatus decode_linked_status(jlong raw) {
++  uint64_t bits = (uint64_t)raw;
++  LinkedStatus result;
++  result.status = (int)((bits >> 48) & 0xffffu);
++  result.bci = (int)((bits >> 32) & 0xffffu);
++  result.value = (jint)(uint32_t)bits;
++  return result;
++}
++
++static jlong linked_table_call1(int slot, jint value) {
++  _linked_calls++;
++  return ((ZbgOneArg)(intptr_t)slot)(value);
++}
++
++static jlong linked_table_call2(int slot, jint first, jint second) {
++  _linked_calls++;
++  return ((ZbgTwoArg)(intptr_t)slot)(first, second);
++}
+ 
+ static jint table_call1(int slot, jint value) {
+   _table_calls++;
+@@ -431,11 +672,334 @@
+   _returned++;
+ }
+ 
++enum LinkedMethodKind {
++  LinkedNoMethod = 0,
++  LinkedLeafMethod,
++  LinkedCallerMethod,
++  LinkedVirtualMethod,
++  LinkedSafeDivMethod
++};
++
++static int first_opcode(Method* method, unsigned char opcode) {
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  for (int i = 0; i < method->code_size(); i++) {
++    if (code[i] == opcode) return i;
++  }
++  return -1;
++}
++
++static bool linked_safe_div_shape(Method* method, int* fault_bci) {
++  static const unsigned char expected[] = {
++      0x1a, 0x1b, 0x6c, 0xac, 0x4d, 0x02, 0xac};
++  if (!code_is(method, expected, sizeof(expected))
++      || !method->has_exception_handler()) return false;
++  ExceptionTable et(method);
++  if (et.length() != 1 || et.start_pc(0) != 0 || et.end_pc(0) != 4
++      || et.handler_pc(0) != 4 || et.catch_type_index(0) == 0) return false;
++  *fault_bci = first_opcode(method, 0x6c);
++  return *fault_bci == 2;
++}
++
++static LinkedMethodKind verify_linked_method(Method* method,
++                                             int* virtual_bci,
++                                             int* safe_div_bci,
++                                             int* return_bci) {
++  if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
++    return LinkedNoMethod;
++  }
++  if (ZeroWasmBaselineOnly != nullptr
++      && strstr(method->name()->as_C_string(), ZeroWasmBaselineOnly) == nullptr) {
++    return LinkedNoMethod;
++  }
++  if (static_int(method, "leaf", "(I)I") && method->is_final()) {
++    static const unsigned char expected[] = {0x1a, 0x06, 0x60, 0xac};
++    if (code_is(method, expected, sizeof(expected))) {
++      *return_bci = first_opcode(method, 0xac);
++      return LinkedLeafMethod;
++    }
++  }
++  if (static_int(method, "caller", "(I)I") && method->is_final()
++      && caller_target_is(method)) {
++    // A different target or extra operation is rejected before the linked
++    // module is entered, while allowing the VM's actual rewritten cache index.
++    *return_bci = first_opcode(method, 0xac);
++    return LinkedCallerMethod;
++  }
++  if (static_int(method, "virtualValue", "(LZeroBaselineFixture$Shape;I)I")
++      && virtual_code_is(method)) {
++    *virtual_bci = first_opcode(method, 0xb9);
++    *return_bci = first_opcode(method, 0xac);
++    return *virtual_bci == 2 ? LinkedVirtualMethod : LinkedNoMethod;
++  }
++  if (static_int(method, "safeDiv", "(II)I")
++      && linked_safe_div_shape(method, safe_div_bci)) {
++    *return_bci = first_opcode(method, 0xac);
++    return LinkedSafeDivMethod;
++  }
++  return LinkedNoMethod;
++}
++
++static Method* linked_group_method(Method* seed, const char* name,
++                                   const char* signature) {
++  InstanceKlass* holder = seed->method_holder();
++  for (int i = 0; i < holder->methods()->length(); i++) {
++    Method* candidate = holder->methods()->at(i);
++    if (candidate->name()->equals(name)
++        && candidate->signature()->equals(signature)) {
++      return candidate;
++    }
++  }
++  return nullptr;
++}
++
++static bool linked_group_resume_bcis(Method* seed, int* virtual_bci,
++                                     int* safe_div_bci) {
++  Method* virtual_method = linked_group_method(
++      seed, "virtualValue", "(LZeroBaselineFixture$Shape;I)I");
++  Method* safe_div_method = linked_group_method(seed, "safeDiv", "(II)I");
++  if (virtual_method == nullptr || !virtual_code_is(virtual_method)) return false;
++  *virtual_bci = first_opcode(virtual_method, 0xb9);
++  *safe_div_bci = safe_div_method == nullptr ? -1
++      : first_opcode(safe_div_method, 0x6c);
++  return *virtual_bci >= 0;
++}
++
++static bool linked_validate_pre_push(interpreterState istate,
++                                     intptr_t* pre_tos, int depth) {
++  // Zero's expression stack grows downward. A push writes pre_tos, then
++  // pre_tos-1, ..., before publishing pre_tos-depth as the new TOS. Check
++  // that complete range before any write occurs.
++  if (istate == nullptr || pre_tos == nullptr || depth <= 0
++      || pre_tos < istate->stack_limit()
++      || pre_tos >= istate->stack_base()) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] PUSH_REJECT depth=%d reason=pre-tos-range", depth);
++    }
++    return false;
++  }
++  ptrdiff_t available = pre_tos - istate->stack_limit();
++  if (available < depth) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] PUSH_REJECT depth=%d available=%ld reason=stack-limit",
++                    depth, (long)available);
++    }
++    return false;
++  }
++  return true;
++}
++
++static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
++                                 address* pc, address resume_pc, int depth) {
++  // push_int/push_oop already moved the downward-growing TOS. Validate the
++  // resulting pointer against the same invariant used by the interpreter;
++  // subtracting depth again would reject a valid max_stack boundary.
++  bool valid = istate != nullptr && *tos != nullptr && resume_pc != nullptr
++      && depth > 0 && *tos >= istate->stack_limit()
++      && *tos < istate->stack_base();
++  if (valid) {
++    // The post-push TOS must still describe a pre-push pointer strictly below
++    // stack_base when depth slots are restored.
++    valid = istate->stack_base() - *tos > depth;
++  }
++  if (!valid) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] RESUME_REJECT depth=%d tos-offset=%ld limit-offset=%ld",
++                    depth,
++                    istate == nullptr || *tos == nullptr ? -1L
++                        : (long)(istate->stack_base() - *tos),
++                    istate == nullptr ? -1L
++                        : (long)(istate->stack_base() - istate->stack_limit()));
++    }
++    return false;
++  }
++  *pc = resume_pc;
++  istate->set_stack(*tos);
++  istate->set_bcp(*pc);
++  // This is a same-frame resume, not a frame-manager call. Clear any stale
++  // call request left in the union before the interpreter sees the BCI.
++  istate->set_msg(BytecodeInterpreter::no_request);
++  istate->set_callee(nullptr);
++  istate->set_callee_entry_point(nullptr);
++  istate->set_bcp_advance(0);
++  return !istate->thread()->has_pending_exception();
++}
++
++static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci) {
++  if (ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr) return false;
++  if (virtual_bci < 0 || safe_div_bci < 0) {
++    if (!linked_group_resume_bcis(seed, &virtual_bci, &safe_div_bci)) return false;
++  }
++  char key[2048];
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-group-v1;compiler=zero-baseline-abi-v2;"
++      "class=ZeroBaselineFixture;group=leaf(I)I|caller(I)I|"
++      "virtualValue(LZeroBaselineFixture$Shape;I)I|safeDiv(II)I;"
++      "virtual-bci=%d;safe-div-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
++      "features=wasm32-i32-i64-linear-memory-status",
++      virtual_bci, safe_div_bci, ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++  WasmBuf module;
++  int length = build_linked_module(module, virtual_bci, safe_div_bci);
++  _linked_module_id = zbb_linked_install(module.data(), length, key,
++                                           (int)(intptr_t)_linked_table_slots);
++  if (_linked_module_id < 0) return false;
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] module direct-call caller->leaf wasm-call=1 status=i64 bytes=%d",
++                  length);
++  }
++  return true;
++}
++
++static ZeroWasmBaseline::Result run_linked_group(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmLinkedGroup || istate == nullptr
++      || istate->thread()->has_pending_exception()) return ZeroWasmBaseline::NotRun;
++  int virtual_bci = -1;
++  int safe_div_bci = -1;
++  int return_bci = -1;
++  LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
++                                                &safe_div_bci, &return_bci);
++  if (ZeroWasmLinkedGroupVerbose && fixture_class(method)
++      && _linked_entry_diagnostics < 16) {
++    tty->print_cr("[zbg] ENTRY method=%s kind=%d locals0=%d locals-1=%d",
++                  method->name()->as_C_string(), (int)kind,
++                  locals == nullptr ? 0 : (jint)locals[0],
++                  locals == nullptr ? 0 : (jint)locals[-1]);
++    _linked_entry_diagnostics++;
++  }
++  if (kind == LinkedNoMethod || return_bci < 0) return ZeroWasmBaseline::NotRun;
++  if (_linked_module_id < 0
++      && !install_linked_group(method, virtual_bci, safe_div_bci)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  LinkedStatus result;
++  switch (kind) {
++    case LinkedLeafMethod:
++      result = decode_linked_status(linked_table_call1(
++          _linked_table_slots[LinkedLeaf], (jint)locals[0]));
++      break;
++    case LinkedCallerMethod:
++      _linked_caller_entries++;
++      if (ZeroWasmLinkedGroupVerbose && _linked_caller_entries == 1) {
++        tty->print_cr("[zbg] DIRECT_CALL caller->leaf runtime=1");
++      }
++      result = decode_linked_status(linked_table_call1(
++          _linked_table_slots[LinkedCaller], (jint)locals[0]));
++      break;
++    case LinkedVirtualMethod: {
++      oop receiver = cast_to_oop((void*)locals[0]);
++      if (receiver == nullptr) return ZeroWasmBaseline::NotRun;
++      jint x = (jint)locals[-1];
++      jint tag = receiver->klass()->name()->equals("ZeroBaselineFixture$Good") ? 1 : 0;
++      result = decode_linked_status(linked_table_call2(
++          _linked_table_slots[LinkedVirtual], tag, x));
++      if (ZeroWasmLinkedGroupVerbose && _linked_calls <= 8) {
++        tty->print_cr("[zbg] STATUS virtualValue tag=%d status=%d bci=%d value=%d",
++                      tag, result.status, result.bci, result.value);
++      }
++      if (result.status == LINKED_RETURN && tag == 1 && result.bci == 0) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, result.value);
++        if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        _linked_returned++;
++        return ZeroWasmBaseline::Returned;
++      }
++      if (result.status != LINKED_DEOPT || result.bci != virtual_bci) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (!linked_validate_pre_push(istate, *tos, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      push_oop(tos, receiver);
++      push_int(tos, x);
++      if (!linked_prepare_state(istate, tos, pc, code_base + virtual_bci, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      _linked_deopt++;
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] STATE_SPILL virtualValue status=DEOPT resume-bci=%d depth=2 sp-offset=%ld pending=0",
++                      virtual_bci,
++                      (long)(istate->stack_base() - istate->stack()));
++      }
++      return ZeroWasmBaseline::DeoptResume;
++    }
++    case LinkedSafeDivMethod: {
++      jint x = (jint)locals[0];
++      jint y = (jint)locals[-1];
++      result = decode_linked_status(linked_table_call2(
++          _linked_table_slots[LinkedSafeDiv], x, y));
++      if (ZeroWasmLinkedGroupVerbose && _linked_calls <= 8) {
++        tty->print_cr("[zbg] STATUS safeDiv status=%d bci=%d value=%d",
++                      result.status, result.bci, result.value);
++      }
++      if (y != 0 && result.status == LINKED_RETURN && result.bci == 0) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, result.value);
++        if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        _linked_returned++;
++        return ZeroWasmBaseline::Returned;
++      }
++      if (y == 0 && result.status == LINKED_EXCEPTION && result.bci == safe_div_bci) {
++        // No exception is pending here. Re-execute idiv exactly once and let
++        // BytecodeInterpreter::handle_exception find the real catch handler.
++        if (!linked_validate_pre_push(istate, *tos, 2)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, x);
++        push_int(tos, y);
++        if (!linked_prepare_state(istate, tos, pc, code_base + safe_div_bci, 2)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        _linked_exception++;
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] STATE_SPILL safeDiv status=EXCEPTION resume-bci=%d depth=2 sp-offset=%ld pending=0",
++                        safe_div_bci,
++                        (long)(istate->stack_base() - istate->stack()));
++        }
++        return ZeroWasmBaseline::ExceptionResume;
++      }
++      return ZeroWasmBaseline::NotRun;
++    }
++    default:
++      return ZeroWasmBaseline::NotRun;
++  }
++
++  if (result.status != LINKED_RETURN || result.bci != 0) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (!linked_validate_pre_push(istate, *tos, 1)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  push_int(tos, result.value);
++  if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  _linked_returned++;
++  return ZeroWasmBaseline::Returned;
++}
++
+ } // namespace
+ 
+ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+-    intptr_t** tos, void* /*istate*/) {
++    intptr_t** tos, interpreterState istate) {
++  if (UseZeroWasmLinkedGroup) {
++    return run_linked_group(method, locals, code_base, pc, tos, istate);
++  }
+   if (!UseZeroWasmBaseline || !fixture_class(method)) return NotRun;
+   if (ZeroWasmBaselineOnly != nullptr
+       && strstr(method->name()->as_C_string(), ZeroWasmBaselineOnly) == nullptr) {
+

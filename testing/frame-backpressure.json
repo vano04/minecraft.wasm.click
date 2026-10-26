@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "purpose": "GPU completion owns two frame credits independently of copied RPC transport slots",
+  "source": {
+    "baseRevision": "f5862293f19eeaf1bc9d8fee77a44b3c488adca4",
+    "patch": "testing/patches/regressions-20261022.patch",
+    "patchSha256": "41edbfd4fb8fd619bb0d793193be4f71b0d1895ded90d3fb726da8a95237455a",
+    "paths": [
+      "OpenJDK/browser/pre.js",
+      "web/webgpu-host.js",
+      "OpenJDK/browser/gpu-rpc-worker.js",
+      "web/frame-backpressure.mjs"
+    ]
+  },
+  "outputs": [
+    {
+      "path": "webgpu-host.js",
+      "bytes": 328217,
+      "sha256": "6d94bef6bceffd9b8516471fe6f2a59f1ba7990f9df07582243f4aad8dc2a444"
+    },
+    {
+      "path": "gpu-rpc-worker.js",
+      "bytes": 41452,
+      "sha256": "27e7ef48a679f2926e57f804d6e8b7e7c3c63d358dd322620134f4ce198227e5"
+    },
+    {
+      "path": "frame-backpressure.mjs",
+      "bytes": 2150,
+      "sha256": "0be2f9bfee25671b8d6afb64db3085c12b03c3f0109688192749d4d822558a71"
+    }
+  ],
+  "frameLimit": 2,
+  "client": {
+    "path": "javavm.js",
+    "bytes": 2396278,
+    "sha256": "3902eedc8da07c6232bba31e661baf39a8b4860bcec05a1b4963c7e3beef9e8c"
+  },
+  "ordering": "Complete acquire/render/present batch stays synchronous. Copied RPC slots release immediately; separate i32[10] frame credits release on actual GPU completion. Only present waits for a credit; ordinary RPCs remain available.",
+  "verification": "node tools/test-frame-backpressure.mjs --derived BUNDLE",
+  "historicalTransformer": "tools/build-frame-backpressure.mjs applies only to the prior release; the current reproducer is the reviewed source patch and clean build",
+  "build": {
+    "sourceTreeSha256": "979473f04b17c3ebd2e2fff77918e247f436f210f2a0b930aecf450d898fa28b",
+    "nativeJvmRecompiled": false,
+    "jniRecompiled": true,
+    "javaPortRecompiled": true,
+    "wrapperRelinked": false,
+    "frameLimitUnchanged": true,
+    "orderingUnchanged": true
+  }
+}

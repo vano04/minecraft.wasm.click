@@ -1,0 +1,2078 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index d244169..2d968ef 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -171,6 +171,15 @@ define_pd_global(bool, CompactStrings, true);
+           "Test-only Wasm Object[] memory limit in pages; zero uses active memory") \
+   product(ccstr, ZeroWasmLinkedRefArrayCacheMutationForTest, nullptr, EXPERIMENTAL, \
+           "Test-only JS cache identity mutation: compiler/digest/bytes/memory/metadata/slot") \
++  product(bool, UseZeroWasmLinkedRefArrayStore, false, EXPERIMENTAL,         \
++          "Run the opt-in OSS fixture linked Object[] store through Zero state") \
++                                                                            \
++  product(intx, ZeroWasmLinkedRefArrayStoreMemoryLimitForTest, 0, EXPERIMENTAL, \
++          "Test-only Wasm Object[] store memory limit in pages; zero uses active memory") \
++  product(ccstr, ZeroWasmLinkedRefArrayStoreCacheMutationForTest, nullptr, EXPERIMENTAL, \
++          "Test-only JS ref-array-store cache identity mutation incl card layout/poison") \
++  product(bool, ZeroWasmLinkedRefArrayStoreCardProbeForTest, false, EXPERIMENTAL, \
++          "Test-only dedicated old-array/young-child Serial card probe") \
+   \
+   product(bool, ZeroWasmLinkedGroupVerbose, false, EXPERIMENTAL,             \
+           "Report linked-group ABI and real Zero resume state")             \
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 948c07a..8c7964c 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -36,6 +36,7 @@
+ extern uint64_t zbb_linked_array_resume_sequence();
+ extern uint64_t zbb_linked_array_store_resume_sequence();
+ extern uint64_t zbb_linked_ref_array_resume_sequence();
++extern uint64_t zbb_linked_ref_array_store_resume_sequence();
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/zeroWasmCompiler.hpp"
+ #include "jvm_io.h"
+@@ -538,10 +539,12 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // jump into the dispatch loop.  Keeping the collision decision here also
+   // makes it impossible for a same-frame retry to bypass the fail-closed
+   // guard below.
+-  const bool zero_ref_array_collision = UseZeroWasmLinkedRefArrayLoad
+-      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+-          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
+-          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  const bool zero_ref_array_collision =
++      (UseZeroWasmLinkedRefArrayLoad && UseZeroWasmLinkedRefArrayStore)
++      || ((UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore)
++          && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++              || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++              || UseZeroWasmBaseline || UseZeroWasmJIT));
+   // Zero's browser runtime is single-threaded. Keep this process-local so a
+   // same-frame retry or a later fixture call cannot emit another collision
+   // marker; the gate requires exactly one bounded diagnostic per launch.
+@@ -815,24 +818,27 @@ run:
+       && ZeroWasmLinkedGroupVerbose && !zero_ref_array_collision_reported) {
+     tty->print_cr("[zbg] REF_ARRAY_REJECT reason=flag-collision "
+                   "group=%d int-load=%d int-store=%d benchmark=%d "
+-                  "baseline=%d jit=%d",
++                  "baseline=%d jit=%d ref-load=%d ref-store=%d",
+                   UseZeroWasmLinkedGroup ? 1 : 0,
+                   UseZeroWasmLinkedIntArray ? 1 : 0,
+                   UseZeroWasmLinkedIntArrayStore ? 1 : 0,
+                   UseZeroWasmLinkedBenchmark ? 1 : 0,
+-                  UseZeroWasmBaseline ? 1 : 0, UseZeroWasmJIT ? 1 : 0);
++                  UseZeroWasmBaseline ? 1 : 0, UseZeroWasmJIT ? 1 : 0,
++                  UseZeroWasmLinkedRefArrayLoad ? 1 : 0,
++                  UseZeroWasmLinkedRefArrayStore ? 1 : 0);
+     zero_ref_array_collision_reported = true;
+   }
+   if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+       || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
+-      || UseZeroWasmLinkedRefArrayLoad)
++      || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore)
+       // The two incompatible fixture-specific array ABIs fail closed as a
+       // pair. Do not call maybe_run and then retry at the same entry forever;
+       // the real interpreter must own the frame when either incompatible
+       // array-store combination is enabled.
+       && !(UseZeroWasmLinkedIntArrayStore
+            && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+-               || UseZeroWasmLinkedRefArrayLoad))
++               || UseZeroWasmLinkedRefArrayLoad
++               || UseZeroWasmLinkedRefArrayStore))
+       && !zero_ref_array_collision
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+@@ -1762,6 +1768,16 @@ run:
+        * This one looks different because of the assignability check
+        */
+       CASE(_aastore): {
++          if (ZeroWasmLinkedGroupVerbose
++              && METHOD->method_holder()->name()->equals("ZeroReferenceArrayStoreFixture")
++              && METHOD->name()->equals("referenceArrayStore")
++              && METHOD->signature()->equals(
++                  "([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;")) {
++            tty->print_cr("[zbg] INTERPRETER_AASTORE seq=%llu bci=%d",
++                          (unsigned long long)
++                              zbb_linked_ref_array_store_resume_sequence(),
++                          BCI());
++          }
+           oop rhsObject = STACK_OBJECT(-1);
+           VERIFY_OOP(rhsObject);
+           ARRAY_INTRO( -3);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 874ab52..7aec74d 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -33,6 +33,7 @@
+ #include "runtime/fieldDescriptor.inline.hpp"
+ #include "runtime/globals.hpp"
+ #include "runtime/os.hpp"
++#include "runtime/safepointVerifiers.hpp"
+ #include "utilities/ostream.hpp"
+ 
+ #include <emscripten.h>
+@@ -282,6 +283,19 @@ struct LinkedRefArrayLayout {
+   int element_size;
+ };
+ 
++// Checked Object[] stores have their own layout and cache identity.  The
++// module receives the live card-table base as an ABI argument so a cached
++// instance never bakes a stale host address into its raw Wasm bytes.
++struct LinkedRefArrayStoreLayout {
++  int length_offset;
++  int base_offset;
++  int element_size;
++  int card_shift;
++  int clean_card;
++  int dirty_card;
++  int card_base;
++};
++
+ // Separate cold store-module identity and callable slot.  These are declared
+ // before the installer helper because the helper is emitted above the other
+ // per-thread linked-group state.
+@@ -291,6 +305,32 @@ static THREAD_LOCAL bool _linked_array_store_collision_reported = false;
+ static THREAD_LOCAL bool _linked_array_store_exception_reported = false;
+ static THREAD_LOCAL int _linked_ref_array_module_id = -1;
+ static THREAD_LOCAL int _linked_ref_array_slot = -1;
++static THREAD_LOCAL int _linked_ref_array_store_module_id = -1;
++static THREAD_LOCAL int _linked_ref_array_store_slot = -1;
++static THREAD_LOCAL bool _linked_ref_array_store_collision_reported = false;
++static THREAD_LOCAL bool _linked_ref_array_store_card_probe_pending = false;
++static THREAD_LOCAL jint _linked_ref_array_store_card_probe_index = -1;
++// Only scalar binding facts cross the Java return/allocation gap. Do not keep
++// a raw oop, CardValue*, or pre-gap card byte in TLS: SerialGC may compact the
++// heap while the fixture helper is between calls. The candidate transaction
++// recomputes and validates the exact address before touching it.
++static THREAD_LOCAL uintptr_t _linked_ref_array_store_card_probe_array_bits = 0;
++static THREAD_LOCAL uintptr_t _linked_ref_array_store_card_probe_address_bits = 0;
++static THREAD_LOCAL jint _linked_ref_array_store_card_probe_length = -1;
++static THREAD_LOCAL jint _linked_ref_array_store_card_probe_span_kind = 0;
++
++// The dedicated card-probe helper is declared before its shape/runner block,
++// while the publication helpers remain beside the other frame-state code.
++// Keep these declarations narrow: the ordinary store lane never calls the
++// fallible publication helper after its Wasm side effect.
++static bool linked_validate_pre_push(interpreterState istate,
++                                     intptr_t* tos, int depth);
++static void linked_publish_ref_store_return_infallible(
++    interpreterState istate, intptr_t** tos, address* pc, address resume_pc,
++    oop value);
++static void linked_publish_ref_store_reexecute_infallible(
++    interpreterState istate, intptr_t** tos, address* pc, address resume_pc,
++    oop array, jint index, oop value);
+ 
+ static const int LINKED_RETURN = 0;
+ static const int LINKED_DEOPT = 1;
+@@ -700,6 +740,158 @@ static void emit_linked_ref_array_load(WasmBuf& body,
+   body.u8(0x0b); // function end
+ }
+ 
++// A checked Object[] store.  The adapter supplies `assignable=1` only after
++// the VM has performed the exact no-GC subtype predicate, but the module
++// retains the guard as part of its pre-store proof.  Its six-argument ABI is
++// (array,index,value,memory-limit-pages,live-card-base,assignable).  Every
++// potentially trapping operation is dominated by a widened end check.  The
++// only side effects on the direct path are one oop i32.store followed by one
++// dirty-card i32.store8; no instruction after the card mark can call, load,
++// branch, or otherwise fail.
++static void emit_linked_ref_array_store(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout, int aastore_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // null array
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05);
++
++  // A positive test override is an explicit semantic fallback. Keep its
++  // precedence after the null guard but before bounds or assignability: the
++  // forced lane must report memory for every non-null call, including calls
++  // that would otherwise reexecute for an index or ArrayStoreException. The
++  // double eqz forms `memory-limit != 0` without introducing a fallible op;
++  // its then arm returns the status before the normal validation else arm.
++  body.u8(0x20); body.uleb(kArrayStoreMemoryLimitLocal);
++  body.u8(0x45); // memory-limit == 0
++  body.u8(0x45); // invert: memory-limit != 0
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05); // memory-limit == 0: continue with validation
++
++  // Check array + length header + one length word against effective memory.
++  // Keep the failing condition in the `then` arm.  This makes every `else`
++  // (and therefore every branch opcode) occur before the side effects below;
++  // after the card mark the binary contains only block terminators.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.length_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x56); // header end > effective memory
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05); // valid header: continue with the remaining checks
++
++  // The unsigned comparison rejects negative indexes without first widening
++  // them to a positive host value.
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x4f); // index >= length
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05); // valid index: continue with the element-end check
++
++  // Check array + base + index * oop-size + one oop word before wrapping.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset + layout.element_size);
++  body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x56); // element end > effective memory
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05); // valid element end: continue with the subtype guard
++
++  // The VM-side subtype test is an explicit ABI guard. Null values are
++  // passed with assignable=1 and therefore take the same card-marked direct
++  // path as non-null values.
++  body.u8(0x20); body.uleb(5); body.u8(0x45);
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05);
++
++  // Compute card = liveCardBase + ((array + base + index * oop-size) >> shift)
++  // in i64, then reject both i32 address overflow and card end overflow.
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift);
++  body.u8(0x88); // field address >> card_shift (i64.shr_u)
++  body.u8(0x7c); // + live card base
++  body.u8(0x42); body.sleb64(0xffffffffLL); body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e); // card > UINT32_MAX
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05); // valid card address: continue with the card-end check
++
++  // Recompute card and check card+1 against the same effective memory. This
++  // also protects the i32.wrap_i64 used by the final store8.
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift);
++  body.u8(0x88); // field address >> card_shift (i64.shr_u)
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(1); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x56); // card + 1 > effective memory
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aastore_bci);
++  body.u8(0x05); // valid card end: direct side effects are now permitted
++
++  // Precompute the low result before either side effect. The direct result is
++  // the stored reference's raw32 bits with RETURN status in the high word.
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  linked_i64_const(body, linked_status(LINKED_RETURN, 0));
++  body.u8(0x84); // i64.or
++
++  // Exactly one oop store, after every validation above has succeeded.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0xa7); // i32.wrap_i64 only after element end proof
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x36); body.uleb(2); body.uleb(0); // aligned i32 oop store
++
++  // Exactly one dirty-card byte store. No loads, calls, branches, or
++  // fallible operations follow this instruction.
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift);
++  body.u8(0x88); // field address >> card_shift (i64.shr_u)
++  body.u8(0x7c);
++  body.u8(0xa7); // i32.wrap_i64 after card end proof
++  body.u8(0x41); body.sleb(layout.dirty_card);
++  body.u8(0x3a); body.uleb(0); body.uleb(0); // dirty card store8
++
++  // Close card-end, card-overflow, assignability, element-end, bounds, and
++  // header arms. There must be no `else`, branch, load, or call after the
++  // dirty-card store8. The memory override status was emitted before the
++  // normal validation arm, so this tail contains only block terminators.
++  body.u8(0x0b); // card-end check
++  body.u8(0x0b); // card overflow check
++  body.u8(0x0b); // assignability check
++  body.u8(0x0b); // element-end check
++  body.u8(0x0b); // bounds check
++  body.u8(0x0b); // header check
++  body.u8(0x0b); // memory override check
++  body.u8(0x0b); // outer null guard
++  body.u8(0x0b); // function end
++}
++
+ // Benchmark-only bodies. They are emitted only in the opt-in benchmark
+ // module, so the production ten-export module remains byte-for-byte stable.
+ // Each wrapper performs its complete N-iteration loop in Wasm; the host makes
+@@ -985,6 +1177,46 @@ static int build_linked_ref_array_load_module(
+   return module.length();
+ }
+ 
++// The checked reference-array store is a separate one-export module. Its ABI
++// is (array,index,value,memory-limit-pages,live-card-base,assignable)->i64 and
++// its sole export is intentionally exact.
++static int build_linked_ref_array_store_module(
++    WasmBuf& module, const LinkedRefArrayStoreLayout& layout, int aastore_bci) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(1);
++  linked_type(types, 6);
++  module.section(1, types);
++
++  WasmBuf imports;
++  imports.uleb(1);
++  imports.string("env"); imports.string("memory");
++  imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++  module.section(2, imports);
++
++  WasmBuf functions;
++  functions.uleb(1);
++  functions.uleb(0);
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(1);
++  emit_linked_export(exports, "referenceArrayStore", 0);
++  module.section(7, exports);
++
++  WasmBuf code;
++  WasmBuf body;
++  emit_linked_ref_array_store(body, layout, aastore_bci);
++  code.uleb(1);
++  code.uleb((unsigned)body.length());
++  code.raw(body.data(), body.length());
++  module.section(10, code);
++  return module.length();
++}
++
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+                                int dispatch_bci, int throw_invoke_bci,
+@@ -1288,6 +1520,12 @@ static bool reference_array_fixture_class(Method* method) {
+       && method->method_holder()->name()->equals("ZeroReferenceArrayLoadFixture");
+ }
+ 
++static bool reference_array_store_fixture_class(Method* method) {
++  return method != nullptr
++      && method->method_holder()->name()->equals(
++          "ZeroReferenceArrayStoreFixture");
++}
++
+ static bool static_int(Method* method, const char* name, const char* sig) {
+   return method->is_static() && method->result_type() == T_INT
+       && method->name()->equals(name) && method->signature()->equals(sig);
+@@ -1702,6 +1940,40 @@ static bool linked_ref_array_layout_for_fixture(LinkedRefArrayLayout* layout) {
+       && layout->base_offset <= INT_MAX - layout->element_size;
+ }
+ 
++static bool linked_ref_array_store_layout_for_fixture(
++    LinkedRefArrayStoreLayout* layout) {
++  if (layout == nullptr) return false;
++  LinkedRefArrayLayout ref_layout;
++  if (!linked_ref_array_layout_for_fixture(&ref_layout)) return false;
++  BarrierSet* barrier = BarrierSet::barrier_set();
++  if (barrier == nullptr || !barrier->is_a(BarrierSet::CardTableBarrierSet)) {
++    return false;
++  }
++  CardTableBarrierSet* card_barrier =
++      static_cast<CardTableBarrierSet*>(barrier);
++  CardTable* card_table = card_barrier->card_table();
++  address card_base = card_table == nullptr ? nullptr
++      : card_table->byte_map_base();
++  if (card_base == nullptr) return false;
++  uintptr_t card_address = (uintptr_t)card_base;
++  int card_shift = CardTable::card_shift();
++  int clean_card = (int)CardTable::clean_card_val();
++  int dirty_card = (int)CardTable::dirty_card_val();
++  if (card_address > UINT32_MAX || card_shift < 0 || card_shift >= 32
++      || clean_card < 0 || clean_card > 255
++      || dirty_card < 0 || dirty_card > 255 || clean_card == dirty_card) {
++    return false;
++  }
++  layout->length_offset = ref_layout.length_offset;
++  layout->base_offset = ref_layout.base_offset;
++  layout->element_size = ref_layout.element_size;
++  layout->card_shift = card_shift;
++  layout->clean_card = clean_card;
++  layout->dirty_card = dirty_card;
++  layout->card_base = (int)(uint32_t)card_address;
++  return true;
++}
++
+ static CardTable::CardValue* linked_card_for(const LinkedOopLayout& layout,
+                                              oop box) {
+   uintptr_t field_address = (uintptr_t)box + (uintptr_t)layout.child_offset;
+@@ -1710,6 +1982,108 @@ static CardTable::CardValue* linked_card_for(const LinkedOopLayout& layout,
+   return (CardTable::CardValue*)card_address;
+ }
+ 
++static CardTable::CardValue* linked_ref_array_card_for(
++    const LinkedRefArrayStoreLayout& layout, oop array, jint index) {
++  if (array == nullptr || index < 0) return nullptr;
++  uintptr_t field_address = (uintptr_t)array
++      + (uintptr_t)layout.base_offset
++      + (uintptr_t)(uint32_t)index * (uintptr_t)layout.element_size;
++  uintptr_t card_address = (uintptr_t)(uint32_t)layout.card_base
++      + (field_address >> layout.card_shift);
++  return (CardTable::CardValue*)card_address;
++}
++
++// The card probe is intentionally separate from the ordinary store adapter.
++// It may touch a card only after proving a wasm32-safe interior element range;
++// production direct stores merely observe the post-store dirty byte.
++static bool linked_ref_array_card_address_checked(
++    const LinkedRefArrayStoreLayout& layout, oop array, jint index,
++    jint length, CardTable::CardValue** card) {
++  if (card == nullptr || array == nullptr || index <= 0 || length < 3
++      || index >= length || layout.element_size <= 0 || layout.card_shift < 0
++      || layout.card_shift >= 32) {
++    return false;
++  }
++  const uint64_t array_address = (uint64_t)(uintptr_t)array;
++  const uint64_t base = (uint64_t)(uint32_t)layout.base_offset;
++  const uint64_t element = (uint64_t)(uint32_t)layout.element_size;
++  const uint64_t scaled = (uint64_t)(uint32_t)index * element;
++  const uint64_t max_wasm_end = (uint64_t)UINT32_MAX + 1u;
++  if (array_address > UINT32_MAX || base > UINT64_MAX - scaled
++      || array_address > UINT64_MAX - base - scaled
++      || array_address + base + scaled > UINT64_MAX - element
++      || array_address + base + scaled + element > max_wasm_end) {
++    return false;
++  }
++  const uint64_t field_address = array_address + base + scaled;
++  const uint64_t card_address = (uint64_t)(uint32_t)layout.card_base
++      + (field_address >> layout.card_shift);
++  if (card_address > UINT32_MAX || card_address + 1u > max_wasm_end) {
++    return false;
++  }
++  *card = (CardTable::CardValue*)(uintptr_t)card_address;
++  return true;
++}
++
++// Prove that the selected card is an interior card wholly covered by the
++// Object[] element body.  The proof is deliberately widened: the native
++// pointer is only converted to the wasm32 card address after every array,
++// element, card-start, and card-end calculation has been checked.  This is
++// the only card layout accepted by the diagnostic root probe (SerialGC,
++// uncompressed raw32 Object[] above), and it keeps a card write from touching
++// an array header or an adjacent object.
++static bool linked_ref_array_card_span_proven(
++    const LinkedRefArrayStoreLayout& layout, oop array, jint index,
++    jint length, CardTable::CardValue** card, int* span_kind) {
++  if (card == nullptr || span_kind == nullptr || array == nullptr
++      || index <= 0 || length < 3 || index >= length
++      || layout.element_size <= 0 || layout.card_shift < 0
++      || layout.card_shift >= 32) {
++    return false;
++  }
++  const uint64_t max_wasm_end = (uint64_t)UINT32_MAX + 1u;
++  const uint64_t array_address = (uint64_t)(uintptr_t)array;
++  const uint64_t base = (uint64_t)(uint32_t)layout.base_offset;
++  const uint64_t element = (uint64_t)(uint32_t)layout.element_size;
++  const uint64_t length_u = (uint64_t)(uint32_t)length;
++  if (array_address > UINT32_MAX || base > UINT64_MAX - array_address
++      || array_address + base > UINT64_MAX - length_u * element
++      || array_address + base + length_u * element > max_wasm_end) {
++    return false;
++  }
++  CardTable::CardValue* checked_card = nullptr;
++  if (!linked_ref_array_card_address_checked(layout, array, index, length,
++                                              &checked_card)
++      || checked_card == nullptr) {
++    return false;
++  }
++  const uint64_t field_address = array_address + base
++      + (uint64_t)(uint32_t)index * element;
++  const uint64_t card_index = field_address >> layout.card_shift;
++  const uint64_t card_span = ((uint64_t)1) << layout.card_shift;
++  if (card_index > UINT64_MAX / card_span
++      || card_index * card_span > UINT64_MAX - card_span) {
++    return false;
++  }
++  const uint64_t card_heap_start = card_index * card_span;
++  const uint64_t card_heap_end = card_heap_start + card_span;
++  const uint64_t body_start = array_address + base;
++  const uint64_t body_end = body_start + length_u * element;
++  if (card_heap_start < body_start || card_heap_end > body_end) {
++    return false;
++  }
++  const uint64_t expected_card_address = (uint64_t)(uint32_t)layout.card_base
++      + card_index;
++  if (expected_card_address > UINT32_MAX
++      || expected_card_address + 1u > max_wasm_end
++      || checked_card != (CardTable::CardValue*)(uintptr_t)expected_card_address) {
++    return false;
++  }
++  *card = checked_card;
++  *span_kind = 1; // serial-all-null-element-body
++  return true;
++}
++
+ static bool linked_reset_store_state(const LinkedOopLayout& layout, oop box,
+                                      int* card_after_clean) {
+   if (box == nullptr) return false;
+@@ -2267,7 +2641,461 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+           throw new Error("owned callable was not removed");
+         }
+         const poisoned = (...args) => 0n;
+-        allocatedPoisonSlot = addFunction(poisoned, "jiii");
++        allocatedPoisonSlot = addFunction(poisoned, "jiii");
++        const poisonCallable = getWasmTableEntry(allocatedPoisonSlot);
++        if (allocatedPoisonSlot !== cached.ownedSlot
++            || typeof poisonCallable !== "function"
++            || poisonCallable === original) {
++          throw new Error("owned table slot was not recycled");
++        }
++        if (getWasmTableEntry(cached.ownedSlot) !== poisonCallable) {
++          throw new Error("poisoned table entry was not visible");
++        }
++        cache.__poisonCallable = poisonCallable;
++        cache.__pendingPoison = true;
++      } catch (error) {
++        // Poison setup is transactional. If allocation or exact-slot reuse
++        // fails after removing the original, remove the allocated poison once
++        // and quarantine the detached cache record; never leave stale
++        // metadata or a callable cache entry for a later hit.
++        let poisonCleanup = allocatedPoisonSlot < 0;
++        if (allocatedPoisonSlot >= 0 && typeof removeFunction === "function") {
++          try {
++            removeFunction(allocatedPoisonSlot);
++            const poisonAfter = getWasmTableEntry(allocatedPoisonSlot);
++            poisonCleanup = typeof poisonAfter !== "function";
++          } catch (cleanupError) {
++            if (typeof console !== "undefined") console.error(
++                "[zbg] ref-array-load cache poison cleanup reject " + cleanupError);
++          }
++        }
++        if (originalRemoved) {
++          cached.slot = -1;
++          cached.instance = null;
++          cached.binary = null;
++          cached.memory = null;
++          delete cache[metadata];
++          cache.__lastInstance = null;
++        }
++        let oldSlotCleared = true;
++        if (originalRemoved && typeof getWasmTableEntry === "function") {
++          try {
++            oldSlotCleared = typeof getWasmTableEntry(cached.ownedSlot) !== "function";
++          } catch (probeError) {
++            oldSlotCleared = false;
++          }
++        }
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
++        cache.__lastInvalidation = {
++          setupFailed: true, originalRemoved, allocatedPoisonSlot,
++          poisonCleanup, oldSlotCleared, metadataCleared: !cache[metadata],
++          lastInstanceCleared: cache.__lastInstance === null
++        };
++        if (typeof console !== "undefined") console.error(
++            "[zbg] ref-array-load cache poison reject " + error
++            + " original-removed=" + (originalRemoved ? "1" : "0")
++            + " poison-slot=" + allocatedPoisonSlot
++            + " poison-cleanup=" + (poisonCleanup ? "1" : "0")
++            + " old-slot-cleared=" + (oldSlotCleared ? "1" : "0")
++            + " metadata-cleared=" + (!cache[metadata] ? "1" : "0")
++            + " last-instance-cleared="
++            + (cache.__lastInstance === null ? "1" : "0"));
++        return -1;
++      }
++      break;
++    }
++    default: return -1;
++  }
++  const oldId = cached.id;
++  const oldSlot = cached.slot;
++  const oldOwnedSlot = cached.ownedSlot;
++  const oldInstance = cached.instance;
++  const missId = install(bytes, length, key, out_slot, 0);
++  const invalidation = cache.__lastInvalidation;
++  const poisonProof = mutation === "poison"
++      ? invalidation && invalidation.poisoning
++          && !invalidation.cachedExportMatches
++          && invalidation.poisonVisible && !invalidation.oldExportVisible
++          && invalidation.poisonRemoved && !invalidation.poisonCallableAfter
++      : invalidation && invalidation.cachedExportMatches;
++  if (missId >= 0 || !invalidation || !invalidation.removed
++      || invalidation.oldSlot !== oldSlot
++      || invalidation.ownedSlot !== oldOwnedSlot
++      || invalidation.oldInstance !== oldInstance
++      || !poisonProof
++      || invalidation.oldCallableAfter
++      || !invalidation.cleanupProven
++      || !invalidation.metadataCleared
++      || !invalidation.lastInstanceCleared) {
++    return -1;
++  }
++  const freshId = install(bytes, length, key, out_slot, 0);
++  const fresh = cache[metadata];
++  const newSlot = HEAP32[out_slot >> 2];
++  if (freshId < 0 || !fresh || fresh.id === oldId
++      || fresh.instance === oldInstance || fresh.slot !== newSlot
++      || fresh.ownedSlot !== newSlot
++      || fresh.metadata !== metadata || !fresh.binary
++      || fresh.binary.length !== length
++      || !fresh.binary.every((value, i) => value === HEAPU8[bytes + i])) {
++    return -1;
++  }
++  if (typeof err === "function") err(
++      "[zbg] JS_CACHE_MUTATION_PASS ref-array-load mutation=" + mutation
++      + " miss=-1 old-id=" + oldId + " new-id=" + freshId
++      + " old-slot=" + oldSlot + " new-slot=" + newSlot
++      + " old-owned-slot=" + oldOwnedSlot
++      + " slot-reused=" + (oldSlot === newSlot ? "1" : "0")
++      + " old-callable-before=" + (invalidation.oldCallable ? "1" : "0")
++      + " export-match=" + (invalidation.cachedExportMatches ? "1" : "0")
++      + " poisoning=" + (invalidation.poisoning ? "1" : "0")
++      + " poison-visible=" + (invalidation.poisonVisible ? "1" : "0")
++      + " old-export-visible=" + (invalidation.oldExportVisible ? "1" : "0")
++      + " poison-removed=" + (invalidation.poisonRemoved ? "1" : "0")
++      + " poison-callable-after=" + (invalidation.poisonCallableAfter ? "1" : "0")
++      + " old-callable-after=0 removed=1 instance-reused=0"
++      + " cache-cleared=1 last-instance-cleared=1 bytes-exact=1");
++  return freshId;
++});
++
++EM_JS(int, zbb_ref_array_store_install, (const unsigned char* bytes, int length,
++                                         const char* key, int out_slot,
++                                         int dump_bytes, const char* card_layout), {
++  const install = (bytes, length, key, out_slot, dump_bytes, card_layout) => {
++    globalThis.__mcwebZeroRefArrayStoreCache ||= Object.create(null);
++    HEAP32[out_slot >> 2] = -1;
++    const metadata = UTF8ToString(key);
++    const cardLayout = UTF8ToString(card_layout);
++    const compiler = "zero-baseline-abi-v1";
++    const dumpPath = typeof process !== "undefined" && process.env
++        ? process.env.MCWEB_ZERO_REF_ARRAY_STORE_WASM_DUMP : "";
++    const importedMemory = wasmMemory;
++    const memoryBuffer = importedMemory && importedMemory.buffer;
++    const sharedMemory = typeof SharedArrayBuffer !== "undefined"
++        && memoryBuffer instanceof SharedArrayBuffer;
++    const memoryPages = memoryBuffer && memoryBuffer.byteLength / 65536;
++    if (!(importedMemory instanceof WebAssembly.Memory) || !sharedMemory
++        || !Number.isInteger(memoryPages) || memoryPages < 0
++        || memoryPages > 65536) {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array-store install reject=memory-identity-shared-max");
++      return -1;
++    }
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    let digestA = 0x811c9dc5;
++    let digestB = 0x9e3779b9;
++    for (let i = 0; i < binary.length; i++) {
++      digestA = Math.imul(digestA ^ binary[i], 0x01000193) >>> 0;
++      digestB = Math.imul(digestB ^ ((binary[i] + i) & 0xff), 0x85ebca6b) >>> 0;
++    }
++    const digest = digestA.toString(16).padStart(8, "0")
++        + digestB.toString(16).padStart(8, "0");
++    const cache = globalThis.__mcwebZeroRefArrayStoreCache;
++    const cached = cache[metadata];
++    const sameBytes = (left, right) => left instanceof Uint8Array
++        && left.length === right.length
++        && left.every((value, i) => value === right[i]);
++    let cachedExportMatches = false;
++    if (cached) {
++      try {
++        cachedExportMatches = typeof getWasmTableEntry === "function"
++            && getWasmTableEntry(cached.ownedSlot) === cached.export;
++      } catch (error) {
++        cachedExportMatches = false;
++      }
++    }
++    if (cached) {
++      if (cached.compiler !== compiler || cached.digest !== digest
++          || cached.bytes !== length || !sameBytes(cached.binary, binary)
++          || cached.metadata !== metadata || cached.memory !== importedMemory
++          || cached.cardLayout !== cardLayout || !cached.instance
++          || cached.slot < 0 || !Number.isInteger(cached.ownedSlot)
++          || cached.slot !== cached.ownedSlot || !cachedExportMatches) {
++        const poisoning = cache.__pendingPoison === true;
++        const poisonCallable = cache.__poisonCallable;
++        const oldSlot = cached.slot;
++        const oldInstance = cached.instance;
++        const ownedSlot = cached.ownedSlot;
++        let oldCallable = false;
++        let callableProbe = false;
++        let poisonVisible = false;
++        let oldExportVisible = false;
++        try {
++          if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
++          const visible = getWasmTableEntry(ownedSlot);
++          oldCallable = typeof visible === "function";
++          poisonVisible = poisoning && visible === poisonCallable;
++          oldExportVisible = visible === cached.export;
++          callableProbe = true;
++        } catch (error) {
++          oldCallable = false;
++          poisonVisible = false;
++          oldExportVisible = false;
++        }
++        cached.instance = null;
++        cached.slot = -1;
++        cached.binary = null;
++        cached.memory = null;
++        delete cache[metadata];
++        cache.__lastInstance = null;
++        let removed = false;
++        try {
++          if (typeof removeFunction !== "function" || ownedSlot < 0) {
++            throw new Error("missing owned table slot cleanup");
++          }
++          removeFunction(ownedSlot);
++          removed = true;
++        } catch (error) {
++          if (typeof console !== "undefined") console.error(
++              "[zbg] ref-array-store install reject=cache-release " + error);
++        }
++        let oldCallableAfter = false;
++        try {
++          if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
++          oldCallableAfter = typeof getWasmTableEntry(ownedSlot) === "function";
++        } catch (error) {
++          oldCallableAfter = false;
++        }
++        // In the supported poison sequence the owned slot itself is the
++        // poisoned slot. removeFunction(ownedSlot) above therefore removes
++        // exactly one callable; there is no second slot to release.
++        let poisonRemoved = !poisoning || removed;
++        let poisonCallableAfter = false;
++        if (poisoning) {
++          try {
++            if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
++            const after = getWasmTableEntry(ownedSlot);
++            poisonCallableAfter = typeof after === "function"
++                || after === poisonCallable;
++          } catch (error) {
++            poisonCallableAfter = false;
++          }
++        }
++        const cacheIdentityProven = poisoning
++            ? !cachedExportMatches && poisonVisible && !oldExportVisible
++                && poisonRemoved && !poisonCallableAfter
++            : cachedExportMatches;
++        const cleanupProven = removed && callableProbe && oldCallable
++            && cacheIdentityProven && !oldCallableAfter;
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
++        cache.__lastInvalidation = {
++          oldSlot, ownedSlot, oldInstance, oldCallable, cachedExportMatches,
++          oldCallableAfter, removed, poisoning, poisonVisible,
++          oldExportVisible, poisonRemoved, poisonCallableAfter,
++          cleanupProven, metadataCleared: !cache[metadata],
++          lastInstanceCleared: cache.__lastInstance === null
++        };
++        if (!cleanupProven) {
++          if (typeof err === "function") err(
++              "[zbg] JS_CACHE_CLEANUP_UNSUPPORTED ref-array-store "
++              + "detached=1 removed=" + (removed ? "1" : "0")
++              + " table-probe=" + (callableProbe ? "1" : "0")
++              + " old-callable-after=" + (oldCallableAfter ? "1" : "0")
++              + " poisoning=" + (poisoning ? "1" : "0")
++              + " poison-visible=" + (poisonVisible ? "1" : "0")
++              + " poison-removed=" + (poisonRemoved ? "1" : "0")
++              + " poison-callable-after=" + (poisonCallableAfter ? "1" : "0"));
++          return -1;
++        }
++        if (typeof err === "function") err(
++            "[zbg] JS_CACHE_INVALIDATE ref-array-store slot=" + oldSlot
++            + " old-id=" + cached.id
++            + " owned-slot=" + ownedSlot + " removed=" + (removed ? "1" : "0")
++            + " old-callable=" + (oldCallable ? "1" : "0")
++            + " export-match=" + (cachedExportMatches ? "1" : "0")
++            + " old-callable-after=" + (oldCallableAfter ? "1" : "0")
++            + " poisoning=" + (poisoning ? "1" : "0")
++            + " poison-visible=" + (poisonVisible ? "1" : "0")
++            + " old-export-visible=" + (oldExportVisible ? "1" : "0")
++            + " poison-removed=" + (poisonRemoved ? "1" : "0")
++            + " poison-callable-after=" + (poisonCallableAfter ? "1" : "0")
++            + " instance-cleared=1 cache-cleared=1 last-instance-cleared=1");
++        return -1;
++      }
++      HEAP32[out_slot >> 2] = cached.slot;
++      if (typeof err === "function") {
++        const sameInstance = cached.instance === cache.__lastInstance;
++        err("[zbg] JS_CACHE_HIT ref-array-store id=" + cached.id
++            + " slot=" + cached.slot + " instance-reused="
++            + (sameInstance ? "1" : "0") + " memory-reused="
++            + (cached.memory === importedMemory ? "1" : "0")
++            + " compiler=" + cached.compiler + " digest=" + cached.digest
++            + " bytes-exact=1 card-layout-exact=1 export-match=1");
++      }
++      cache.__lastInstance = cached.instance;
++      return cached.id;
++    }
++    let installedSlot = -1;
++    try {
++      if (dump_bytes) {
++        const fs = typeof require === "function" ? require("fs") : null;
++        if (!fs || typeof Buffer === "undefined" || typeof dumpPath !== "string"
++            || dumpPath.length === 0) {
++          throw new Error("missing unique ref-array-store dump path");
++        }
++        // wx makes stale-path reuse fail closed; the gate supplies a fresh
++        // path under its per-run work directory through the environment.
++        fs.writeFileSync(dumpPath, Buffer.from(binary), { flag: "wx" });
++      }
++      if (!WebAssembly.validate(binary)) {
++        if (typeof console !== "undefined") console.error(
++            "[zbg] ref-array-store install reject=validate");
++        return -1;
++      }
++      const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
++        env: { memory: wasmMemory }
++      });
++      const exportedStore = instance.exports.referenceArrayStore;
++      if (typeof exportedStore !== "function") {
++        if (typeof console !== "undefined") console.error(
++            "[zbg] ref-array-store install reject=missing-export");
++        return -1;
++      }
++      if (typeof addFunction !== "function" || typeof removeFunction !== "function") {
++        if (typeof console !== "undefined") console.error(
++            "[zbg] ref-array-store install reject=missing-table-primitives");
++        return -1;
++      }
++      installedSlot = addFunction(exportedStore, "jiiiiii");
++      if (!Number.isInteger(installedSlot) || installedSlot < 0) {
++        if (typeof console !== "undefined") console.error(
++            "[zbg] ref-array-store install reject=invalid-slot");
++        return -1;
++      }
++      const id = cache.__nextId || 1;
++      cache.__nextId = id + 1;
++      cache[metadata] = {
++        id, metadata, bytes: length, binary, instance, slot: installedSlot,
++        compiler, digest, memory: importedMemory, memoryPages, cardLayout,
++      };
++      Object.defineProperty(cache[metadata], "export", {
++        value: exportedStore, writable: false, configurable: false, enumerable: true
++      });
++      Object.defineProperty(cache[metadata], "ownedSlot", {
++        value: installedSlot, writable: false, configurable: false, enumerable: true
++      });
++      cache.__lastInstance = instance;
++      HEAP32[out_slot >> 2] = installedSlot;
++      if (typeof err === "function") {
++        err("[zbg] JS_INSTALL ref-array-store exports=1 id=" + id
++            + " slot=" + installedSlot
++            + " bytes=" + length + " compiler=" + compiler
++            + " digest=" + digest + " memory=shared max-pages=65536"
++            + " card-layout=" + cardLayout);
++      }
++      return id;
++    } catch (error) {
++      if (installedSlot >= 0 && typeof removeFunction === "function") {
++        try { removeFunction(installedSlot); } catch (releaseError) {
++          if (typeof console !== "undefined") console.error(
++              "[zbg] ref-array-store install reject=cache-release " + releaseError);
++        }
++      }
++      const failed = cache[metadata];
++      if (failed && failed.slot === installedSlot) {
++        delete cache[metadata];
++        cache.__lastInstance = null;
++      }
++      HEAP32[out_slot >> 2] = -1;
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array-store install reject=exception " + error);
++      return -1;
++    }
++  };
++  globalThis.__mcwebZeroRefArrayStoreInstall = install;
++  return install(bytes, length, key, out_slot, dump_bytes, card_layout);
++});
++
++EM_JS(int, zbb_ref_array_store_cache_mutation, (const unsigned char* bytes,
++                                                int length, const char* key,
++                                                int out_slot, int dump_bytes,
++                                                const char* card_layout,
++                                                const char* mutation_name), {
++  const mutation = UTF8ToString(mutation_name);
++  const metadata = UTF8ToString(key);
++  const cardLayout = UTF8ToString(card_layout);
++  const cache = globalThis.__mcwebZeroRefArrayStoreCache;
++  const cached = cache && cache[metadata];
++  const install = globalThis.__mcwebZeroRefArrayStoreInstall;
++  HEAP32[out_slot >> 2] = -1;
++  if (!cached || typeof install !== "function") return -1;
++  // Cache validation must be anchored to this invocation's actual input and
++  // imported memory, never to mutable fields on the old cache record. Compute
++  // these values before touching that record so every replacement check has a
++  // wrapper-owned reference to compare against.
++  const expectedBinary = HEAPU8.slice(bytes, bytes + length);
++  let expectedDigestA = 0x811c9dc5;
++  let expectedDigestB = 0x9e3779b9;
++  for (let i = 0; i < expectedBinary.length; i++) {
++    expectedDigestA = Math.imul(expectedDigestA ^ expectedBinary[i], 0x01000193) >>> 0;
++    expectedDigestB = Math.imul(
++        expectedDigestB ^ ((expectedBinary[i] + i) & 0xff), 0x85ebca6b) >>> 0;
++  }
++  const expectedDigest = expectedDigestA.toString(16).padStart(8, "0")
++      + expectedDigestB.toString(16).padStart(8, "0");
++  const expectedMemory = wasmMemory;
++  const expectedMemoryBuffer = expectedMemory && expectedMemory.buffer;
++  const expectedMemoryPages = expectedMemoryBuffer
++      && expectedMemoryBuffer.byteLength / 65536;
++  const freshValidationMode = mutation === "selftest-fresh-false"
++      || mutation === "selftest-fresh-throw" ? mutation : "normal";
++  cache.__lastInvalidation = null;
++  cache.__pendingPoison = false;
++  cache.__poisonCallable = null;
++  switch (mutation) {
++    case "compiler": cached.compiler = "mutated-compiler"; break;
++    case "digest": cached.digest = "deadbeefdeadbeef"; break;
++    case "bytes":
++      cached.binary = cached.binary.slice();
++      cached.binary[0] ^= 1;
++      break;
++    case "slot": cached.slot = cached.ownedSlot + 1; break;
++    case "memory":
++      try {
++        cached.memory = new WebAssembly.Memory({initial: 0, maximum: 65536,
++                                                shared: true});
++      } catch (error) {
++        return -1;
++      }
++      break;
++    case "metadata": cached.metadata = metadata + "#mutated"; break;
++    case "card-layout": cached.cardLayout = cardLayout + "#mutated"; break;
++    // These bounded diagnostics deliberately use the same ordinary cache
++    // invalidation path as a real mutation, then force the replacement
++    // validator to return false or throw. They are self-test modes, not
++    // members of the accepted eight-entry cache matrix.
++    case "selftest-fresh-false":
++    case "selftest-fresh-throw":
++      cached.compiler = "mutated-compiler";
++      break;
++    case "poison": {
++      let originalRemoved = false;
++      let allocatedPoisonSlot = -1;
++      try {
++        if (typeof addFunction !== "function"
++            || typeof getWasmTableEntry !== "function"
++            || typeof removeFunction !== "function"
++            || !Number.isInteger(cached.ownedSlot) || cached.ownedSlot < 0) {
++          throw new Error("missing callable table poison primitives");
++        }
++        const original = getWasmTableEntry(cached.ownedSlot);
++        if (typeof original !== "function") {
++          throw new Error("owned table slot is not callable");
++        }
++        // Emscripten's supported table API is the only mutation surface. The
++        // allocator must recycle the exact owned slot after its original
++        // callable is removed; otherwise this diagnostic is unsupported and
++        // fails closed without touching an unrelated table entry.
++        removeFunction(cached.ownedSlot);
++        originalRemoved = true;
++        const originalAfter = getWasmTableEntry(cached.ownedSlot);
++        if (typeof originalAfter === "function" || originalAfter === original) {
++          throw new Error("owned callable was not removed");
++        }
++        const poisoned = (...args) => 0n;
++        allocatedPoisonSlot = addFunction(poisoned, "jiiiiii");
+         const poisonCallable = getWasmTableEntry(allocatedPoisonSlot);
+         if (allocatedPoisonSlot !== cached.ownedSlot
+             || typeof poisonCallable !== "function"
+@@ -2280,10 +3108,12 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+         cache.__poisonCallable = poisonCallable;
+         cache.__pendingPoison = true;
+       } catch (error) {
+-        // Poison setup is transactional. If allocation or exact-slot reuse
+-        // fails after removing the original, remove the allocated poison once
+-        // and quarantine the detached cache record; never leave stale
+-        // metadata or a callable cache entry for a later hit.
++        // Poison setup is a transaction. If allocator reuse or table identity
++        // probing fails after the original callable was removed, release any
++        // newly allocated poison exactly once and quarantine the detached
++        // cache record. The C++ caller already holds out_slot=-1 and will
++        // clear its module/slot state on this failure; no stale JS metadata
++        // may make a later cache hit callable.
+         let poisonCleanup = allocatedPoisonSlot < 0;
+         if (allocatedPoisonSlot >= 0 && typeof removeFunction === "function") {
+           try {
+@@ -2292,7 +3122,7 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+             poisonCleanup = typeof poisonAfter !== "function";
+           } catch (cleanupError) {
+             if (typeof console !== "undefined") console.error(
+-                "[zbg] ref-array-load cache poison cleanup reject " + cleanupError);
++                "[zbg] ref-array-store cache poison cleanup reject " + cleanupError);
+           }
+         }
+         if (originalRemoved) {
+@@ -2319,7 +3149,7 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+           lastInstanceCleared: cache.__lastInstance === null
+         };
+         if (typeof console !== "undefined") console.error(
+-            "[zbg] ref-array-load cache poison reject " + error
++            "[zbg] ref-array-store cache poison reject " + error
+             + " original-removed=" + (originalRemoved ? "1" : "0")
+             + " poison-slot=" + allocatedPoisonSlot
+             + " poison-cleanup=" + (poisonCleanup ? "1" : "0")
+@@ -2337,7 +3167,7 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+   const oldSlot = cached.slot;
+   const oldOwnedSlot = cached.ownedSlot;
+   const oldInstance = cached.instance;
+-  const missId = install(bytes, length, key, out_slot, 0);
++  const missId = install(bytes, length, key, out_slot, dump_bytes, card_layout);
+   const invalidation = cache.__lastInvalidation;
+   const poisonProof = mutation === "poison"
+       ? invalidation && invalidation.poisoning
+@@ -2350,25 +3180,131 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+       || invalidation.ownedSlot !== oldOwnedSlot
+       || invalidation.oldInstance !== oldInstance
+       || !poisonProof
+-      || invalidation.oldCallableAfter
+-      || !invalidation.cleanupProven
+-      || !invalidation.metadataCleared
+-      || !invalidation.lastInstanceCleared) {
++      || invalidation.oldCallableAfter || !invalidation.cleanupProven
++      || !invalidation.metadataCleared || !invalidation.lastInstanceCleared) {
+     return -1;
+   }
+-  const freshId = install(bytes, length, key, out_slot, 0);
+-  const fresh = cache[metadata];
++  const freshId = install(bytes, length, key, out_slot, dump_bytes, card_layout);
+   const newSlot = HEAP32[out_slot >> 2];
+-  if (freshId < 0 || !fresh || fresh.id === oldId
+-      || fresh.instance === oldInstance || fresh.slot !== newSlot
+-      || fresh.ownedSlot !== newSlot
+-      || fresh.metadata !== metadata || !fresh.binary
+-      || fresh.binary.length !== length
+-      || !fresh.binary.every((value, i) => value === HEAPU8[bytes + i])) {
++  let fresh = null;
++  let freshValid = false;
++  try {
++    fresh = cache[metadata];
++    if (freshValidationMode === "selftest-fresh-throw") {
++      throw new Error("selftest-fresh-throw");
++    }
++    const freshCallableMatches = fresh != null
++        && typeof getWasmTableEntry === "function"
++        && Number.isInteger(newSlot) && newSlot >= 0
++        && getWasmTableEntry(newSlot) === fresh.export;
++    const freshBinaryExact = !!fresh && fresh.binary instanceof Uint8Array
++        && fresh.binary.length === expectedBinary.length
++        && fresh.binary.every((value, i) => value === expectedBinary[i]);
++    freshValid = freshId >= 0 && !!fresh && fresh.id !== oldId
++        && fresh.instance !== oldInstance && fresh.slot === newSlot
++        && fresh.ownedSlot === newSlot && fresh.metadata === metadata
++        && fresh.compiler === "zero-baseline-abi-v1"
++        && fresh.digest === expectedDigest && fresh.bytes === expectedBinary.length
++        && fresh.memory === expectedMemory
++        && Number.isInteger(fresh.memoryPages)
++        && fresh.memoryPages === expectedMemoryPages
++        && freshCallableMatches && fresh.cardLayout === cardLayout
++        && freshBinaryExact;
++    if (freshValidationMode === "selftest-fresh-false") freshValid = false;
++  } catch (error) {
++    freshValid = false;
++  }
++  if (!freshValid) {
++    // A fresh replacement is a transaction too. If validation fails after
++    // install, remove only the fresh record's immutable ownedSlot exactly
++    // once, prove its table entry is gone, and quarantine all JS state before
++    // returning failure. Never remove oldOwnedSlot a second time: it was
++    // already released by the preceding invalidation and the allocator may
++    // have legitimately recycled that number for this fresh instance.
++    let freshOwnedSlot = -1;
++    try {
++      freshOwnedSlot = fresh && Number.isInteger(fresh.ownedSlot)
++          ? fresh.ownedSlot : -1;
++    } catch (error) {
++      freshOwnedSlot = -1;
++    }
++    let freshCallableBefore = false;
++    let freshCallableProbeBefore = false;
++    let freshRemoved = false;
++    let freshCallableAfter = false;
++    let freshCallableProbeAfter = false;
++    let freshRemovalAttempted = false;
++    let freshCleanupProven = fresh == null && freshId < 0 && newSlot < 0;
++    try {
++      if (freshOwnedSlot >= 0 && typeof getWasmTableEntry === "function") {
++        freshCallableBefore = typeof getWasmTableEntry(freshOwnedSlot) === "function";
++        freshCallableProbeBefore = true;
++      }
++      if (freshOwnedSlot >= 0 && typeof removeFunction === "function"
++          && !freshRemovalAttempted) {
++        freshRemovalAttempted = true;
++        removeFunction(freshOwnedSlot);
++        freshRemoved = true;
++        if (typeof getWasmTableEntry !== "function") {
++          throw new Error("missing fresh table probe");
++        }
++        freshCallableAfter = typeof getWasmTableEntry(freshOwnedSlot) === "function";
++        freshCallableProbeAfter = true;
++        freshCleanupProven = freshCallableBefore && freshCallableProbeBefore
++            && freshCallableProbeAfter && !freshCallableAfter;
++      }
++    } catch (error) {
++      freshCleanupProven = false;
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array-store fresh-cache cleanup reject " + error);
++    }
++    try {
++      if (fresh) {
++        fresh.slot = -1;
++        fresh.instance = null;
++        fresh.binary = null;
++        fresh.memory = null;
++        fresh.export = null;
++      }
++      const residual = cache[metadata];
++      if (residual && residual !== fresh) {
++        residual.slot = -1;
++        residual.instance = null;
++        residual.binary = null;
++        residual.memory = null;
++        residual.export = null;
++      }
++      delete cache[metadata];
++    } catch (error) {
++      freshCleanupProven = false;
++    }
++    cache.__lastInstance = null;
++    cache.__pendingPoison = false;
++    cache.__poisonCallable = null;
++    HEAP32[out_slot >> 2] = -1;
++    cache.__lastInvalidation = {
++      freshCleanup: true, freshId, freshOwnedSlot, freshCallableBefore,
++      freshCallableProbeBefore, freshRemoved, freshRemovalAttempted,
++      freshCallableAfter, freshCallableProbeAfter, freshCleanupProven,
++      metadataCleared: !cache[metadata], lastInstanceCleared: true
++    };
++    if (typeof err === "function") err(
++        "[zbg] JS_CACHE_FRESH_REJECT ref-array-store fresh-id=" + freshId
++        + " validation=" + freshValidationMode
++        + " fresh-slot=" + freshOwnedSlot
++        + " removed=" + (freshRemoved ? "1" : "0")
++        + " removal-attempted=" + (freshRemovalAttempted ? "1" : "0")
++        + " callable-before=" + (freshCallableBefore ? "1" : "0")
++        + " callable-after=" + (freshCallableAfter ? "1" : "0")
++        + " callable-probe-before=" + (freshCallableProbeBefore ? "1" : "0")
++        + " callable-probe-after=" + (freshCallableProbeAfter ? "1" : "0")
++        + " cleanup-proven=" + (freshCleanupProven ? "1" : "0")
++        + " metadata-cleared=" + (!cache[metadata] ? "1" : "0")
++        + " last-instance-cleared=1");
+     return -1;
+   }
+   if (typeof err === "function") err(
+-      "[zbg] JS_CACHE_MUTATION_PASS ref-array-load mutation=" + mutation
++      "[zbg] JS_CACHE_MUTATION_PASS ref-array-store mutation=" + mutation
+       + " miss=-1 old-id=" + oldId + " new-id=" + freshId
+       + " old-slot=" + oldSlot + " new-slot=" + newSlot
+       + " old-owned-slot=" + oldOwnedSlot
+@@ -2381,7 +3317,7 @@ EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
+       + " poison-removed=" + (invalidation.poisonRemoved ? "1" : "0")
+       + " poison-callable-after=" + (invalidation.poisonCallableAfter ? "1" : "0")
+       + " old-callable-after=0 removed=1 instance-reused=0"
+-      + " cache-cleared=1 last-instance-cleared=1 bytes-exact=1");
++      + " cache-cleared=1 last-instance-cleared=1 bytes-exact=1 card-layout-exact=1");
+   return freshId;
+ });
+ 
+@@ -2515,6 +3451,93 @@ static bool install_linked_ref_array_load(const LinkedRefArrayLayout& layout,
+       && _linked_ref_array_slot >= 0;
+ }
+ 
++static bool install_linked_ref_array_store(
++    const LinkedRefArrayStoreLayout& layout, int aastore_bci,
++    int load_value_bci) {
++  if (ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr
++      || _linked_ref_array_store_module_id >= 0) {
++    return _linked_ref_array_store_module_id >= 0;
++  }
++  char key[3072];
++  char card_layout[256];
++  int card_written = jio_snprintf(
++      card_layout, sizeof(card_layout),
++      "card-base=%u;card-shift=%d;clean-card=%d;dirty-card=%d",
++      (unsigned)(uint32_t)layout.card_base, layout.card_shift,
++      layout.clean_card, layout.dirty_card);
++  if (card_written <= 0 || card_written >= (int)sizeof(card_layout)) return false;
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-ref-array-store-v1;compiler=%s;class=ZeroReferenceArrayStoreFixture;"
++      "method=referenceArrayStore([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;"
++      ";aastore-bci=%d;value-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
++      "features=wasm32-i32-i64-linear-memory-status;array-mode=ref-store-checked;"
++      "exports=1;slot=separate;collector=serial;compressed-oops=0;"
++      "compressed-class-pointers=0;compact-headers=0;pointer-bytes=%d;oop-bytes=%d;"
++      "heap-oop-bytes=%d;length-offset=%d;base-offset=%d;element-size=%d;"
++      "card-layout=%s;memory=shared;memory-max-pages=65536;memory-mode=active-min-override;"
++      "memory-limit-pages=%lld",
++      kCompilerVersion, aastore_bci, load_value_bci, ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
++      (int)sizeof(void*), (int)sizeof(oop), heapOopSize,
++      layout.length_offset, layout.base_offset, layout.element_size,
++      card_layout, (long long)ZeroWasmLinkedRefArrayStoreMemoryLimitForTest);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++
++  WasmBuf module;
++  int length = build_linked_ref_array_store_module(module, layout, aastore_bci);
++  if (length <= 0) return false;
++  _linked_ref_array_store_module_id = zbb_ref_array_store_install(
++      module.data(), length, key, (int)(intptr_t)&_linked_ref_array_store_slot,
++      ZeroWasmLinkedGroupVerbose ? 1 : 0, card_layout);
++  if (_linked_ref_array_store_module_id < 0) {
++    _linked_ref_array_store_slot = -1;
++    return false;
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    int cached_slot = -1;
++    int cached_id = zbb_ref_array_store_install(
++        module.data(), length, key, (int)(intptr_t)&cached_slot, 0, card_layout);
++    if (cached_id != _linked_ref_array_store_module_id
++        || cached_slot != _linked_ref_array_store_slot) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_CACHE_REJECT first-id=%d hit-id=%d "
++                    "first-slot=%d hit-slot=%d",
++                    _linked_ref_array_store_module_id, cached_id,
++                    _linked_ref_array_store_slot, cached_slot);
++      _linked_ref_array_store_module_id = -1;
++      _linked_ref_array_store_slot = -1;
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedRefArrayStoreCacheMutationForTest != nullptr) {
++    const int fresh_id = zbb_ref_array_store_cache_mutation(
++        module.data(), length, key, (int)(intptr_t)&_linked_ref_array_store_slot,
++        0, card_layout, ZeroWasmLinkedRefArrayStoreCacheMutationForTest);
++    _linked_ref_array_store_module_id = fresh_id;
++    if (fresh_id < 0) {
++      _linked_ref_array_store_slot = -1;
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REF_ARRAY_STORE_MODULE_KEY abi=referenceArrayStore:"
++                  "([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;"
++                  "->(i32,i32,i32,i32,i32,i32)->i64 exports=1 slot=%d "
++                  "collector=serial compressed-oops=0 compressed-class-pointers=0 "
++                  "compact-headers=0 pointer-bytes=%d oop-bytes=%d heap-oop-bytes=%d "
++                  "length-offset=%d base-offset=%d element-size=%d "
++                  "card-base=%u card-shift=%d clean-card=%d dirty-card=%d bytes=%d",
++                  _linked_ref_array_store_slot, (int)sizeof(void*), (int)sizeof(oop),
++                  heapOopSize, layout.length_offset, layout.base_offset,
++                  layout.element_size, (unsigned)(uint32_t)layout.card_base,
++                  layout.card_shift, layout.clean_card, layout.dirty_card, length);
++  }
++  return _linked_ref_array_store_module_id >= 0
++      && _linked_ref_array_store_slot >= 0;
++}
++
+ EM_JS(int, zbb_benchmark_install, (const unsigned char* bytes, int length,
+                                    const char* key, int out_slots,
+                                    int dump_bytes), {
+@@ -2603,6 +3626,8 @@ static THREAD_LOCAL uint64_t _linked_array_store_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_array_store_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_ref_array_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_ref_array_resume_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_ref_array_store_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_ref_array_store_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ static THREAD_LOCAL int _benchmark_module_id = -1;
+@@ -2617,6 +3642,7 @@ typedef jlong (*ZbgOneArg)(jint);
+ typedef jlong (*ZbgTwoArg)(jint, jint);
+ typedef jlong (*ZbgThreeArg)(jint, jint, jint);
+ typedef jlong (*ZbgFourArg)(jint, jint, jint, jint);
++typedef jlong (*ZbgSixArg)(jint, jint, jint, jint, jint, jint);
+ 
+ struct LinkedStatus {
+   int status;
+@@ -2668,6 +3694,14 @@ static jlong linked_ref_array_load_call(jint array, jint index,
+       array, index, memory_limit_pages);
+ }
+ 
++static jlong linked_ref_array_store_call(jint array, jint index, jint value,
++                                         jint memory_limit_pages,
++                                         jint live_card_base, jint assignable) {
++  _linked_calls++;
++  return ((ZbgSixArg)(intptr_t)_linked_ref_array_store_slot)(
++      array, index, value, memory_limit_pages, live_card_base, assignable);
++}
++
+ static jlong benchmark_table_call2(int slot, jint first, jint second) {
+   _benchmark_table_calls++;
+   return ((ZbgTwoArg)(intptr_t)slot)(first, second);
+@@ -2807,6 +3841,7 @@ enum LinkedMethodKind {
+   LinkedIntArrayLoadMethod,
+   LinkedIntArrayStoreMethod,
+   LinkedRefArrayLoadMethod,
++  LinkedRefArrayStoreMethod,
+   LinkedBenchPrimCandidateMethod,
+   LinkedBenchPrimReferenceMethod,
+   LinkedBenchDispatchCandidateMethod,
+@@ -2948,6 +3983,180 @@ static bool linked_ref_array_load_shape(Method* method, int* aaload_bci,
+   return *aaload_bci == 2 && *return_bci == 3;
+ }
+ 
++static bool linked_ref_array_store_shape(Method* method, int* aastore_bci,
++                                         int* load_value_bci,
++                                         int* return_bci) {
++  if (!reference_array_store_fixture_class(method) || method->is_native()
++      || method->is_synchronized() || !method->is_static()
++      || method->result_type() != T_OBJECT || method->code_size() != 6
++      || method->verifier_max_stack() != 3 || method->max_locals() != 3
++      || method->size_of_parameters() != 3
++      || method->has_exception_handler() || aastore_bci == nullptr
++      || load_value_bci == nullptr || return_bci == nullptr
++      || !method->name()->equals("referenceArrayStore")
++      || !method->signature()->equals(
++          "([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;")) {
++    return false;
++  }
++  static const unsigned char expected[] = {
++      (unsigned char)Bytecodes::_aload_0,
++      (unsigned char)Bytecodes::_iload_1,
++      (unsigned char)Bytecodes::_aload_2,
++      (unsigned char)Bytecodes::_aastore,
++      (unsigned char)Bytecodes::_aload_2,
++      (unsigned char)Bytecodes::_areturn};
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if ((code[0] != expected[0] && code[0] != (unsigned char)Bytecodes::_fast_aload_0)
++      || memcmp(code + 1, expected + 1, sizeof(expected) - 1) != 0) {
++    return false;
++  }
++  *aastore_bci = first_opcode(method, (unsigned char)Bytecodes::_aastore);
++  // The first aload_2 is the value consumed by aastore's input stack.  The
++  // linked return operand must be the exact reload after aastore, not a broad
++  // first-opcode search that can bind BCI 2 by accident.
++  *load_value_bci = -1;
++  for (int bci = *aastore_bci + 1; bci < method->code_size(); bci++) {
++    if (code[bci] == (unsigned char)Bytecodes::_aload_2) {
++      *load_value_bci = bci;
++      break;
++    }
++  }
++  *return_bci = first_opcode(method, (unsigned char)Bytecodes::_areturn);
++  return *aastore_bci == 3 && *load_value_bci == 4 && *return_bci == 5;
++}
++
++static bool linked_ref_array_store_card_probe_shape(Method* method,
++                                                     int* return_bci) {
++  if (!reference_array_store_fixture_class(method) || method->is_native()
++      || method->is_synchronized() || !method->is_static()
++      || (method->result_type() != T_OBJECT && method->result_type() != T_ARRAY)
++      || method->code_size() != 2
++      || method->verifier_max_stack() != 1 || method->max_locals() != 1
++      || method->size_of_parameters() != 1 || method->has_exception_handler()
++      || return_bci == nullptr
++      || !method->name()->equals("prepareReferenceArrayStoreCardProbe")
++      || !method->signature()->equals(
++          "([Ljava/lang/Object;)[Ljava/lang/Object;")) {
++    return false;
++  }
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if (code[0] != (unsigned char)Bytecodes::_aload_0
++      && code[0] != (unsigned char)Bytecodes::_fast_aload_0) {
++    return false;
++  }
++  if (code[1] != (unsigned char)Bytecodes::_areturn) {
++    return false;
++  }
++  *return_bci = 1;
++  return true;
++}
++
++// Dedicated root/card evidence setup. This is not the production store
++// transaction: it accepts only a large, fully null, already-old Object[] and
++// binds scalar identity/address facts for one widened-bounds-proven interior
++// card. It does not mutate the card across the Java return/allocation gap.
++// The following candidate store revalidates the exact array, index, span, and
++// card byte in one no-safepoint interval immediately before Wasm.
++static ZeroWasmBaseline::Result run_linked_ref_array_store_card_probe_setup(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmLinkedRefArrayStore
++      || !ZeroWasmLinkedRefArrayStoreCardProbeForTest || istate == nullptr
++      || istate->thread()->has_pending_exception()) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  int return_bci = -1;
++  if (!linked_ref_array_store_card_probe_shape(method, &return_bci)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (locals == nullptr || code_base == nullptr || pc == nullptr || *pc == nullptr
++      || tos == nullptr || *tos == nullptr
++      || !linked_validate_pre_push(istate, *tos, 1)
++      || _linked_ref_array_store_card_probe_pending) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  LinkedRefArrayStoreLayout layout;
++  if (!linked_ref_array_store_layout_for_fixture(&layout)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  bool ready = false;
++  bool array_old = false;
++  bool all_null = false;
++  bool card_clean = false;
++  int probe_index = -1;
++  int array_length = -1;
++  uintptr_t array_bits = 0;
++  uintptr_t card_address_bits = 0;
++  int span_kind = 0;
++  {
++    NoSafepointVerifier nsv;
++    oop array = cast_to_oop((void*)locals[0]);
++    if (array != nullptr && array->klass() != nullptr
++        && array->klass()->is_objArray_klass()) {
++      array_length = objArrayOop(array)->length();
++      BarrierSet* barrier = BarrierSet::barrier_set();
++      CardTableBarrierSet* card_barrier =
++          barrier != nullptr && barrier->is_a(BarrierSet::CardTableBarrierSet)
++              ? static_cast<CardTableBarrierSet*>(barrier) : nullptr;
++      CardTable* card_table = card_barrier == nullptr
++          ? nullptr : card_barrier->card_table();
++      array_old = card_table != nullptr && !card_table->is_in_young(array);
++      all_null = array_length >= 1024;
++      if (all_null) {
++        for (int i = 0; i < array_length; i++) {
++          if (objArrayOop(array)->obj_at(i) != nullptr) {
++            all_null = false;
++            break;
++          }
++        }
++      }
++      if (array_old && all_null) {
++        probe_index = array_length / 2;
++        CardTable::CardValue* card = nullptr;
++        if (linked_ref_array_card_span_proven(
++                layout, array, probe_index, array_length, &card, &span_kind)
++            && card != nullptr) {
++          // The setup helper must observe a naturally clean card, rather than
++          // carrying a raw pointer or an old byte through Java allocation.
++          // A future layout that cannot provide this invariant is rejected.
++          card_clean = (int)*card == layout.clean_card;
++          ready = card_clean;
++          if (ready) card_address_bits = (uintptr_t)card;
++        }
++      }
++      array_bits = (uintptr_t)array;
++      if (ready) {
++        _linked_ref_array_store_card_probe_pending = true;
++        _linked_ref_array_store_card_probe_index = probe_index;
++        _linked_ref_array_store_card_probe_array_bits = array_bits;
++        _linked_ref_array_store_card_probe_address_bits = card_address_bits;
++        _linked_ref_array_store_card_probe_length = array_length;
++        _linked_ref_array_store_card_probe_span_kind = span_kind;
++        linked_publish_ref_store_return_infallible(
++            istate, tos, pc, code_base + return_bci, array);
++      }
++    }
++  }
++  if (!ready) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_CARD_PROBE_REJECT array-old=%d "
++                    "all-null=%d length=%d", array_old ? 1 : 0,
++                    all_null ? 1 : 0, array_length);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REF_ARRAY_STORE_CARD_PROBE_SETUP array-bits=%u "
++                  "card-address=%u length=%d index=%d array-old=1 all-null=1 "
++                  "card-clean=%d span-kind=%d prepared=1 pending=1",
++                  (unsigned)(uint32_t)array_bits,
++                  (unsigned)(uint32_t)card_address_bits, array_length,
++                  probe_index, card_clean ? 1 : 0, span_kind);
++  }
++  return ZeroWasmBaseline::Returned;
++}
++
+ static bool linked_int_array_store_code_shape(Method* method, int* iastore_bci,
+                                               int* return_bci) {
+   if (method == nullptr || method->code_size() != 6
+@@ -3107,7 +4316,9 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* throw_handler_bci,
+                                              int* int_array_bci,
+                                              int* int_array_store_bci,
+-                                             int* ref_array_bci) {
++                                             int* ref_array_bci,
++                                             int* ref_array_store_bci,
++                                             int* ref_array_store_value_bci) {
+   if (reference_array_fixture_class(method)) {
+     if (UseZeroWasmLinkedRefArrayLoad
+         && linked_ref_array_load_shape(method, ref_array_bci, return_bci)) {
+@@ -3115,6 +4326,15 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     }
+     return LinkedNoMethod;
+   }
++  if (reference_array_store_fixture_class(method)) {
++    if (UseZeroWasmLinkedRefArrayStore
++        && linked_ref_array_store_shape(method, ref_array_store_bci,
++                                        ref_array_store_value_bci,
++                                        return_bci)) {
++      return LinkedRefArrayStoreMethod;
++    }
++    return LinkedNoMethod;
++  }
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -3401,6 +4621,66 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+   return !istate->thread()->has_pending_exception();
+ }
+ 
++// These publication helpers are intentionally non-fallible at their call
++// sites. The caller reserves the complete stack range before entering the
++// no-safepoint interval; once the Wasm store has happened, a failed state
++// publication is a VM invariant violation, never permission to reexecute.
++// Keep this path separate from linked_prepare_state(): that helper is a
++// fallible pre-side-effect transaction used by the older lanes and may emit a
++// rejection diagnostic.  Reference-store publication is already committed,
++// so it must validate and publish or fail-stop without a fallback branch.
++static void linked_prepare_state_infallible(
++    interpreterState istate, intptr_t** tos, address* pc, address resume_pc,
++    int depth) {
++  assert(istate != nullptr && tos != nullptr && *tos != nullptr
++             && resume_pc != nullptr && depth > 0,
++         "prevalidated reference-store publication arguments");
++  if (istate == nullptr || tos == nullptr || *tos == nullptr
++      || pc == nullptr || resume_pc == nullptr || depth <= 0
++      || *tos < istate->stack_limit() || *tos >= istate->stack_base()
++      || istate->stack_base() - *tos <= depth
++      || istate->thread()->has_pending_exception()) {
++    fatal("ZeroWasm reference-array store publication invariant failed");
++  }
++  *pc = resume_pc;
++  istate->set_stack(*tos);
++  istate->set_bcp(*pc);
++  istate->set_msg(BytecodeInterpreter::no_request);
++  istate->set_callee(nullptr);
++  istate->set_callee_entry_point(nullptr);
++  istate->set_bcp_advance(0);
++}
++
++static void linked_publish_ref_store_return_infallible(
++    interpreterState istate, intptr_t** tos, address* pc, address resume_pc,
++    oop value) {
++  assert(istate != nullptr && tos != nullptr && *tos != nullptr,
++         "prevalidated reference-store return state");
++  if (istate == nullptr || tos == nullptr || *tos == nullptr
++      || *tos < istate->stack_limit() || *tos >= istate->stack_base()
++      || *tos - istate->stack_limit() < 1) {
++    fatal("ZeroWasm reference-array store result stack became invalid");
++  }
++  push_oop(tos, value);
++  linked_prepare_state_infallible(istate, tos, pc, resume_pc, 1);
++}
++
++static void linked_publish_ref_store_reexecute_infallible(
++    interpreterState istate, intptr_t** tos, address* pc, address resume_pc,
++    oop array, jint index, oop value) {
++  assert(istate != nullptr && tos != nullptr && *tos != nullptr,
++         "prevalidated reference-store reexecute state");
++  if (istate == nullptr || tos == nullptr || *tos == nullptr
++      || *tos < istate->stack_limit() || *tos >= istate->stack_base()
++      || *tos - istate->stack_limit() < 3) {
++    fatal("ZeroWasm reference-array store reexecute stack became invalid");
++  }
++  push_oop(tos, array);
++  push_int(tos, index);
++  push_oop(tos, value);
++  linked_prepare_state_infallible(istate, tos, pc, resume_pc, 3);
++}
++
+ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci,
+                                  int dispatch_bci, int throw_invoke_bci,
+                                  const LinkedOopLayout* oop_layout,
+@@ -3629,12 +4909,15 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+   int unused_int_array_bci = -1;
+   int unused_int_array_store_bci = -1;
+   int unused_ref_array_bci = -1;
++  int unused_ref_array_store_bci = -1;
++  int unused_ref_array_store_value_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(
+       method, &unused_virtual_bci, &unused_safe_div_bci,
+       &unused_safe_div_handler_bci, &return_bci, &unused_alloc_bci,
+       &unused_init_bci, &unused_dispatch_bci, &unused_throw_invoke_bci,
+       &unused_throw_handler_bci, &unused_int_array_bci,
+-      &unused_int_array_store_bci, &unused_ref_array_bci);
++      &unused_int_array_store_bci, &unused_ref_array_bci,
++      &unused_ref_array_store_bci, &unused_ref_array_store_value_bci);
+   bool primitive = kind == LinkedBenchPrimCandidateMethod
+       || kind == LinkedBenchPrimReferenceMethod;
+   bool dispatch = kind == LinkedBenchDispatchCandidateMethod
+@@ -3984,6 +5267,401 @@ static ZeroWasmBaseline::Result run_linked_ref_array_load(
+   return ZeroWasmBaseline::OpcodeResume;
+ }
+ 
++static ZeroWasmBaseline::Result run_linked_ref_array_store(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmLinkedRefArrayStore || istate == nullptr
++      || istate->thread()->has_pending_exception()
++      || !reference_array_store_fixture_class(method)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  int aastore_bci = -1;
++  int load_value_bci = -1;
++  int return_bci = -1;
++  if (!linked_ref_array_store_shape(method, &aastore_bci, &load_value_bci,
++                                    &return_bci)) {
++    if (ZeroWasmLinkedGroupVerbose && method != nullptr
++        && method->name()->equals("referenceArrayStore")) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_CLASSIFY holder=%s method=%s "
++                    "descriptor=%s accepted=0 reason=shape-or-eligibility",
++                    method->method_holder()->name()->as_C_string(),
++                    method->name()->as_C_string(),
++                    method->signature()->as_C_string());
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  if (locals == nullptr || code_base == nullptr || pc == nullptr || *pc == nullptr
++      || tos == nullptr || *tos == nullptr
++      || !linked_validate_pre_push(istate, *tos, 3)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_REJECT reason=invalid-frame-before-install");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  jlong memory_limit_pages =
++      (jlong)ZeroWasmLinkedRefArrayStoreMemoryLimitForTest;
++  if (memory_limit_pages < 0 || memory_limit_pages > INT_MAX) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_REJECT reason=invalid-memory-limit pages=%lld",
++                    (long long)memory_limit_pages);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  // Resolve/install before taking raw oop copies. The frame locals remain the
++  // GC roots while the JS cache operation runs; the no-safepoint block below
++  // rereads and validates them immediately before the raw ABI call.
++  LinkedRefArrayStoreLayout layout;
++  if (!linked_ref_array_store_layout_for_fixture(&layout)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_REJECT stage=array-layout serial=%d "
++                    "compressed-oops=%d compressed-class=%d compact-headers=%d "
++                    "ptr=%d oop=%d heap-oop-size=%d obj-array-klass=%p",
++                    UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
++                    UseCompressedClassPointers ? 1 : 0,
++                    UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                    (int)sizeof(oop), heapOopSize,
++                    (void*)Universe::objectArrayKlass());
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  // Reject a non-null primitive/non-object array before installing or calling
++  // the store module. The Java descriptor normally prevents this value, but
++  // the adapter remains fail-closed if a malformed frame reaches the hook.
++  bool non_object_array_before_install = false;
++  {
++    NoSafepointVerifier nsv;
++    oop initial_array = cast_to_oop((void*)locals[0]);
++    non_object_array_before_install = initial_array != nullptr
++        && (initial_array->klass() == nullptr
++            || !initial_array->klass()->is_objArray_klass());
++  }
++  if (non_object_array_before_install) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_REJECT reason=non-object-array-before-install");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_linked_ref_array_store_module_id < 0
++      && !install_linked_ref_array_store(layout, aastore_bci, load_value_bci)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_REJECT stage=module-install "
++                    "aastore-bci=%d value-bci=%d", aastore_bci, load_value_bci);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_linked_ref_array_store_slot < 0
++      || _linked_ref_array_store_module_id < 0) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  const uint64_t sequence = ++_linked_ref_array_store_sequence;
++  _linked_ref_array_store_resume_sequence = sequence;
++  LinkedStatus result;
++  int outcome = 0; // 1=return, 2=reexecute; publication occurs in nsv below
++  uintptr_t array_bits = 0;
++  uintptr_t value_bits = 0;
++  jint index = 0;
++  jint assignable = 1;
++  bool null_array = false;
++  bool bounds_ok = true;
++  bool assignability_ok = true;
++  bool object_array_ok = true;
++  bool direct_candidate = false;
++  bool card_checked = false;
++  bool card_after_dirty = false;
++  bool card_probe_post = false;
++  bool card_probe_restored = false;
++  bool card_probe_array_old = false;
++  bool card_probe_child_young = false;
++  bool card_probe_before_clean = false;
++  int array_length = -1;
++  CardTable::CardValue* card_probe_transaction_card = nullptr;
++  uintptr_t card_probe_transaction_card_bits = 0;
++  int card_probe_transaction_old_card = -1;
++  int card_probe_transaction_span_kind = 0;
++  bool card_probe_transaction_active = false;
++  {
++    NoSafepointVerifier nsv;
++    // Reread all rooted inputs after install and immediately before the raw
++    // call. This protects the ABI from stale locals and makes the direct path
++    // a no-safepoint interval from subtype proof through card mark.
++    oop array = cast_to_oop((void*)locals[0]);
++    index = (jint)locals[-1];
++    oop value = cast_to_oop((void*)locals[-2]);
++    oop reread_array = cast_to_oop((void*)locals[0]);
++    oop reread_value = cast_to_oop((void*)locals[-2]);
++    if (array != reread_array || value != reread_value) {
++      fatal("ZeroWasm reference-array store rooted locals changed");
++    }
++    array_bits = (uintptr_t)array;
++    value_bits = (uintptr_t)value;
++    null_array = array == nullptr;
++    if (array != nullptr) {
++      object_array_ok = array->klass() != nullptr
++          && array->klass()->is_objArray_klass();
++      if (!object_array_ok) {
++        fatal("ZeroWasm reference-array store non-object array changed");
++      } else {
++        array_length = objArrayOop(array)->length();
++        bounds_ok = (uint32_t)index < (uint32_t)array_length;
++        if (bounds_ok && value != nullptr) {
++          Klass* rhs_klass = value->klass();
++          Klass* elem_klass = ObjArrayKlass::cast(array->klass())->element_klass();
++          assignability_ok = rhs_klass != elem_klass
++              ? rhs_klass->is_subtype_of(elem_klass) : true;
++          assignable = assignability_ok ? 1 : 0;
++        } else if (!bounds_ok) {
++          assignable = 0;
++        }
++      }
++    }
++    LinkedRefArrayStoreLayout live_layout;
++    if (!linked_ref_array_store_layout_for_fixture(&live_layout)
++        || live_layout.length_offset != layout.length_offset
++        || live_layout.base_offset != layout.base_offset
++        || live_layout.element_size != layout.element_size
++        || live_layout.card_shift != layout.card_shift
++        || live_layout.clean_card != layout.clean_card
++        || live_layout.dirty_card != layout.dirty_card
++        || live_layout.card_base != layout.card_base) {
++      fatal("ZeroWasm reference-array store layout changed in no-safepoint interval");
++    }
++    direct_candidate = !null_array && object_array_ok && bounds_ok
++        && assignability_ok && assignable == 1 && memory_limit_pages == 0;
++    if (_linked_ref_array_store_card_probe_pending) {
++      // Only scalar facts crossed the helper's Java return/allocation gap.
++      // Rebind the live oop and the exact card inside this no-safepoint
++      // transaction; never dereference a TLS raw oop or CardValue*.
++      if (array == nullptr || !object_array_ok
++          || (uintptr_t)array != _linked_ref_array_store_card_probe_array_bits
++          || index != _linked_ref_array_store_card_probe_index
++          || array_length != _linked_ref_array_store_card_probe_length
++          || _linked_ref_array_store_card_probe_span_kind != 1
++          || _linked_ref_array_store_card_probe_address_bits == 0) {
++        fatal("ZeroWasm reference-array store card probe binding changed");
++      }
++      bool all_null_before_store = true;
++      for (int i = 0; i < array_length; i++) {
++        if (objArrayOop(array)->obj_at(i) != nullptr) {
++          all_null_before_store = false;
++          break;
++        }
++      }
++      CardTable::CardValue* rebound_card = nullptr;
++      int rebound_span_kind = 0;
++      if (!all_null_before_store
++          || !linked_ref_array_card_span_proven(
++                 layout, array, index, array_length, &rebound_card,
++                 &rebound_span_kind)
++          || rebound_card == nullptr || rebound_span_kind != 1
++          || (uintptr_t)rebound_card
++                 != _linked_ref_array_store_card_probe_address_bits
++          || (int)*rebound_card != layout.clean_card) {
++        fatal("ZeroWasm reference-array store card probe precondition changed");
++      }
++      card_probe_transaction_card = rebound_card;
++      card_probe_transaction_card_bits =
++          _linked_ref_array_store_card_probe_address_bits;
++      card_probe_transaction_old_card = (int)*rebound_card;
++      card_probe_transaction_span_kind = rebound_span_kind;
++      card_probe_transaction_active = true;
++      card_probe_before_clean = true;
++    }
++    result = decode_linked_status(linked_ref_array_store_call(
++        (jint)(intptr_t)array, index, (jint)(intptr_t)value,
++        (jint)memory_limit_pages, (jint)(uint32_t)layout.card_base, assignable));
++    if (result.status == LINKED_RETURN && result.bci == 0) {
++      if ((uint32_t)result.value != (uint32_t)value_bits) {
++        fatal("ZeroWasm reference-array store returned a different oop");
++      }
++      if (direct_candidate) {
++        if (objArrayOop(array)->obj_at(index) != value) {
++          fatal("ZeroWasm reference-array store target oop mismatch");
++        }
++        CardTable::CardValue* card = linked_ref_array_card_for(layout, array, index);
++        card_checked = card != nullptr;
++        card_after_dirty = card_checked && (int)*card == layout.dirty_card;
++        if (!card_after_dirty) {
++          fatal("ZeroWasm reference-array store card did not become dirty");
++        }
++      }
++      if (card_probe_transaction_active) {
++        BarrierSet* barrier = BarrierSet::barrier_set();
++        CardTableBarrierSet* card_barrier =
++            barrier != nullptr && barrier->is_a(BarrierSet::CardTableBarrierSet)
++                ? static_cast<CardTableBarrierSet*>(barrier) : nullptr;
++        CardTable* card_table = card_barrier == nullptr
++            ? nullptr : card_barrier->card_table();
++        CardTable::CardValue* probe_card =
++            linked_ref_array_card_for(layout, array, index);
++        int post_span_kind = 0;
++        CardTable::CardValue* proven_card = nullptr;
++        bool exact_card = linked_ref_array_card_span_proven(
++            layout, array, index, array_length, &proven_card, &post_span_kind)
++            && proven_card == card_probe_transaction_card
++            && (uintptr_t)proven_card == card_probe_transaction_card_bits
++            && post_span_kind == card_probe_transaction_span_kind;
++        card_probe_array_old = card_table != nullptr
++            && !card_table->is_in_young(array);
++        card_probe_child_young = value != nullptr && card_table != nullptr
++            && card_table->is_in_young(value);
++        card_probe_post = exact_card && card_probe_before_clean
++            && card_probe_transaction_old_card == layout.clean_card
++            && card_probe_array_old && card_probe_child_young
++            && probe_card == card_probe_transaction_card
++            && (uintptr_t)probe_card == card_probe_transaction_card_bits
++            && (int)*probe_card == layout.dirty_card;
++        if (!card_probe_post) {
++          fatal("ZeroWasm reference-array store card/root probe proof failed");
++        }
++        _linked_ref_array_store_card_probe_pending = false;
++        _linked_ref_array_store_card_probe_index = -1;
++        _linked_ref_array_store_card_probe_array_bits = 0;
++        _linked_ref_array_store_card_probe_address_bits = 0;
++        _linked_ref_array_store_card_probe_length = -1;
++        _linked_ref_array_store_card_probe_span_kind = 0;
++      }
++      linked_publish_ref_store_return_infallible(
++          istate, tos, pc, code_base + return_bci, value);
++      outcome = 1;
++    } else if (result.status == LINKED_REEXECUTE && result.bci == aastore_bci) {
++      if (card_probe_transaction_active) {
++        CardTable::CardValue* probe_card =
++            (CardTable::CardValue*)(uintptr_t)card_probe_transaction_card_bits;
++        if (probe_card == nullptr || probe_card != card_probe_transaction_card
++            || (uintptr_t)probe_card != card_probe_transaction_card_bits
++            || card_probe_transaction_old_card < 0
++            || (int)*probe_card != card_probe_transaction_old_card) {
++          fatal("ZeroWasm reference-array store card probe restore unavailable");
++        }
++        *probe_card = (CardTable::CardValue)
++            card_probe_transaction_old_card;
++        if ((int)*probe_card != card_probe_transaction_old_card) {
++          fatal("ZeroWasm reference-array store card probe restore failed");
++        }
++        card_probe_restored = true;
++        _linked_ref_array_store_card_probe_pending = false;
++        _linked_ref_array_store_card_probe_index = -1;
++        _linked_ref_array_store_card_probe_array_bits = 0;
++        _linked_ref_array_store_card_probe_address_bits = 0;
++        _linked_ref_array_store_card_probe_length = -1;
++        _linked_ref_array_store_card_probe_span_kind = 0;
++      }
++      linked_publish_ref_store_reexecute_infallible(
++          istate, tos, pc, code_base + aastore_bci, array, index, value);
++      outcome = 2;
++    } else {
++      if (card_probe_transaction_active) {
++        CardTable::CardValue* probe_card =
++            (CardTable::CardValue*)(uintptr_t)card_probe_transaction_card_bits;
++        if (probe_card == nullptr || probe_card != card_probe_transaction_card
++            || (uintptr_t)probe_card != card_probe_transaction_card_bits
++            || card_probe_transaction_old_card < 0) {
++          fatal("ZeroWasm reference-array store card probe abort unavailable");
++        }
++        *probe_card = (CardTable::CardValue)card_probe_transaction_old_card;
++        if ((int)*probe_card != card_probe_transaction_old_card) {
++          fatal("ZeroWasm reference-array store card probe abort restore failed");
++        }
++        _linked_ref_array_store_card_probe_pending = false;
++        _linked_ref_array_store_card_probe_index = -1;
++        _linked_ref_array_store_card_probe_array_bits = 0;
++        _linked_ref_array_store_card_probe_address_bits = 0;
++        _linked_ref_array_store_card_probe_length = -1;
++        _linked_ref_array_store_card_probe_span_kind = 0;
++      }
++      fatal("ZeroWasm reference-array store returned unexpected status");
++    }
++  }
++
++  // Keep the diagnostic reason in the same precedence as the module: null is
++  // observable before any test override, then a positive memory override
++  // forces every non-null call to the memory fallback, and only then do the
++  // canonical bounds/assignability reasons apply.
++  const char* reason = null_array ? "null"
++      : (memory_limit_pages > 0 ? "memory"
++         : (!object_array_ok ? "non-object-array"
++            : (!bounds_ok ? "bounds"
++               : (!assignability_ok ? "assignability" : "memory-or-card"))));
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REF_ARRAY_STORE_ENTER seq=%llu method=referenceArrayStore "
++                  "static=1 params=3 max-stack=3 max-locals=3 raw32=1 "
++                  "actual-klass=objArrayKlass length-offset=%d base-offset=%d "
++                  "element-size=%d card-base=%u card-shift=%d clean-card=%d "
++                  "dirty-card=%d limit-pages=%lld slot=%d assignable=%d",
++                  (unsigned long long)sequence, layout.length_offset,
++                  layout.base_offset, layout.element_size,
++                  (unsigned)(uint32_t)layout.card_base, layout.card_shift,
++                  layout.clean_card, layout.dirty_card,
++                  (long long)memory_limit_pages,
++                  _linked_ref_array_store_slot, assignable);
++    tty->print_cr("[zbg] REF_ARRAY_STORE_ADAPTER seq=%llu array-bits=%u index=%d "
++                  "value-bits=%u length=%d klass=%s bounds=%d assignable=%d",
++                  (unsigned long long)sequence, (unsigned)(uint32_t)array_bits,
++                  index, (unsigned)(uint32_t)value_bits, array_length,
++                  null_array ? "null" : "objArrayKlass", bounds_ok ? 1 : 0,
++                  assignable);
++    tty->print_cr("[zbg] REF_ARRAY_STORE_TABLE_CALL seq=%llu slot=%d "
++                  "array-bits=%u index=%d value-bits=%u limit-pages=%lld "
++                  "live-card-base=%u assignable=%d",
++                  (unsigned long long)sequence, _linked_ref_array_store_slot,
++                  (unsigned)(uint32_t)array_bits, index,
++                  (unsigned)(uint32_t)value_bits,
++                  (long long)memory_limit_pages,
++                  (unsigned)(uint32_t)layout.card_base, assignable);
++    tty->print_cr("[zbg] REF_ARRAY_STORE_STATUS seq=%llu status=%d bci=%d "
++                  "value-oop-bits=%u expected-bci=%d limit-pages=%lld "
++                  "assignable=%d", (unsigned long long)sequence,
++                  result.status, result.bci, (unsigned)(uint32_t)result.value,
++                  aastore_bci, (long long)memory_limit_pages, assignable);
++  }
++  if (outcome == 1) {
++    _linked_returned++;
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_EXIT seq=%llu status=RETURN bci=0",
++                    (unsigned long long)sequence);
++      tty->print_cr("[zbg] DIRECT_REF_STORE referenceArrayStore runtime=1 "
++                    "seq=%llu result-oop-bits=%u card-mark=%d "
++                    "card-after-dirty=%d",
++                    (unsigned long long)sequence, (unsigned)(uint32_t)value_bits,
++                    card_checked && card_after_dirty ? 1 : 0,
++                    card_checked && card_after_dirty ? 1 : 0);
++      if (card_probe_post) {
++        tty->print_cr("[zbg] REF_ARRAY_STORE_CARD_PROBE_POST seq=%llu "
++                      "array-old=%d child-young=%d card-before-clean=%d "
++                      "card-after-dirty=%d restored=0",
++                      (unsigned long long)sequence,
++                      card_probe_array_old ? 1 : 0,
++                      card_probe_child_young ? 1 : 0,
++                      card_probe_before_clean ? 1 : 0,
++                      card_after_dirty ? 1 : 0);
++      }
++    }
++    return ZeroWasmBaseline::Returned;
++  }
++  if (outcome != 2) {
++    fatal("ZeroWasm reference-array store failed to publish a result");
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REF_ARRAY_STORE_EXIT seq=%llu status=REEXECUTE bci=%d "
++                  "reason=%s", (unsigned long long)sequence, aastore_bci, reason);
++    tty->print_cr("[zbg] REF_ARRAY_STORE_OPCODE_REEXECUTE seq=%llu reason=%s "
++                  "resume-bci=%d depth=3 pending=0",
++                  (unsigned long long)sequence, reason, aastore_bci);
++    if (card_probe_restored) {
++      tty->print_cr("[zbg] REF_ARRAY_STORE_CARD_PROBE_POST seq=%llu "
++                    "array-old=0 child-young=0 card-before-clean=1 "
++                    "card-after-dirty=0 restored=1",
++                    (unsigned long long)sequence);
++    }
++  }
++  _linked_deopt++;
++  return ZeroWasmBaseline::OpcodeResume;
++}
++
+ static ZeroWasmBaseline::Result run_linked_group(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -4014,6 +5692,8 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int int_array_bci = -1;
+   int int_array_store_bci = -1;
+   int ref_array_bci = -1;
++  int ref_array_store_bci = -1;
++  int ref_array_store_value_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci,
+@@ -4025,7 +5705,9 @@ static ZeroWasmBaseline::Result run_linked_group(
+                                                 &throw_handler_bci,
+                                                 &int_array_bci,
+                                                 &int_array_store_bci,
+-                                                &ref_array_bci);
++                                                &ref_array_bci,
++                                                &ref_array_store_bci,
++                                                &ref_array_store_value_bci);
+   if (!UseZeroWasmLinkedGroup && kind != LinkedIntArrayLoadMethod
+       && kind != LinkedIntArrayStoreMethod) {
+     return ZeroWasmBaseline::NotRun;
+@@ -4699,6 +6381,10 @@ uint64_t zbb_linked_ref_array_resume_sequence() {
+   return _linked_ref_array_resume_sequence;
+ }
+ 
++uint64_t zbb_linked_ref_array_store_resume_sequence() {
++  return _linked_ref_array_store_resume_sequence;
++}
++
+ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -4706,12 +6392,24 @@ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+       && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+           || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
+           || UseZeroWasmBaseline || UseZeroWasmJIT);
+-  if (ref_array_collision) return NotRun;
++  const bool ref_array_store_collision = UseZeroWasmLinkedRefArrayStore
++      && (UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedGroup
++          || UseZeroWasmLinkedIntArray || UseZeroWasmLinkedIntArrayStore
++          || UseZeroWasmLinkedBenchmark || UseZeroWasmBaseline || UseZeroWasmJIT);
++  if (ref_array_collision || ref_array_store_collision) return NotRun;
+   if (UseZeroWasmLinkedRefArrayLoad) {
+     Result ref_array = run_linked_ref_array_load(method, locals, code_base,
+                                                   pc, tos, istate);
+     if (ref_array != NotRun) return ref_array;
+   }
++  if (UseZeroWasmLinkedRefArrayStore) {
++    Result card_probe = run_linked_ref_array_store_card_probe_setup(
++        method, locals, code_base, pc, tos, istate);
++    if (card_probe != NotRun) return card_probe;
++    Result ref_array_store = run_linked_ref_array_store(method, locals, code_base,
++                                                         pc, tos, istate);
++    if (ref_array_store != NotRun) return ref_array_store;
++  }
+   if (UseZeroWasmLinkedBenchmark) {
+     Result benchmark = run_linked_benchmark(method, locals, code_base, pc,
+                                              tos, istate);

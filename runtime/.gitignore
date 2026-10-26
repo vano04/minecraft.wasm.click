@@ -1,0 +1,68 @@
+# ─── Build output and toolchain caches ───────────────────────────────────────
+build/
+node_modules/
+*.log
+
+# ─── Mojang-owned files and anything derived from them ───────────────────────
+# Mojang's jar, libraries and assets are fetched by the browser from Mojang; the
+# build reads a local install (or --download into build/mojang-cache) only to
+# compile and verify. None of it may be committed or redistributed.
+minecraft-26.2-client.jar
+*-client.jar
+dist/
+OpenJDK/mcweb/mcweb-port.jar
+src/graal/resources/assets/
+# Staged by retired tooling; older checkouts may still hold these Mojang files.
+web/assets/
+/mcweb/
+tests/tmp-shots/
+**/design-qa-assets/mojangstudios.png
+
+# A local Minecraft server used for protocol tests: Mojang server jars, bundled
+# libraries, region files and a usercache holding real player names.
+test-server/
+/minecraft/
+
+# ─── Test, probe and measurement output ──────────────────────────────────────
+test-results/
+playwright-report/
+measure-out-*/
+probe-out/
+logs/
+private/
+OpenJDK/browser/*.png
+
+# ─── The wasm JVM (OpenJDK 25 Zero on Emscripten) ────────────────────────────
+# Fetched sources and build output (3.7 GB). The recipe — patches/, tests/,
+# *.sh — stays tracked.
+OpenJDK/work/
+# Linked runtime (OpenJDK/make-image.sh && OpenJDK/link-browser.sh).
+OpenJDK/browser/javavm.js
+OpenJDK/browser/javavm.wasm
+OpenJDK/browser/javavm.data
+OpenJDK/browser/javavm-debug.js
+OpenJDK/browser/javavm-debug.wasm
+OpenJDK/browser/javavm-debug.data
+OpenJDK/browser/runtime-manifest.json
+OpenJDK/browser/*.so
+# The port and its bridge (OpenJDK/build-mcweb.sh).
+OpenJDK/mcweb/classes/
+OpenJDK/mcweb/shim-classes/
+OpenJDK/mcweb/libmcwebjs.so
+OpenJDK/mcweb/jsbridge.c
+OpenJDK/mcweb/jsbridge-report.txt
+OpenJDK/mcweb/port-build.json
+OpenJDK/native-policy/classpath.txt
+OpenJDK/native-policy/current.json
+OpenJDK/native-policy/dist/
+OpenJDK/tests/classes/
+OpenJDK/tests/jarclasses/
+OpenJDK/tests/plugin.jar
+
+# ─── Local editor and agent configuration ────────────────────────────────────
+.claude/
+.omp/
+.DS_Store
+
+# LLVM coverage output that instrumented toolchain binaries drop in the cwd
+*.profraw

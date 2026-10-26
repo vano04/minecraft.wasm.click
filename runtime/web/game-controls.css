@@ -1,0 +1,518 @@
+/* MC-Web game controls (game-controls.js). Everything is scoped to the
+   mcweb-gc-* classes; the launcher keeps ownership of the canvas size. */
+
+.mcweb-gc-host-positioned {
+  position: relative;
+}
+
+.mcweb-gc-host.mcweb-gc-fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+/* Page-fit fallback where element fullscreen is unavailable or refused. */
+.mcweb-gc-host.mcweb-gc-css-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  z-index: 2147483000 !important;
+}
+
+@supports (height: 100dvh) {
+  .mcweb-gc-host.mcweb-gc-css-fullscreen {
+    height: 100dvh !important;
+  }
+}
+
+html.mcweb-gc-scroll-locked,
+html.mcweb-gc-scroll-locked body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.mcweb-gc-root {
+  --mcweb-gc-u: 1vh;
+  --mcweb-gc-fill: rgb(150 153 153 / 48%);
+  --mcweb-gc-fill-active: rgb(205 211 207 / 68%);
+  --mcweb-gc-edge: rgb(43 43 39 / 68%);
+  --mcweb-gc-highlight: rgb(236 239 232 / 28%);
+  --mcweb-gc-shadow: rgb(28 28 25 / 45%);
+  --mcweb-gc-icon: rgb(55 53 47 / 78%);
+  --mcweb-gc-icon-active: rgb(31 30 27 / 92%);
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+  overflow: hidden;
+  container-type: size;
+  pointer-events: none;
+  color: #fff;
+  font: 13px/1.35 ui-sans-serif, system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (height: 1cqh) {
+  .mcweb-gc-root {
+    --mcweb-gc-u: 1cqh;
+  }
+}
+
+.mcweb-gc-root *,
+.mcweb-gc-root *::before,
+.mcweb-gc-root *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mcweb-gc-root[hidden],
+.mcweb-gc-root [hidden],
+.mcweb-gc-exit[hidden] {
+  display: none !important;
+}
+
+/* With touch on, the overlay owns every finger over the game. */
+.mcweb-gc-root.is-touch {
+  pointer-events: auto;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+.mcweb-gc-root.is-menu .mcweb-gc-play {
+  display: none;
+}
+
+/* Inventory: in gameplay, and in the inventory screen it opened (to close
+   it); hidden in other menus, where E would type into a text field. */
+.mcweb-gc-root.is-menu:not(.is-inventory) .mcweb-gc-inventory {
+  display: none;
+}
+
+.mcweb-gc-touch {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------------------------------------------------------- toolbar */
+
+.mcweb-gc-toolbar {
+  position: absolute;
+  z-index: 6;
+  top: max(env(safe-area-inset-top), 6px);
+  left: max(env(safe-area-inset-left), 6px);
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.mcweb-gc-tool,
+.mcweb-gc-exit,
+.mcweb-gc-help-close {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 4px;
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  opacity: .7;
+  touch-action: manipulation;
+}
+
+.mcweb-gc-tool:hover,
+.mcweb-gc-tool:focus-visible,
+.mcweb-gc-tool[aria-pressed="true"],
+.mcweb-gc-tool[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.mcweb-gc-tool[aria-pressed="true"] {
+  background: rgb(60 110 60 / 70%);
+}
+
+.mcweb-gc-tool svg,
+.mcweb-gc-exit svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.mcweb-gc-tool:focus-visible,
+.mcweb-gc-exit:focus-visible,
+.mcweb-gc-help-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Always visible while fullscreen, outside the overlay so it survives a
+   game that is not ready yet. */
+.mcweb-gc-exit {
+  position: absolute;
+  z-index: 2147483001;
+  top: max(env(safe-area-inset-top), 6px);
+  right: max(env(safe-area-inset-right), 6px);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  border-color: rgb(255 255 255 / 55%);
+  background: rgb(0 0 0 / 60%);
+  font-weight: 600;
+  opacity: .85;
+}
+
+.mcweb-gc-exit:hover,
+.mcweb-gc-exit:focus-visible {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------- touch controls */
+
+.mcweb-gc-btn,
+.mcweb-gc-move,
+.mcweb-gc-knob {
+  border: max(2px, calc(var(--mcweb-gc-u) * .46)) solid var(--mcweb-gc-edge);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, var(--mcweb-gc-highlight), transparent 24%, transparent 74%, rgb(27 27 24 / 17%)),
+    var(--mcweb-gc-fill);
+  box-shadow:
+    inset 1px 1px rgb(255 255 255 / 12%),
+    inset -2px -2px rgb(25 25 22 / 12%),
+    0 max(2px, calc(var(--mcweb-gc-u) * .55)) 0 var(--mcweb-gc-shadow);
+}
+
+.mcweb-gc-btn,
+.mcweb-gc-move {
+  opacity: .72;
+}
+
+.mcweb-gc-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+}
+
+.mcweb-gc-btn svg {
+  display: block;
+  width: 68%;
+  height: 68%;
+  fill: var(--mcweb-gc-icon);
+  filter: drop-shadow(0 1px 0 rgb(238 239 230 / 24%));
+  pointer-events: none;
+}
+
+.mcweb-gc-btn.is-active,
+.mcweb-gc-btn.is-latched {
+  opacity: .9;
+  translate: 0 max(1px, calc(var(--mcweb-gc-u) * .3));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 19%), transparent 30%, rgb(21 21 19 / 12%)),
+    var(--mcweb-gc-fill-active);
+  box-shadow:
+    inset 2px 2px rgb(28 28 25 / 22%),
+    0 1px 0 var(--mcweb-gc-shadow);
+}
+
+.mcweb-gc-btn.is-latched {
+  border-color: rgb(240 240 200 / 85%);
+}
+
+.mcweb-gc-btn.is-active svg,
+.mcweb-gc-btn.is-latched svg {
+  fill: var(--mcweb-gc-icon-active);
+}
+
+.mcweb-gc-utility {
+  position: absolute;
+  z-index: 3;
+  top: max(env(safe-area-inset-top), 6px);
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  translate: -50% 0;
+}
+
+/* Over one of the game's text fields (game-controls.js uncoverTextFields):
+   the tap belongs to the field. */
+.mcweb-gc-utility .is-over-text-field {
+  visibility: hidden;
+}
+
+.mcweb-gc-small {
+  position: relative;
+  width: clamp(30px, calc(var(--mcweb-gc-u) * 7), 40px);
+  height: clamp(30px, calc(var(--mcweb-gc-u) * 7), 40px);
+}
+
+.mcweb-gc-small svg {
+  width: 80%;
+  height: 80%;
+}
+
+.mcweb-gc-move {
+  position: absolute;
+  z-index: 2;
+  top: 40%;
+  left: max(calc(env(safe-area-inset-left) + 12px), 7%);
+  width: clamp(112px, calc(var(--mcweb-gc-u) * 31.5), 180px);
+  height: clamp(112px, calc(var(--mcweb-gc-u) * 31.5), 180px);
+  touch-action: none;
+  background: rgb(160 169 183 / 13%);
+}
+
+.mcweb-gc-move.is-active {
+  opacity: .88;
+  background: rgb(168 176 190 / 19%);
+}
+
+.mcweb-gc-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: 50%;
+  margin: -25% 0 0 -25%;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.mcweb-gc-action {
+  z-index: 2;
+  width: clamp(48px, calc(var(--mcweb-gc-u) * 12.8), 72px);
+  height: clamp(48px, calc(var(--mcweb-gc-u) * 12.8), 72px);
+}
+
+.mcweb-gc-jump {
+  top: 31.5%;
+  right: max(calc(env(safe-area-inset-right) + 12px), 4.3%);
+}
+
+.mcweb-gc-sneak {
+  top: 52%;
+  right: max(calc(env(safe-area-inset-right) + 12px), 4.3%);
+}
+
+.mcweb-gc-attack {
+  top: 20%;
+  right: max(calc(env(safe-area-inset-right) + 14%), 15%);
+}
+
+.mcweb-gc-sprint {
+  top: 41%;
+  right: max(calc(env(safe-area-inset-right) + 14%), 15%);
+}
+
+.mcweb-gc-use {
+  top: 62%;
+  right: max(calc(env(safe-area-inset-right) + 14%), 15%);
+}
+
+/* Undocked default: bottom-right corner, clear of the hotbar. The script
+   docks the arrows beside the hotbar (is-docked) whenever it can place them
+   inside the overlay. */
+.mcweb-gc-hotbar-tools {
+  position: absolute;
+  z-index: 2;
+  right: max(calc(env(safe-area-inset-right) + 12px), 3%);
+  bottom: max(calc(env(safe-area-inset-bottom) + 8px), 2%);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.mcweb-gc-hotbar-tools.is-docked {
+  right: auto;
+  bottom: auto;
+}
+
+/* Pocket Edition's inventory button: three light dots on a dark tile. */
+.mcweb-gc-btn.mcweb-gc-inventory {
+  background: rgb(38 38 38 / 78%);
+  border-color: rgb(16 16 16 / 85%);
+  opacity: .85;
+}
+
+.mcweb-gc-btn.mcweb-gc-inventory svg {
+  width: 86%;
+  height: 86%;
+  fill: rgb(235 235 235 / 95%);
+  filter: none;
+}
+
+.mcweb-gc-btn.mcweb-gc-inventory.is-active svg {
+  fill: #fff;
+}
+
+/* Controller cursor in menus; Minecraft draws none of its own. */
+.mcweb-gc-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+  margin: -1px 0 0 -1px;
+  pointer-events: none;
+  background: #fff;
+  clip-path: polygon(0 0, 0 100%, 30% 72%, 52% 100%, 66% 92%, 45% 64%, 85% 64%);
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  will-change: transform;
+}
+
+/* ---------------------------------------------------------- help, toast */
+
+.mcweb-gc-help {
+  position: absolute;
+  z-index: 7;
+  top: 50%;
+  left: 50%;
+  width: min(640px, 94%);
+  max-height: 88%;
+  overflow: auto;
+  padding: 12px 14px;
+  translate: -50% -50%;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 6px;
+  background: rgb(10 12 16 / 90%);
+  pointer-events: auto;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.mcweb-gc-help h2 {
+  margin: 4px 0 6px;
+  font-size: 14px;
+}
+
+.mcweb-gc-help table {
+  width: 100%;
+  margin-bottom: 8px;
+  border-collapse: collapse;
+}
+
+.mcweb-gc-help th,
+.mcweb-gc-help td {
+  padding: 3px 6px;
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
+  text-align: left;
+  vertical-align: top;
+}
+
+.mcweb-gc-help p {
+  margin: 6px 0;
+  color: rgb(255 255 255 / 75%);
+}
+
+.mcweb-gc-help-close {
+  margin-left: auto;
+  height: 40px;
+  padding: 0 16px;
+  opacity: 1;
+}
+
+.mcweb-gc-toast {
+  position: absolute;
+  z-index: 8;
+  bottom: 22%;
+  left: 50%;
+  max-width: 80%;
+  padding: 6px 12px;
+  translate: -50% 0;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 70%);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s linear;
+}
+
+.mcweb-gc-toast.is-visible {
+  opacity: 1;
+}
+
+.mcweb-gc-toast:empty {
+  display: none;
+}
+
+@media (max-aspect-ratio: 1.45 / 1) {
+  .mcweb-gc-move { top: 46%; }
+  .mcweb-gc-jump { top: 36%; }
+  .mcweb-gc-sneak { top: 56%; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mcweb-gc-btn {
+    transition: background 70ms linear, opacity 70ms linear, translate 70ms steps(2, end);
+  }
+
+  .mcweb-gc-knob {
+    transition: transform 65ms linear;
+  }
+
+  .mcweb-gc-move.is-active .mcweb-gc-knob {
+    transition: none;
+  }
+}
+
+/* The native keyboard's textarea (game-controls.js "native keyboard"). It is
+   placed over the game's field, never hit-tested and never seen: the game
+   draws the field and its text. Not display:none or visibility:hidden, which
+   could not take focus, and 16px type, below which iOS zooms the page in. */
+.mcweb-gc-text-proxy {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  overflow: hidden;
+  resize: none;
+  opacity: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px;
+  line-height: 1;
+  white-space: pre;
+  pointer-events: none;
+}
+
+/* While the keyboard is open, the stage's contents move by
+   --mcweb-gc-kb-shift (up when positive) to keep the field in the visible
+   part of the viewport. translate, not transform or a size change: the
+   canvas keeps its box size and framebuffer, and input mapping reads the
+   moved box. */
+.mcweb-gc-host.mcweb-gc-kb-shifted > :not(.mcweb-gc-exit) {
+  translate: 0 calc(-1 * var(--mcweb-gc-kb-shift, 0px));
+}

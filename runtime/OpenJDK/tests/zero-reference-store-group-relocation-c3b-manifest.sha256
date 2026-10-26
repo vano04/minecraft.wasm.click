@@ -1,0 +1,27 @@
+# M2-C3b Stage-1 structural WIP. This is deliberately non-acceptance evidence.
+phase=C3B_STAGE1_STRUCTURAL_WIP
+acceptance=NOT_EXECUTED
+runtime=NOT_REBUILT
+module=NOT_DUMPED
+continuation=UNARMED
+gc=NOT_EXECUTED
+class-contract=ZeroReferenceStoreGroupRelocationFixture#groupedReferenceStoreAcrossRelocation@probe-bci8;phase1@bci0
+probe-contract=ZeroReferenceStoreGroupRelocationProbe#forceYoungRelocation()V@bci8
+orchestrator-root-map=bci8:oops=0,2,3;token=4:int;depth=0
+phase1-root-map=bci0:oops=0,2,3;token=4:int;depth=0
+phase-abi=dispatcher9->i64;phase0:i32->i32;phase1:3i32->void
+phase-edges=dispatcher->phase0,dispatcher->phase1,phase0->relay,phase1->relay,phase1->commit,relay->leaf
+cache-mutations-planned=compiler,digest,bytes,memory,metadata,slot,card-layout,phase-abi,phase-edges,root-map,poison
+d4e51fc808206813f81ecac7a92b8286f28456c66385384d69b771ea8b03a4e0 1197 OpenJDK/tests/ZeroReferenceStoreGroupRelocationFixture.java
+62e1c4efa2cc49a0484123a72f8c3f9d17aa8f4223c1408f53eda2a94eeeaa26 1191 OpenJDK/tests/ZeroReferenceStoreGroupRelocationNearMiss.java
+0f275ae51fca22a244200106f19a245e863ba406c9724b0ebf202f7f7d7e664e 1558 OpenJDK/tests/ZeroReferenceStoreGroupRelocationProbe.java
+fba5abe6758be08bcff450b832b0994930c2d260af59165a1fb0e709914ec80b 15046 OpenJDK/tests/check-zero-reference-store-group-relocation-class.mjs
+cf5124de82b9b945dd69448c3a6b529665b936b2e7131714d0562ae02b718716 1851 OpenJDK/tests/check-zero-reference-store-group-relocation-log.mjs
+414c4848200e5ff0ae6cc937a39bd6d7016e9cb0b66cbe2f9486f66db8537d73 8024 OpenJDK/tests/check-zero-reference-store-group-relocation-manifest.mjs
+de7ea87abe4fa76d1508fe500685e1bfbfe2516c5471af23ea82af1d221cae6d 25665 OpenJDK/tests/check-zero-reference-store-group-relocation-source.mjs
+709ba11bed90cc3375155fdf3e605360a2595511691dba453a839b16d9101f46 21693 OpenJDK/tests/check-zero-reference-store-group-relocation-wat.mjs
+277147e255e216e3b2fd222c6ec4a1957b44e635f10207cabad027e70ddedea7 6501 OpenJDK/tests/run-zero-reference-store-group-relocation-static.sh
+60d0714dc2d49e5229b6968d056afebaf7315378a846d1109fef230f1e3ee4fe 13543 OpenJDK/work/jdk25/src/hotspot/cpu/zero/globals_zero.hpp
+afd131113475ff1cadea5d3a5c597363b2c3149a6db69650a10b0b1d36b7db31 152502 OpenJDK/work/jdk25/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+8823a13b0d5faae937620abd873e049f819aa9acb84b94f2fb2a9220e60760f4 403295 OpenJDK/work/jdk25/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+c21bfcd9dd8896f551ea28ab16c3487ad9a34f5afae2165f8b8ddc1646197e7a 1212 OpenJDK/work/jdk25/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp

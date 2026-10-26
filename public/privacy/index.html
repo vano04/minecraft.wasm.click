@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="How account imports, browser storage, downloads and multiplayer connections work in this launcher.">
+  <link rel="stylesheet" href="/site.css">
+  <link rel="icon" href="/mcweb-icon.svg" type="image/svg+xml">
+  <title>Privacy | minecraft.wasm.click</title>
+</head>
+<body>
+  <main class="privacy-page"><div class="privacy-shell">
+    <p class="kicker">minecraft.wasm.click / PRIVACY</p>
+    <h1>Privacy</h1>
+    <p class="privacy-lede">What your browser sends, what the server keeps and where game files go.</p>
+    <section class="privacy-card">
+      <h2>Account import</h2>
+      <p>You select a Prism Launcher accounts.json file in your browser. The page reads it locally and selects the active account, or the first account when none is active. It sends only that account's short-lived Minecraft access token, profile and expiry for verification. Refresh tokens, other accounts and the full account file are not uploaded.</p>
+      <p>The server sends the selected token to Minecraft Services to verify Java Edition entitlement and profile identity. It creates a separate session for your browser and returns public profile fields, the expiry and an opaque HttpOnly session cookie. The token does not appear in public session responses.</p>
+      <p>The server keeps the selected token and profile in memory for at most four hours, bounded by the imported token's expiry. Logout, expiry or a server restart ends the session and closes its network connections. The server does not refresh tokens or store imported account files on disk.</p>
+      <p>The operator of this server can inspect credentials while they are in memory. Import your account only into a host you trust. Remote access requires HTTPS. The default Docker installation runs on your computer's loopback address.</p>
+    </section>
+    <section class="privacy-card">
+      <h2>Browser storage</h2>
+      <p>Installed game files, worlds, saved servers, settings and imported resource packs stay in this browser's storage. This server does not receive your singleplayer worlds. The browser can also remember that you have read the project notice.</p>
+      <p>Logout does not erase saved files. Clearing site data, deleting a browser profile or browser storage eviction can remove them. Export backups through Settings first. A different hostname, port, browser profile or installed web app can use different storage.</p>
+    </section>
+    <section class="privacy-card">
+      <h2>Multiplayer and resource packs</h2>
+      <p>The server provides an authenticated TCP relay for public Minecraft servers. It receives the requested server address and resolves it before connecting. Private and local destinations are rejected. This distribution does not pair a local CLI or reach LAN servers.</p>
+      <p>For an online join, the authentication server sends your Minecraft token to Mojang's session-join endpoint. It generates connection-specific game encryption material and returns it to the browser. The browser handles encryption and compression. The server operator can access the token and game keys while the session is active.</p>
+      <p>If you accept a server resource pack, your browser first tries the pack's HTTPS URL. When the pack host blocks browser reads, the authenticated server relay can download and stream it. In that case the server sees the pack URL and contents. The pack host sees the IP address of whichever machine makes the request.</p>
+    </section>
+    <section class="privacy-card">
+      <h2>Game files, sounds and textures</h2>
+      <p>Your browser downloads the Minecraft client and required libraries from Mojang. This server supplies the reviewed Java runtime, browser adapters and other launcher libraries.</p>
+      <p>For sounds and panorama images, your browser tries Mojang's asset host first. If that request is unavailable to the browser, it tries the version-pinned <a href="https://github.com/InventivetalentDev/minecraft-assets/tree/26.3/assets" target="_blank" rel="noopener noreferrer">Minecraft assets repository on GitHub</a> through raw.githubusercontent.com. The browser checks the asset index and each file's size and hash. Those requests omit browser credentials and the referrer. This server does not proxy the sounds or panorama images.</p>
+      <p>The server requests public signed profile information from Mojang and verifies its texture signature. Account-menu skins can load through this server. In-game skins and capes can load directly from Minecraft's texture host. Direct download hosts see your IP address and requested files; those requests do not carry your Minecraft access token.</p>
+    </section>
+    <section class="privacy-card">
+      <h2>Logs and reports</h2>
+      <p>The application does not log imported account tokens or upstream provider bodies. The server operator, reverse proxy and download hosts can process request metadata under their own policies. This application does not control those logs.</p>
+      <p>Report project bugs through <a href="https://github.com/vano04/minecraft.wasm.click/issues" target="_blank" rel="noopener noreferrer">GitHub issues</a>. Leave account files, tokens, cookies and player data out of reports. Contact the operator of the host you used about that host's logs or handling of sessions.</p>
+    </section>
+    <nav class="privacy-links" aria-label="Privacy links"><a href="/">Launcher</a><a href="/contact/">Contact</a><a href="/notices/">Licenses and source</a><a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener noreferrer">Microsoft privacy</a><a href="https://github.com/vano04/minecraft.wasm.click" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
+    <p class="privacy-disclaimer">NOT AN OFFICIAL MINECRAFT PRODUCT OR SERVICE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
+  </div></main>
+</body>
+</html>

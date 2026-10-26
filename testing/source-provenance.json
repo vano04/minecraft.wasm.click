@@ -1,0 +1,3885 @@
+{
+  "schema": 1,
+  "kind": "in-repository-source-build",
+  "baseRevision": "f5862293f19eeaf1bc9d8fee77a44b3c488adca4",
+  "baseSource": "https://github.com/vano04/mcweb-experimental",
+  "sourceTreeSha256": "7ee89eb850b124ea3851fbb804cc4468790fd2f5daf3b20ad5dbe2e230eb9632",
+  "patch": {
+    "path": "testing/patches/regressions-20261022.patch",
+    "bytes": 905730,
+    "sha256": "41edbfd4fb8fd619bb0d793193be4f71b0d1895ded90d3fb726da8a95237455a"
+  },
+  "selection": {
+    "roots": [
+      "OpenJDK/",
+      "src/",
+      "web/",
+      "tools/",
+      "tests/"
+    ],
+    "rootFiles": [
+      "package-lock.json",
+      "package.json"
+    ],
+    "excludedGeneratedPaths": [
+      "OpenJDK/browser/runtime-manifest.json",
+      "OpenJDK/mcweb/jsbridge-report.txt",
+      "OpenJDK/mcweb/jsbridge.c",
+      "OpenJDK/mcweb/port-build.json",
+      "OpenJDK/native-policy/classpath.txt",
+      "OpenJDK/native-policy/current.json"
+    ],
+    "excludedDirectoryNames": [
+      ".git",
+      "assets",
+      "build",
+      "classes",
+      "dist",
+      "jarclasses",
+      "node_modules",
+      "playwright-report",
+      "private",
+      "shim-classes",
+      "target",
+      "test-results",
+      "tmp-shots",
+      "work"
+    ],
+    "excludedSuffixes": [
+      ".a",
+      ".class",
+      ".data",
+      ".dll",
+      ".dylib",
+      ".exe",
+      ".jar",
+      ".log",
+      ".md",
+      ".o",
+      ".profraw",
+      ".pyc",
+      ".so",
+      ".wasm"
+    ],
+    "untrackedPolicy": "Captured source files plus new nonignored runtime inputs; no native objects or compiler cache"
+  },
+  "mobilePolicy": "WASMLM_THREADED",
+  "files": [
+    {
+      "path": "OpenJDK/browser-harness/bench.sh",
+      "bytes": 4669,
+      "sha256": "17a99c0e1113cbb33d6c779ed93c720c88ff8d3bd02302462f0a79a2c7add26c",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/browser.mjs",
+      "bytes": 1663,
+      "sha256": "49dd7c4f150371be2ba1b7ec5a30911c1c5c1416fe8e375558ab536dcffe7832",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/drive.mjs",
+      "bytes": 1669,
+      "sha256": "9a519edcda4c3c390ca86b127cb4dde85b12ee45237a547c9976d0fc13d5215f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/jit-gate.sh",
+      "bytes": 5916,
+      "sha256": "8dadfbede8ffdcad0ef1710da3d23af790f39908b9adf282eaea8a21c4184cad",
+      "mode": "100755",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/browser-harness/link.sh",
+      "bytes": 2047,
+      "sha256": "5ffa3f6389733daebff46520123c57164c6c738aa3c712c826a0430c31369b0a",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/manymods-worker.js",
+      "bytes": 142,
+      "sha256": "d4d5708c26edbc618c7f738483708e2f83cfb6c3b174480d0cf284fecbc45f43",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/manymods.html",
+      "bytes": 517,
+      "sha256": "b277d0bfd86f64c465529ae71a535984e1076c9791d41286d8e249af91edbf87",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/manymods.js",
+      "bytes": 2268,
+      "sha256": "f233c1739cdcea0f7016a05942ffa6d3a873cf88bbff4cb510c9632063c0399e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/pre.js",
+      "bytes": 637,
+      "sha256": "8791b678e212c7cc1c348cd79c003744df14c98cd949c2b9c836bfe5f83c5db5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/probe.mjs",
+      "bytes": 1010,
+      "sha256": "4cff3e91a9e7b45b0438c7c5abe969d5670bad12e8965e71a70898e137819826",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/run.html",
+      "bytes": 948,
+      "sha256": "e512da3be8fc41916615e2f53a2079745358bc9c2bb04d634e002062f78e0916",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser-harness/serve.mjs",
+      "bytes": 1213,
+      "sha256": "350f26339d44cc29b667ec34be438c95f59bb5751bc842941e6b9879c1c94e10",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser/gpu-rpc-worker.js",
+      "bytes": 41452,
+      "sha256": "27e7ef48a679f2926e57f804d6e8b7e7c3c63d358dd322620134f4ce198227e5",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/browser/jar-massage.js",
+      "bytes": 42551,
+      "sha256": "7a487f8e5e7fa259a8fab421fd88be7cc5c5584fb8ece7fbff2b4632ff204d19",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser/mojang-upstream.js",
+      "bytes": 21503,
+      "sha256": "0bf59433eb3ef046d127f8e2703a4ff24d720a649a71710e9c80df6dbe3d94d9",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser/pre.js",
+      "bytes": 66536,
+      "sha256": "ba98ab6c3fa4a9b6d9ac6ddd40a1ac5c2787470c570a5a157c673a0c1c4e1b08",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/browser/present-probe.html",
+      "bytes": 3467,
+      "sha256": "a14a1f90d2a1c5dbba9615e22f77cf5e3260d826c196bd10e2ee09c573a1ff94",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser/serve.mjs",
+      "bytes": 2956,
+      "sha256": "acd2b4f556bd6e6d1f96e706c46f704a7d6b4d417d3b58ab45cc9f532cd4671a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/browser/worker-env.js",
+      "bytes": 9156,
+      "sha256": "79888b58b28330cba834397365ae30903e9495820e1d28c95917c8ada5cf2e3c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/build-mcweb.sh",
+      "bytes": 3085,
+      "sha256": "7bf6731482ea1cf5af940d19072977c99e71a78ccde48dda6943eadede020ca0",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/build-native-policy-support.sh",
+      "bytes": 3404,
+      "sha256": "2ca40a23f0f83fa065c18a3ff780a1b1fdde4ac4d0611144efef47a9e7518e81",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/build-tests.sh",
+      "bytes": 752,
+      "sha256": "87cd08a02f51a490d853f9ca79efd7e53e483558893542629614a3a70041ff4a",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/configure-wasm.sh",
+      "bytes": 1950,
+      "sha256": "29317a14964a4b2c3f21fbdabfafd64b8fb906dbb5dd13ac272ff20f8bdc3862",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/jdk-home.sh",
+      "bytes": 660,
+      "sha256": "158301bc1e5d73d99905349858c6bf6215a0a6ac3d8081db80b13f77ef7cde58",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/jit-probe/jitprobe.c",
+      "bytes": 9093,
+      "sha256": "0717a8cf747a8cb096143cb6811b3c0e82ee618b5e276dfa7a8cc1de115582a7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/link-browser.sh",
+      "bytes": 5637,
+      "sha256": "45f6c1a226028453889dbac0c67a6b01cea79a41015ab758d2daffa2cdc7a729",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/link-debug.sh",
+      "bytes": 336,
+      "sha256": "22356a9ad7723a9a797241d979e33f7bbe6b95a9dae0d998543c2e3e5d53de0b",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/link-launcher.sh",
+      "bytes": 2994,
+      "sha256": "609ddfd7d8c86c7f190d8fdc681afe024b4974cad322e3949b131824d11b96a8",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/make-image.sh",
+      "bytes": 3412,
+      "sha256": "9b5349f01c2dba5efc795445f49ee19c960890bf980b3c582d55e9d2a40c0b2e",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/mcweb/boot-src/dev/mcweb/wasm/Boot.java",
+      "bytes": 2457,
+      "sha256": "b421cc85cee6bc5015f522ab5df6c49dd7704cadd3db01170a4dd5a9e49720d8",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/mcweb/gen-jsbridge.mjs",
+      "bytes": 30174,
+      "sha256": "e317967e6c1d601dff3e33f474d44e0519f0c2d335482f19d336e2163139cc68",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/mcweb/jsbridge.c.shims.js",
+      "bytes": 420,
+      "sha256": "2325fc8ac795cd87722ddbfed056b2acbc54664c80393dc6d7cc210c697a9b71",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/mcweb/shim-src/com/oracle/svm/webimage/annotation/JSRawCall.java",
+      "bytes": 263,
+      "sha256": "5dda77b519a0a0117089a3a4e11202dbb2dfc4a5d4d0e666682b110b1ade41a5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/mcweb/shim-src/com/oracle/svm/webimage/wasmgc/annotation/WasmExport.java",
+      "bytes": 297,
+      "sha256": "ec9519baac13b45be72a3e99d26d1cbd8c06810bfee77af6484fe9135b698159",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/mcweb/shim-src/org/graalvm/webimage/api/JS.java",
+      "bytes": 771,
+      "sha256": "9cbfee7f7ee5b9c83a70646dd0d7d05093a95b614ff816dd5cafab8be0ea24b4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/native-policy/MANIFEST.MF",
+      "bytes": 140,
+      "sha256": "4720703af9fd1716f6803cfbf10a18f22405b24dd0d3378822113e1a511b2db8",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patch-javavm.mjs",
+      "bytes": 7380,
+      "sha256": "7da3f682fccccfea8f0532113adab8a2e0578c6a6def523a7030fd63333b0990",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0001-openjdk25-wasm32-emscripten-zero.patch",
+      "bytes": 22742,
+      "sha256": "cac7e9275f82fdf55c4284c614fae50de6d97931c4ab2f073295fac8ca22b482",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0002-libffi-wasm32-unaligned-64bit.patch",
+      "bytes": 4639,
+      "sha256": "505e21d2e25c8ad4acb3bf9860aeffeea6ba6a9d71609c2ada6a6d65f1b23d36",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0003-zero-switch-dispatch-on-wasm.patch",
+      "bytes": 891,
+      "sha256": "9634f4b75303e87e473a0ed14e76c99a6e1b597e1b1cd2bbd885c16dc997b6ba",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0004-zero-wasm-jit.patch",
+      "bytes": 151743,
+      "sha256": "79e9a5fed0ce47d4123fb18cae625d4e865bd25edfdc62173ed20b3c6d9c0423",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0005-zero-wasm-baseline.patch",
+      "bytes": 24930,
+      "sha256": "1fc4c140460235f80ca3f7c5c585e3a5f9a64ba8ef5a98ff87a375d43add137c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0006-zero-wasm-linked-group.patch",
+      "bytes": 28349,
+      "sha256": "647658277094a82263098b8a4c3c817b74f851fb17583514c99d1505303202dd",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0007-zero-wasm-linked-oop-store.patch",
+      "bytes": 24215,
+      "sha256": "13bbc538e68850f2f68276ac2c58e3f6f8210b405af95d5708804cf8852938a8",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0008-zero-wasm-linked-alloc-bail.patch",
+      "bytes": 8527,
+      "sha256": "72947ef019bfd1a7e249391a71057a55035f423f229e36e9dd924a35cd0c11fd",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0009-zero-wasm-linked-class-init-bail.patch",
+      "bytes": 12042,
+      "sha256": "093bb129a2258b25e03f025810978523461c985aad9238b9b8372992c296aaee",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0010-zero-wasm-linked-virtual-guard.patch",
+      "bytes": 22816,
+      "sha256": "0ba6bd86c81bd51a5d5574ba8770a39393c84542c039e8619ae64a676c9ca206",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0011-zero-wasm-linked-idiv-resume.patch",
+      "bytes": 8976,
+      "sha256": "e41007bb2d42c478aa4af386b2cfaba78e0f122b78b745dc69d602bd3c7000c7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0012-zero-wasm-linked-invoke-throw-resume.patch",
+      "bytes": 25318,
+      "sha256": "69914e5b78acb8e59266a2edaa08e14771ee58344774d9ff56cbee85156eda03",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0013-zero-wasm-linked-benchmark.patch",
+      "bytes": 53853,
+      "sha256": "a68e95c8c22e303561b9811fe4368875fcf2d16911873a90fa5289ffef852c5c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0014-zero-wasm-linked-int-array-load.patch",
+      "bytes": 33552,
+      "sha256": "8320faa76eb1288c066bbd8ae86a14333cb4737c030e683d7ec4ccabb644aa11",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0015-zero-wasm-linked-int-array-store.patch",
+      "bytes": 38206,
+      "sha256": "9d76abe0cd8818b37089ff96386203cb9f2de3d0f6591768119c1e8213ffe2d2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0016-zero-wasm-linked-ref-array-load.patch",
+      "bytes": 50378,
+      "sha256": "0d7c204725b28cb1824f49cc2988f86ba07fea98098dbad126c98861ddb7c7ee",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0017-zero-wasm-linked-ref-array-load-cache-integrity.patch",
+      "bytes": 13417,
+      "sha256": "ddb93941e71c293b6b20ca2810806301aaddf046f1f0cd24d2bb21366cac96a8",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0018-zero-wasm-linked-ref-array-store.patch",
+      "bytes": 102106,
+      "sha256": "53cf9d1332f70d3f83e101ec73b5f6d3ebde7e9bb059fd8456754a3e0bcc0024",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0019-zero-wasm-reference-store-group.patch",
+      "bytes": 118366,
+      "sha256": "983ed617633fbf9b2635a3a175dfbf96850c72412388f3fb6474e9364e935905",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0020-zero-wasm-reference-store-group-relocation-scaffold.patch",
+      "bytes": 25800,
+      "sha256": "9485c8785249162ba1d407423a52c62ef634188fcd31afe5a87dd04646cfa51e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0021-zero-wasm-host-and-interpreter-fixes.patch",
+      "bytes": 9951,
+      "sha256": "ffc23e16ce9bcd93244516ae43b9a7caaa63c74f3117de03216ce99ad8ac397b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0022-zero-wasm-jit-direct-entry-typed-inline.patch",
+      "bytes": 466394,
+      "sha256": "934a0020cf8c217149c486925f661a06d58ae2c3fbb34560751a52e16e8a25c5",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/patches/0023-zero-wasm-jit-reuse-retired-slots.patch",
+      "bytes": 735,
+      "sha256": "ec24b78a67eecec996d90561be78b94b116808ce30e2ee83a6dea210d62009ca",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/patches/0024-zero-wasm-jit-filter-list.patch",
+      "bytes": 2254,
+      "sha256": "68213627df673090ca675c2bbe18f79972237bdf292349bd7a2480af9eed6be7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/0025-zero-wasm-jit-residence-stats.patch",
+      "bytes": 29743,
+      "sha256": "a47ff2ac996d3fe5d294c2d9aac790c546b63a6e2aa9410539cb5678dc76a939",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/patches/0026-zero-wasm-jit-no-replayed-volatile-stores.patch",
+      "bytes": 2317,
+      "sha256": "1a01faf41c45f7e9a53eff6b0d284dd79686d1075a0c890694c6613da3c5ef6a",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/dlfcn.h",
+      "bytes": 507,
+      "sha256": "8c103dd0695513075647285e4f7667152ec25677b5a6d3551dd5770c1ec42402",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/emscripten_posix_compat.c",
+      "bytes": 4326,
+      "sha256": "644423b1bd5fb139f57f863ac2d3ff880cebc3ac1eec46d7f1d458904ce867fe",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/lazy_mmap.c",
+      "bytes": 4317,
+      "sha256": "57ebbfca56536fd5864fc886905c6bd1259ffb4ac2fe85714fc75af1ccccdf4e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/linux/elf-em.h",
+      "bytes": 342,
+      "sha256": "d600584e52bc337e7aa368e1b6afd59315ed547c29d437c1bb83d92056e2bf59",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/linux/fs.h",
+      "bytes": 442,
+      "sha256": "db89225073b5d7cb9d275d903c5ef7a4e97547812a0e9f6eff0e1684730562ce",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/linux/futex.h",
+      "bytes": 1672,
+      "sha256": "31e5525305243e36106d0f2db3ae04d193437e29a13454f827d58b28b03dfd94",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/linux/limits.h",
+      "bytes": 159,
+      "sha256": "6fffebe450a0b60fa5b2ffb19570e0beb0430c9505af23674ee6124a93c8cb03",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/linux/random.h",
+      "bytes": 253,
+      "sha256": "b96497b155b4b70b332aa2659ace8307da40acbf29f34fa9f249081741943284",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/linux/types.h",
+      "bytes": 307,
+      "sha256": "de4f53e26eaca8a3691ebc692f91701583d37787043b05d8514d31fb0be90c3c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/sys/eventfd.h",
+      "bytes": 2119,
+      "sha256": "2e3e45a90bdf770d4dba60772c95118a6c656b6d395018825aacf47ebd541f36",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/sys/inotify.h",
+      "bytes": 1419,
+      "sha256": "1b2d15a8f30bd0b1704b1abb47b246c23dd7ccc475b55e0d750aac493e31a9ed",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/sys/prctl.h",
+      "bytes": 756,
+      "sha256": "6588232274ba20b450388bfdc3e55ea341991b800fa7c5ad14dab527478794e2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/patches/emscripten-compat/sys/sendfile.h",
+      "bytes": 1139,
+      "sha256": "e8fcf804451c5ff60c31eb4a6231889dd6e0a0897e535763176093f2aa174aaa",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/browser-attrib.mjs",
+      "bytes": 4551,
+      "sha256": "a522efcc898829a15a67d3c1eaf393460fde37510ba86631554783b5f2433c11",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/browser-profile.mjs",
+      "bytes": 7883,
+      "sha256": "e9d348802a6d43485ca6501dede9965ecfe3ec206c5920ff56f324953b40914a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/browser-summary.mjs",
+      "bytes": 2670,
+      "sha256": "de5d32ec66ebc65139b033f172218109a631b91f7ea7cd9fbe6fc87b83e58a07",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/categories.mjs",
+      "bytes": 1319,
+      "sha256": "96a9c70394f90a521480ff08b1cee871ee15bd18c4e966d8a0c0369e656e3c1a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/mc-bench.sh",
+      "bytes": 3685,
+      "sha256": "a98c01fe76b55f6d23d41037da219d1ff5907a110bd947b208c9a70291946865",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/mc-gate-weak-views.sh",
+      "bytes": 2742,
+      "sha256": "ca7390f7d60b17a9a70e3ce0d645079e5c69a03c4ddc2341aaa7f4d67f87b5d7",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/mc-gate.sh",
+      "bytes": 2426,
+      "sha256": "f872c4df0d9aeca573b6b62a50299a690288eecd141435d423716d96c6bed6b4",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/mhshare.mjs",
+      "bytes": 1953,
+      "sha256": "81dbcd73cbc101777dd2b56890240224f79839c60e9c0ccc3f2fdaa95922f707",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/names.mjs",
+      "bytes": 1102,
+      "sha256": "e81c82f3718684e198c96e825683ef8b164e73d0d504c6003ca64fb8042a1cb7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/profile.sh",
+      "bytes": 1628,
+      "sha256": "be5d84a3d9759af258dbc1a842cf1a6aa26b84151521d5b9558f471fea0ce34e",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/profruns.mjs",
+      "bytes": 1455,
+      "sha256": "37e218116e9b1b0b68212dee1dd62fa9b302a6173ceb3e5972587db958f39d2c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/profstack.mjs",
+      "bytes": 2013,
+      "sha256": "05aea18b2326ebe0538983a89260ce3d827a0aceeb9f96c1d7f9d4ac5960a68e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/proftail.mjs",
+      "bytes": 1355,
+      "sha256": "fdca1780d040ac05a41c5900d807dae37ab7e9c6dedbcf404ebc2dd158dba1be",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/proftime.mjs",
+      "bytes": 1247,
+      "sha256": "9951deeb862eaf2d9553baf8dee0ac9532a87082f3d57cf7189523f53558fd72",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/subtree-cats.mjs",
+      "bytes": 1604,
+      "sha256": "68e2b0e0d0bc5a639c854463dfe7cf1700d5e100a15b2d1207c32bd5605604ca",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/prof/subtree.mjs",
+      "bytes": 2086,
+      "sha256": "0c8dd0b4a4a709e163bbc2ca6050d259d5aee520063bed24180a050cf18440d4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/regen-local-patches.sh",
+      "bytes": 4764,
+      "sha256": "8979dab3d36c1747ab304fecf17943eb37571dbf35908d0a83f55ecd2d557c53",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/run-java.sh",
+      "bytes": 1913,
+      "sha256": "f73ecd02dd02bd8fec33405cff00090f5eb59821b60cdabc7a03a0c1526a2d06",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/run-jit-tests.sh",
+      "bytes": 39083,
+      "sha256": "2386e5af4c2840cbcd94271c2b5d85271a74b2160397f294e4a9c4d7f1cef39b",
+      "mode": "100755",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/setup.sh",
+      "bytes": 28708,
+      "sha256": "d11e2bbb384220221adb62d8433014f5fb8a3055484da0c50571978fd0c6673e",
+      "mode": "100755",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/tests/Bench.java",
+      "bytes": 863,
+      "sha256": "ba9d5b6a7e8f5f84da5c37392e7ba7c2fe8e084a19f6567e177324310efa8c30",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/Bench2.java",
+      "bytes": 790,
+      "sha256": "eebc632117e007d7fb1b8f0d63cac912010c78c0561445265f31cc2b48261915",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/CallBench.java",
+      "bytes": 2149,
+      "sha256": "c5a8e533292a9cb47a9c40d144f9d0de1b0c596520511acd9aa45a788e13b335",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ClockBench.java",
+      "bytes": 1079,
+      "sha256": "948686df30a43426de7172ca48f5e1ccb4aa96244d1d9561160033eb8def3f69",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/DeepFramed.java",
+      "bytes": 870,
+      "sha256": "2ffb5501c4d2d4192c57367ce9fc2b1c3801a49cdf796428993876ff15693528",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/DeepLinear.java",
+      "bytes": 698,
+      "sha256": "de93c071a35d10d9bf8e0d623179749341ea15fa64c9fda7169c5d65e186dd2f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/DeepMH.java",
+      "bytes": 2570,
+      "sha256": "ce0280ea7aa1c78fe935c6bc80c6adb58313d08830479cb4c76e0793d708c03d",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/tests/DeepProbe.java",
+      "bytes": 623,
+      "sha256": "f0b185914bf9fa3635afd008395f5afdd0a172e51cc44adc7bf601a0de2329d9",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/DensityBench.java",
+      "bytes": 5724,
+      "sha256": "be9baa26f19a99a6d15b8c9c00ab5ae15ac0bacd58e1772dae8b7f1a0481c58c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/DirectBench.java",
+      "bytes": 1261,
+      "sha256": "03e3796b55944664d6038bd579f6ed9d92e75d34d5161112c1ff08ae982e382f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/DirectCodeProbe.java",
+      "bytes": 1073,
+      "sha256": "44343768c09f1362d13fc11fd9dfddc0f7c41bf43ef8c5d8700148016b4c5d1d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/FlStoreBench.java",
+      "bytes": 3076,
+      "sha256": "ccf41b0c26bba1833edd188b2b9c3961abd0fc9b179f1dc501763f642e63b564",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/FramedBench.java",
+      "bytes": 2693,
+      "sha256": "a975580b7adc7d94405ac9a57ee52fbd0671aeacf35353a0f1c0cc4848e7ab6c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/GcPauseStress.java",
+      "bytes": 5067,
+      "sha256": "a1d7778ac0725e85d9a07c69c8eb0c40039c9e41598376b148de9ce8e80b5366",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/Hello.java",
+      "bytes": 2225,
+      "sha256": "dab6aa174bc330fd1ce84c12baf427720a80bf0f4a740f23994d99eb7cd0a58f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/IndyBench.java",
+      "bytes": 1864,
+      "sha256": "b80756e0072098a5b877e984f8fc774228c878ff019061dcabf091a6cd73b792",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JarLoad.java",
+      "bytes": 2462,
+      "sha256": "566b273c7be34fb62268c122cd0076aad17e38c2c39499575195e459d6f99873",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitAlloc.java",
+      "bytes": 1922,
+      "sha256": "005f63d92c7d12eeb50869db3032e5a9c442ae9ba8bc11ace628d593ee9aab2e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitArrays.java",
+      "bytes": 2904,
+      "sha256": "844ef2d015d25a59255264d7c44de43be38a8650f684b4c3998311756ac888a0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitBench.java",
+      "bytes": 944,
+      "sha256": "1e25cf64854e4c81f56a8413749bba6b29f91122d5ffd6235a16ee2d3b0e7a5f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitBranch.java",
+      "bytes": 679,
+      "sha256": "8730e72cb49e2bcfff1fba1a774b69fa8539ab1b0e41e27b56a82f6316e9f3e4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitClassCast.java",
+      "bytes": 2297,
+      "sha256": "459a9be5e23901895903cd7730525dd78c6496bd800f02a5a1ac40485c1826e4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitClock.java",
+      "bytes": 2179,
+      "sha256": "7a4cc2015f01ecef06fe318f3ef81503a74fe26bd7d96c10c77d39b8ae575c33",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitCold.java",
+      "bytes": 2822,
+      "sha256": "6a217bc13cd5fb0fdbf92a272577007a0709a2559c7c303ed8106543596e861a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitColdCall.java",
+      "bytes": 1962,
+      "sha256": "4a29a52aa8ed40ebb5020b8b8b43e95d62004cf7c067104fe60e78d8235df763",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitColdJoin.java",
+      "bytes": 2594,
+      "sha256": "624a63942e121d126769542c20b46496c2918aaea95371938e41f97316b48c06",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitDiff.java",
+      "bytes": 6403,
+      "sha256": "06471a9c049373bdaf861673ee68087544023759687cbad18853b7c0806a8e53",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitDiff2.java",
+      "bytes": 7788,
+      "sha256": "96f07990a20919203bcd0981bb15512c0c98bcf71cc46cf57784b3a05cef23dd",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitDirect.java",
+      "bytes": 4223,
+      "sha256": "4203a0f289e9b6d674a1de4b3efb839f155c7a83af588217494db23a167fb7c0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitEnumSwitch.java",
+      "bytes": 10431,
+      "sha256": "cf4418d9a46f7411ced812e1de7fff8efb8d979f8cd52506b8827202c26a174c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitExactThis.java",
+      "bytes": 3575,
+      "sha256": "b3810b3aef1c1544800a9164d89f078cb29af99158ca3186a616a714778784e4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitForcedVirtual.java",
+      "bytes": 2655,
+      "sha256": "727a61c3c232f52bd4c0bbd4f944f2ec1d0954b28a673340b75cbbe807367fd5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitFramed.java",
+      "bytes": 4580,
+      "sha256": "50e3d8b8e478b65e4c8e33e6d3c887a0f3a1a29d46589690c89c8e8e90607d8c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitFrameless.java",
+      "bytes": 5356,
+      "sha256": "3bf92de87d43a07807f74d7f84466cece4da35e2599deca2a97245797f68499a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitFramelessAlloc.java",
+      "bytes": 4431,
+      "sha256": "5da153a64f32251eab04a75d2a576775cc2ca5c7bc30aa8e9f82e9b03e98d3da",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitFramelessStores.java",
+      "bytes": 5887,
+      "sha256": "e046e758244a81fe2f6c9597516354e11c512ef2d865417735fb4bf1cd5d2226",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitFusedLoads.java",
+      "bytes": 1251,
+      "sha256": "54562828a6d4608d96fe7a48804d921391fec1398b32a5d75bdf1f054d4ad798",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitHash.java",
+      "bytes": 2136,
+      "sha256": "0da8ac36b97d64e0abf70cae329f53b9033fa7573dbc4de90a178eee0f793089",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitIndy.java",
+      "bytes": 3349,
+      "sha256": "c45b1344374db12e9278b246db05a35075e056e0f20df2b386fa6b890d235dad",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitInline.java",
+      "bytes": 1297,
+      "sha256": "98bbb64b120d223dcc9f2ca83690444f0839f3150233a1db890099b80be93685",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitInlineAlloc.java",
+      "bytes": 3680,
+      "sha256": "1d62aeb68d4dd8c213c4aa31afb71992b6f78633e029d53bafa57aa5058c5448",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitInlineArrayStores.java",
+      "bytes": 3513,
+      "sha256": "e5457d8ab3daa815b2456f984f22333ec266f0213c8354d16cc513282426ea84",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitInlineStores.java",
+      "bytes": 4656,
+      "sha256": "e6fd360fef3ac56336dde2d03c143c6caafecef1264fa86d2e21063e793283e3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitIntrinsics.java",
+      "bytes": 3238,
+      "sha256": "be251281f01a9c8133ee41c91b8ba5eb6a5221fc807271fa678ef9d92e0eecc2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitLambdaAlloc.java",
+      "bytes": 11984,
+      "sha256": "526955588a224025f927b2f867c4d8e0ddbb16c64fdc0d8d9617c10c6ac87104",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitLateClass.java",
+      "bytes": 1605,
+      "sha256": "718e24a3af488516063c97819e3848d21cdce44251532d2b2feee70b2d184d8c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitMerge.java",
+      "bytes": 1896,
+      "sha256": "51f397d1963cef2b980efb9848f584116e3d8aec9bd3a12b6b4f43f33b66317c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitNested.java",
+      "bytes": 2691,
+      "sha256": "b9e687659323571019f5eb1fd1fc29bc987bf196b94d8c9ebc177d79b673c74b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitPoly.java",
+      "bytes": 3127,
+      "sha256": "66662452138e3ce24e95d2c93ddae5b7be09e4832ee4a4f4d027c667fd68bf05",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitProfiled.java",
+      "bytes": 3879,
+      "sha256": "3ea9d4e190512d1740bf39d945b86565ebd36a1a2bd5aab36631ed555f7f1e44",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitRecordGc.java",
+      "bytes": 3277,
+      "sha256": "e0d74d5eff586be21dc0adbdc25a88f4f8f9569484a7a51fe3a609894454050e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitRecordShape.java",
+      "bytes": 4047,
+      "sha256": "8fe2853925b8d3f6aab927d4b85fd970cf92f9bb254faec5ea620cbad10d805a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitRem.java",
+      "bytes": 2227,
+      "sha256": "2bb296a4582c5c3b70124dd369382b984fee8dc6d3733f1a0d3c7ac6385daac5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitStaticStoreReplay.java",
+      "bytes": 2389,
+      "sha256": "e44b9d7f5cfe165107fc1197b9f9971e7e5f43beca2e753a0495da3787ccba16",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/tests/JitStringHash.java",
+      "bytes": 4354,
+      "sha256": "f1f0e534c6d59158c46a0da546eae60f0ba8d4dc740077fa351119e8a3ae7cdf",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/tests/JitThreadLocal.java",
+      "bytes": 3627,
+      "sha256": "4a15124d55310f37052d9ffb429d9d24a7a45aee9d159823dda324941e574270",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitTyped.java",
+      "bytes": 3735,
+      "sha256": "b10ec70128169b2aef9b7c3d7e4f7652f4d10de1bd08c9270bc2c7e61cd2b355",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitTypes.java",
+      "bytes": 6791,
+      "sha256": "63cda49cd5ff3b554877a0b6a84014f4db4a021fd4309455c028cc86b321a961",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitUnaligned.java",
+      "bytes": 7244,
+      "sha256": "e32ed1cfc65261b00ba82e032b05bab797ed145d9d14d24e578e8a9661ec1266",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/tests/JitUnsafe.java",
+      "bytes": 5310,
+      "sha256": "cdb843324f5c43402a09d80d5f8bd3eb8b87ea68a31bb8cbd15d38fb498a3c11",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitVarHandle.java",
+      "bytes": 9851,
+      "sha256": "5e7bb8e5849bfa06fee62d3db442f147b7814bd07021687008173af73ce0e24d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitVolatile.java",
+      "bytes": 3608,
+      "sha256": "fb44e083eb4e6c4558e2efbc37ac66d0bd5b5ff57a9f9ad8674e9093314cee35",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitVolatileReplay.java",
+      "bytes": 15405,
+      "sha256": "49a199a98c87db293e706b7c190912c4c45122a8242396732c73f32324f46dc0",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/tests/JitVtableHash.java",
+      "bytes": 2540,
+      "sha256": "1fc84973e195cd1b8c6c14d8a5cffbc86138b27a43d46d883b1d338aa2c077ec",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/JitWide.java",
+      "bytes": 2298,
+      "sha256": "7611116bd62dcb2894e8b95a014be1adf85cbb370d2a07bc18f626db4808bfe3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/LambdaStress.java",
+      "bytes": 1440,
+      "sha256": "3b38b4538b56d207f9417089259a5633deed9b496449e8261bc0ccf04ea942ac",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/LazyMmapCheck.c",
+      "bytes": 1300,
+      "sha256": "a62e2a4589166fe9ed362c0d1d9670bc52d9357bd87503de2b21e947fe08785c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/LockGcStress.java",
+      "bytes": 4209,
+      "sha256": "6846438fbfd5074c91dddf5e2995d7e180d577af85045463d76173fee4ffb7dc",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/LockStress.java",
+      "bytes": 3571,
+      "sha256": "3a54f671ee3bca9b90f353e7258e6b787a05b372aa9bd9cbf973b603df503dab",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/MathCheck.java",
+      "bytes": 2521,
+      "sha256": "cc29ad21152a31a5627fa3abab96285d9e62cf67f10c3f540a95c3cbe4bb9750",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/NativeCalls.java",
+      "bytes": 4347,
+      "sha256": "8b9abf1981fed5d3c2ff4a071857d5f61bdbe448593026a3744c37b2326f4675",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/PoolChain.java",
+      "bytes": 1747,
+      "sha256": "931bb7bb25cc71d2cff905f905e119a99c68d409c28bd1e89b975db581098fca",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/PoolLatency.java",
+      "bytes": 1550,
+      "sha256": "432a3d11394d758be8d3bf9122e4e62e8ac1b9eb5923e3203165f34d91cfd24e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/QueueSignalStress.java",
+      "bytes": 7974,
+      "sha256": "bffc0304dac3f57d752387ee194175511a5892a38197fe8a8c59608d09ef423d",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "OpenJDK/tests/RecordBench.java",
+      "bytes": 3801,
+      "sha256": "3dcd3ca47d52e91b4bec594f933cfdea246137b4792c68ae1422cbcc83524f3a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ShapeBench.java",
+      "bytes": 3735,
+      "sha256": "ca5bf3b235b0296e62325f705baccefb7294e5f1299211582fef979b07b8c3b9",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/StackDepth.java",
+      "bytes": 995,
+      "sha256": "fe62e2146b5f54fa6b8c1d23f18ce1683227b567af7da51c8e6a52dca2464180",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ThreadProbe.java",
+      "bytes": 1891,
+      "sha256": "3efaed40ef990b98c487aae26bee162725521bce1b343f132708bc1dc87d2775",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ThreadStress.java",
+      "bytes": 2063,
+      "sha256": "f36bdbd0ac23cffe2ee37ea3481623702318b3bb87cebe64202b24aa384bf60e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/VhBench.java",
+      "bytes": 1296,
+      "sha256": "008975e7279acad563f5af4679359440785ac25ac78ce7e58c96c873a744965c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/WholeUnitFixture.java",
+      "bytes": 2167,
+      "sha256": "4ad2f379b56693090e68d075d40a25cb98ddfabad73d0781c0ef031e0f22608b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroBaselineFixture.java",
+      "bytes": 36901,
+      "sha256": "af823feba2371e55dfb6d6fda494437ea3390c737b1bafefaae39c597fdf644b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroExceptionStoreNearMiss.java",
+      "bytes": 1401,
+      "sha256": "b41503f1c8981d76ec8fd69bf590de373dce9a5300ccd0f29b06ee81ee174439",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceArrayLoadFixture.java",
+      "bytes": 7978,
+      "sha256": "e69d2558341b337813a36a100587c80e4f92da86e59e8455aecac1fb9592891f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceArrayLoadNearMiss.java",
+      "bytes": 431,
+      "sha256": "a4ff337625ba45f7a7e841d9ecb930b1f408af282138e0b18022de82c16d0ac5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceArrayStoreFixture.java",
+      "bytes": 14160,
+      "sha256": "a312cbfce7fc4dea4bd5d106cec35ef249127e9634cc0fde6d4d024a03d73b89",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceArrayStoreNearMiss.java",
+      "bytes": 516,
+      "sha256": "2861d67e19a95dc0f7872ec405c0f2fdb86f5d8abb45bc799cab740f66c12e7d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupFixture.java",
+      "bytes": 678,
+      "sha256": "4fa5e65df8b20369652043684ce8789ffe178e505840befe543f80ae48bc1239",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupNearMiss.java",
+      "bytes": 668,
+      "sha256": "0166f42228c5ae3129d787e5d790c2fa025be707768bce5f38ea65bee7783ff2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupPerfFixture.java",
+      "bytes": 959,
+      "sha256": "8c8168a107636b4bc5c8fbe249c49e61ff4acdabab262108055c9ba143ef28ed",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupPerfProbe.java",
+      "bytes": 8983,
+      "sha256": "3d197158d502c360edd3d049f8bd0c2b9827a53c449e53e1a433b54d35329354",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupProbe.java",
+      "bytes": 8200,
+      "sha256": "007c2de3eb866b8efa5f3f8cb05b7ba5f49bd7f316aeacbfa0faaa57dff43a78",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupRelocationFixture.java",
+      "bytes": 1197,
+      "sha256": "d4e51fc808206813f81ecac7a92b8286f28456c66385384d69b771ea8b03a4e0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupRelocationNearMiss.java",
+      "bytes": 1191,
+      "sha256": "62e1c4efa2cc49a0484123a72f8c3f9d17aa8f4223c1408f53eda2a94eeeaa26",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/ZeroReferenceStoreGroupRelocationProbe.java",
+      "bytes": 1558,
+      "sha256": "0f275ae51fca22a244200106f19a245e863ba406c9724b0ebf202f7f7d7e664e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-jit-retirement.sh",
+      "bytes": 1230,
+      "sha256": "d8ea795e3e389e42b4194906ac7a40a63e79cc388f3559d71538938855a091bc",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-lazy-mmap.sh",
+      "bytes": 910,
+      "sha256": "548097b39755449cde3ae6a6cb421b6c98397f7ac9236dcf14a8fc63d3dac152",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0015-patch-boundary.sh",
+      "bytes": 4408,
+      "sha256": "30180f73a1e5ea3428f2959344466efb92fc60aad845c9656876408772c08841",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0017-legacy-provenance.sh",
+      "bytes": 5083,
+      "sha256": "fc3f6659e2908783199224c448e96621c6cc008ed9ec5e2e61228f0531147f6d",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0018-legacy-provenance.sh",
+      "bytes": 10242,
+      "sha256": "98210162e613050c97e02d881be392b022e6cb04710d7c144698d9d32d70a310",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0019-legacy-provenance.sh",
+      "bytes": 5672,
+      "sha256": "4867c4d6910ebf17783c83640ab0547f08230e501c0b2e5e2ddd7dbe783e30cf",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0019-module-provenance.mjs",
+      "bytes": 5740,
+      "sha256": "6d69546ddc3df88fa736c23cb77419d5cf27705a5de2fe3b05692ca18904d8d0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0019-patch-boundary.sh",
+      "bytes": 11916,
+      "sha256": "2469f814f314fe7a90d7160879417a549c6599e46f19b012d78130ba9de95e73",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-0020-patch-boundary.sh",
+      "bytes": 14923,
+      "sha256": "32182d7d91ef3c03c608307d067f8d98d5bc2c02d97950a37dd5ee0df6557f12",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-array-log.mjs",
+      "bytes": 3577,
+      "sha256": "5b0c56298c2dfd72c307eab51583f95f5f49a4858c773f75c68d04ddf9c1a8bd",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-array-relocation.mjs",
+      "bytes": 4017,
+      "sha256": "42f1e1c137f2f06dd11de9f9e6afae51bafc858973b228ada8e88761f6c18436",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-array-store-exception-class.mjs",
+      "bytes": 10557,
+      "sha256": "d64a3b365cbdd7da2b1345c9630249178293e5cd406620fcc865eda611ccdde7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-array-store-log.mjs",
+      "bytes": 11353,
+      "sha256": "16b683b535579a7b26acecd7ae691f2349e42df30a25ca5a310d590cbb1e6ade",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-array-store-wat.mjs",
+      "bytes": 20464,
+      "sha256": "a66f8b119c89900fb9136205bc2f5575d59d41e085039322ebdc0b9331db2adb",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-array-wat.mjs",
+      "bytes": 4493,
+      "sha256": "b2556c80941d129f32a3e99d2bf71d3de8a547b18becb807fdf38ae7a05bafd5",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-ref-array-load-log.mjs",
+      "bytes": 16564,
+      "sha256": "5ac5449f67d54abece5f9b0deaf35c2f5dd2a00f7a035f7d26dd71885f0a9231",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-ref-array-load-wat.mjs",
+      "bytes": 20612,
+      "sha256": "826089b26d45d20f5a2299b4a9dac09dd2477d7edf12e8044d2cf852c8ad558a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-ref-array-store-c2-log.mjs",
+      "bytes": 22524,
+      "sha256": "32218f39897f5447fc831b33b8c7f73198e6e21af04f45988b1cc5dbce6ee8c5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-linked-ref-array-store-wat.mjs",
+      "bytes": 25751,
+      "sha256": "04a519775f7cdeb6fc04d8ef99c23e7fb9d8fee590db7a0a7a9052d4d7a36d74",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-nested-evidence.mjs",
+      "bytes": 5065,
+      "sha256": "16e8fcda12969331013a36d1e7e59ed765581c9fa39ba2b8f238b74732fc9a51",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-array-store-class.mjs",
+      "bytes": 6043,
+      "sha256": "761efdea7515696e612e41fc7c2d8c26a882801b1fb08ed355a3ff4b52e164c2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-class.mjs",
+      "bytes": 7328,
+      "sha256": "c9b65ac0420fc643e60a7c0e54b646ee90587f223ac217fded6be3241edea8f4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-log.mjs",
+      "bytes": 21172,
+      "sha256": "023b4624812308bf0ae37d764d81d9a951b7e38c53e9d290bba7a0ab22255f2a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-manifest.mjs",
+      "bytes": 7691,
+      "sha256": "6676075b29cbd0dc1602f9d28ef881dcff0856a16f02fb2c1d52e44eb5a6fac3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-perf-log.mjs",
+      "bytes": 11834,
+      "sha256": "cf8b0a9bf3c0f8cf12fc69bff9e4049f18fb7e93e3c906142cc1a924b6fe4c6e",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-perf-publication-log.mjs",
+      "bytes": 4070,
+      "sha256": "2418397eda605e9409b6555b36ea509fe620af9e17129ac3f30da4706dbb54c2",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-perf-publication-source.mjs",
+      "bytes": 4123,
+      "sha256": "7a8af382906077be03adde6721a19b6268db7a8bedd37b2b1c8fd2b0be492e4f",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-perf-wasm.mjs",
+      "bytes": 11561,
+      "sha256": "8f94a68249bcba276fb03f44ae6f1606c15dd9d1e1beae9ed1d7e7ca367fed2a",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-relocation-class.mjs",
+      "bytes": 15046,
+      "sha256": "fba5abe6758be08bcff450b832b0994930c2d260af59165a1fb0e709914ec80b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-relocation-log.mjs",
+      "bytes": 1851,
+      "sha256": "cf5124de82b9b945dd69448c3a6b529665b936b2e7131714d0562ae02b718716",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-relocation-manifest.mjs",
+      "bytes": 8024,
+      "sha256": "414c4848200e5ff0ae6cc937a39bd6d7016e9cb0b66cbe2f9486f66db8537d73",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-relocation-source.mjs",
+      "bytes": 25665,
+      "sha256": "de7ea87abe4fa76d1508fe500685e1bfbfe2516c5471af23ea82af1d221cae6d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-relocation-wat.mjs",
+      "bytes": 21693,
+      "sha256": "709ba11bed90cc3375155fdf3e605360a2595511691dba453a839b16d9101f46",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/check-zero-reference-store-group-wat.mjs",
+      "bytes": 29532,
+      "sha256": "73ba4d63d4ca4e236b29ff02f4556e38afd064b63a62eaec9183ed08de7b41bb",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/generate-retirement-stress.py",
+      "bytes": 1370,
+      "sha256": "2042b9d5916a9cd20f110628537892a2e945472bbe30fca330631f218043e1c5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/jarsrc/Plugin.java",
+      "bytes": 188,
+      "sha256": "d8f8a0e3b00a4a92b15293a40e30bc229e6ed52a2f63a922a1d67f36c4c91fad",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/mc/McChunkBench.java",
+      "bytes": 9096,
+      "sha256": "301e603f066308f72de42302b2ae976816cddd24cd83338ab9bf179bdff541f7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/mc/McImageBench.java",
+      "bytes": 3787,
+      "sha256": "604a0370cf80bdbd7b2f67dcbe36bed89f7a0c2524c8b8498a5733c5c9d38770",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/mc/McNoiseBench.java",
+      "bytes": 1726,
+      "sha256": "8d4050509b6d3a1280bc25f3e55d3b93c574d4c48786bf2b34335eea74ce2dc5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/mc/McVertexBench.java",
+      "bytes": 3813,
+      "sha256": "9751ed31edd35a4dcb9e3c9711fd901999ad68f3f04341de2a4f45c9c6d8f1b5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/mc/McWorldgenBench.java",
+      "bytes": 2999,
+      "sha256": "bfb76424562e375cad10d435718a81093505a3204910e89408c65873e5d429e0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/mc/headless/dev/mcweb/graal/webgpu/BrowserGpu.java",
+      "bytes": 458,
+      "sha256": "6f86127765646600add0b31e61d2d67ba20f1ff57d9bb8e3bd6614cd6a322912",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/net/LinkProbe.java",
+      "bytes": 17638,
+      "sha256": "d9e00205aeca2f81ca8f889550a3cb005c6baf023c4dfee3cbf8a187b262c22e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/net/MakeServerPackFixture.java",
+      "bytes": 2873,
+      "sha256": "1fdd8dfd4eec89ac94e7b544c3be0fcd88674cd06663061b0d0773f32d0db387",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/net/PackHttpProbe.java",
+      "bytes": 16872,
+      "sha256": "ad82814a49101d9e9628680807a15ca9b1e8a187ebdcaa8cd6b3dbd7ba389a76",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/net/WebSocketLinkProbe.java",
+      "bytes": 30848,
+      "sha256": "78a4d9262940254e1e1ae83a29639fa1cecaafe01878171e5c38c0eba491e69f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/net/mock-mc-server.mjs",
+      "bytes": 5003,
+      "sha256": "7d11e5ffa5dfcf0a4848736f7facdf7b0e3fb6b35192a4851b62d2e1e362717d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/net/stage3-jar.mjs",
+      "bytes": 1714,
+      "sha256": "1500de397f76868fdb1dff188af048120af748a27b18ababbfaa434bf45fd929",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-whole-unit-host-cache.mjs",
+      "bytes": 53535,
+      "sha256": "f41d97da56835d109c909cdea96cd942d5d0f51f444d553c4b85d73bbf3582a3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-whole-unit.mjs",
+      "bytes": 19477,
+      "sha256": "0c40e623f08ff42b7c8955b6f69dfd6d9b4e10a8b898982bc9ffc85afe8a9a78",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-0019-final-legacy-suite.sh",
+      "bytes": 14630,
+      "sha256": "5277fa1fef8b3fa84f95fdc1d267a33069287ab584c62573f5874de629c900cd",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-0019-final-suite.sh",
+      "bytes": 31077,
+      "sha256": "0cdf32769f697611f1b410b1e3c7398b142f531051af43d59118ea1b273dff64",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-baseline.sh",
+      "bytes": 2423,
+      "sha256": "bc8e7e21f3431d5e0fb1f5e1986c6761e2b3823a22790e397aebda4d217fd8da",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-alloc-bail.sh",
+      "bytes": 11885,
+      "sha256": "a208b0ffe0ced68caa765aea94cd8f2d3daffab250ee9c1848c745d88b242a42",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-array-store.sh",
+      "bytes": 62089,
+      "sha256": "3106c47100cef41fbfeb8e0812993c4aff2a35eaff8c86741e788fc6de0471e0",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-array.sh",
+      "bytes": 41332,
+      "sha256": "b813e0af5dc645ab4d11aaa29b83ceceb68460bbbade802f719f8f750d38fe1c",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-class-init.sh",
+      "bytes": 10088,
+      "sha256": "169f24b2d8ae0b2945c8ca800c5e029d0face5874ce3739ce2112955e796c8a1",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-gc.sh",
+      "bytes": 14708,
+      "sha256": "08fda4432ecd45870f87a87f31f06af712582e42be56a956ac717f02003c1cfd",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-group.sh",
+      "bytes": 12303,
+      "sha256": "0bee34a019510190a5d63633996c214e6fcc6fc59aeaf95a520a556514a30998",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-idiv.sh",
+      "bytes": 10383,
+      "sha256": "054a139860b093a41b0433e0714ac476c1f690ef76b72132905e41043ce5e0b9",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-performance.sh",
+      "bytes": 47950,
+      "sha256": "5e878dcc641ea06eaf0b8bd801b57568cc9be26f5280f7cbd5b51a5adf26550d",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-ref-array-load.sh",
+      "bytes": 56792,
+      "sha256": "f544ad387fc01de409d84d355f2f6055f668b0b221d092614972fbca5766ae4d",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-ref-array-store-c2.sh",
+      "bytes": 44294,
+      "sha256": "b20239aa793e439a4e285844f48af69aba9b93b7c11871c2d979cca42b428eda",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-throw.sh",
+      "bytes": 9872,
+      "sha256": "72d232cc31700e856be550ceb4347595fc86e0bc68605c192c00f6f0b8084396",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-linked-virtual.sh",
+      "bytes": 12062,
+      "sha256": "2ae7eed2eaa5c093b1b74293a4b8015f799622c96f88c6f00dd0d01ed5823e4e",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-cold.sh",
+      "bytes": 10236,
+      "sha256": "365945bd09fe9319a7c2b8042c7584211b54e47761516f1d5988aa4233d6a342",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-focused.sh",
+      "bytes": 12740,
+      "sha256": "6345091da16d2b24ecd5aac993fa1c714bcaa71b9cb5a6174e39c67b442443bc",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-perf-publication.sh",
+      "bytes": 7172,
+      "sha256": "189621977e80313d199376deb4abacedd4116a81fc418e2745ca1c7fbbce9aa9",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-perf.sh",
+      "bytes": 12029,
+      "sha256": "c3f08cd7d19479dfe2dfa1d6a2641fa1f1c66c4f8e966ca7a827a158fbf68fdc",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-relocation-stage1-evidence.sh",
+      "bytes": 10327,
+      "sha256": "976d226bc7e7033c9ac394777b5bfd0f61c8b2d54c704f36c927c0220e26faa2",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-relocation-static.sh",
+      "bytes": 6501,
+      "sha256": "277147e255e216e3b2fd222c6ec4a1957b44e635f10207cabad027e70ddedea7",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-reference-store-group-static.sh",
+      "bytes": 6959,
+      "sha256": "3c8846fc9bae42677e13c21f8eab361b236b348963c2647ca056b7922b326d5d",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/run-zero-setup-transaction.sh",
+      "bytes": 25075,
+      "sha256": "102b9563f89a3b3289b1795e7a279fe4218f1f0d3b355e9ab3ad87519bf97194",
+      "mode": "100755",
+      "change": "modified"
+    },
+    {
+      "path": "OpenJDK/tests/wasm-call-cost.mjs",
+      "bytes": 2875,
+      "sha256": "57968ace8397b9f773660b74b202cf3ef3ab9d2333dce7e6a5962dc00573114c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/wasm-instantiate-cost.mjs",
+      "bytes": 2789,
+      "sha256": "ec28a43a2955e6377621e77cc703c187159a52cbd7ead8630015b1a02e3582cb",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-linked-array-manifest.sha256",
+      "bytes": 2288,
+      "sha256": "eac64ac8033fdc5da7cc49e0bee57173967676ec60455fc13be7777293ea7dd3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-linked-array-store-manifest.sha256",
+      "bytes": 2763,
+      "sha256": "273b2f45e28014c1a6f51f341b35faf089c24c3cb410fdfd83a66e498b0efc92",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-linked-ref-array-load-manifest.sha256",
+      "bytes": 3513,
+      "sha256": "cfe441f1d451eda3913ff0e6d9b1eff3e36b080fc186e032b872dc59505a4251",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-linked-ref-array-store-c2-manifest.sha256",
+      "bytes": 4162,
+      "sha256": "03faf9f568a40459ea14c69fecc3e4088784841432f30f7993d14745c360d094",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-reference-store-group-c3a-manifest.sha256",
+      "bytes": 9007,
+      "sha256": "4c4ef4556ebe8a7cbbe8f5e2d0ed0cf223d0077bdf1e093d9833bacdce591e5a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-reference-store-group-relocation-c3b-manifest.sha256",
+      "bytes": 2591,
+      "sha256": "4e744140c3ef00c117433ce9c8279386e26159db7a7bb53a62a31c774616465d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tests/zero-runtime-gate-lock.sh",
+      "bytes": 2378,
+      "sha256": "c6d9fcc5b201c2678e07c874cdff5d366c39b90726ae840cab69aeff19092c3f",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tools/ShadowLinkCheck.java",
+      "bytes": 5999,
+      "sha256": "b374525b33b7dc2d01644e1f3d469c7b2ce09851546475a560416e0310f17854",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tools/dylink-metadata.mjs",
+      "bytes": 5072,
+      "sha256": "ef9a8fb4eaebe83620de9986b426ccbf48fc0063678a655e2ab0df7dfda34aae",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tools/test-native-policy.mjs",
+      "bytes": 14930,
+      "sha256": "54ae5b483188883c9f56872f99b114a1247cc2deffa544064c401e45f3a9f97c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tools/whole-unit-compiler.mjs",
+      "bytes": 39560,
+      "sha256": "89276157b5d52e25f5ef9bb9cb9bbc115cfcdc0559b5f09642ce1f495e95322b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "OpenJDK/tools/whole-unit-host-cache.mjs",
+      "bytes": 27520,
+      "sha256": "825c598e803209d51fc12b8c96624b894d2d4099eab42711198e55b77e8f703a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 2221,
+      "sha256": "d17d1f2d2e3169279a89e2fbd89a8b34ba7b299b00693aac4ceb83f53f4a5995",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "package.json",
+      "bytes": 336,
+      "sha256": "df3d483f1dc70aa3c07c293a2c9d392e7945b51efd02f9eb63802ca947517840",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "playwright.config.ts",
+      "bytes": 1708,
+      "sha256": "6a227a6c24fc0719730a4ac15fa07c0d73e5befd2db2195ea6c508d50aafade7",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/com/ibm/icu/text/ArabicShaping.java",
+      "bytes": 2599,
+      "sha256": "4e84406b24dee7d5faae2488b50d330b2c6cf6ae5d8c5090f47c832722bdf7f4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/com/ibm/icu/text/ArabicShapingException.java",
+      "bytes": 245,
+      "sha256": "621b81cd3c154ed26a6f428eb01dbadd2db51484167d9e1925d1477e6e419e8d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/com/ibm/icu/text/Bidi.java",
+      "bytes": 2585,
+      "sha256": "1609079fcbcd02d5eab7fc97000cb64187018c160b9d57e29f33ca3ebd598df0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/com/ibm/icu/text/BidiRun.java",
+      "bytes": 870,
+      "sha256": "6861f02799908313f56fa36df950cefa0e8bc61b375a4051c970521425391925",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/com/mojang/blocklist/BlockListSupplier.java",
+      "bytes": 503,
+      "sha256": "a5ad4a2f8f019ac13a0ec5dcef568ee5d32be63b6774a736f65074f700ec55b1",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/com/mojang/logging/LogUtils.java",
+      "bytes": 1198,
+      "sha256": "8f94ba8d60ecada42ed4d7c8bdd6c19bf5e2ee85273793f56ff7f5967169b088",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/com/mojang/text2speech/Narrator.java",
+      "bytes": 1060,
+      "sha256": "bae3629f93c5f9407991b75e474187ace286c158fcf268501323fca22978b3ec",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/browser/BrowserPackFolder.java",
+      "bytes": 612,
+      "sha256": "83e9b9038672fe5bfcb19fc3c1216d5a7b179c956a21e02fc3757ce77fe5c45e",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/browser/BrowserPlayerTextures.java",
+      "bytes": 11532,
+      "sha256": "7b6472cd4eb3263190ac1bf7ef633ce5ac372d31a5d08a909526574a37af40f3",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/AgentExecutorService.java",
+      "bytes": 134804,
+      "sha256": "c027885e73102034f224867a9a4930e0b8281ef36bbfbf6047d13065921ef09f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserAsyncCompat.java",
+      "bytes": 7108,
+      "sha256": "745fe1a9af1bc98b8e01f0f771f810bbe1eb287402b7de75368fc9c6c925391e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserAudio.java",
+      "bytes": 6368,
+      "sha256": "deb5968cf8393831b2dedd35fc3b959a2cb2e48ff84a3c2bd8feeb4eefccc89b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserBootCompat.java",
+      "bytes": 2065,
+      "sha256": "190765e8661163523be746864e18935259efc81b7702755c1293660e1e44410e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserBootSampler.java",
+      "bytes": 21235,
+      "sha256": "1d6a9694a78334eb557ed7aa8e2bfa2f6bbc5e47937474442bc41571e54de27f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserBufferCompat.java",
+      "bytes": 4333,
+      "sha256": "8f2734fd5ff991e186f3533bbc7a175dd9f84f972d8abb1f00e1ba65133ac897",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserChunkCompat.java",
+      "bytes": 19404,
+      "sha256": "2f7efe20463b17d0ec4992ebff0ca43038b44719cbc8b5968a93037500f9e4e8",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserClientProfile.java",
+      "bytes": 1972,
+      "sha256": "49c8bc022d34267b9aa9305098fa467951765d096ee0c7496bf35def03a670e7",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserCopyLockTrace.java",
+      "bytes": 4534,
+      "sha256": "a48f7443bd4e9b124366e6923860a563f69c85261f6d53dd1a7d6c3f41806e4d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserFramePump.java",
+      "bytes": 115378,
+      "sha256": "960c672701a12dccf9f627751492d9724cb8c6fddd8843002fd13e6a1212846a",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserFrameTiming.java",
+      "bytes": 9776,
+      "sha256": "01266db27b68b82cdd74902b66ea7ed6cbe9e50c16d4de99fdc8bcdf4cc68f8b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserInputBridge.java",
+      "bytes": 6774,
+      "sha256": "df1f0eecc1694c5562884819cf73d890e7ec0279d99a5f7cd7fc5a836d2ff5fb",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserInputCompat.java",
+      "bytes": 15216,
+      "sha256": "ea725c2c891ebe2d485f048c236ed1849555338b24cd25c5fee82c21318120ad",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserInputDispatcher.java",
+      "bytes": 496,
+      "sha256": "24957dd62e600c64d596774c77c1c568d2a205710edf2d50abfa69351a1cb32f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserIntegratedServerCompat.java",
+      "bytes": 59880,
+      "sha256": "7aad7bef391ae4526ea38dfbc33ca812b3912d9fc079245dad1e6474089a1549",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserLevelLoadReporter.java",
+      "bytes": 2354,
+      "sha256": "98dc5d2516989959d9bca8d89c9b418654899030a9abed0f6e6034056878e94e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserManagementCompat.java",
+      "bytes": 4721,
+      "sha256": "534b0032f0f74b4e71ac5da6500abca0237c7c06f5398670323092fdc40fc805",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserMinecraftMain.java",
+      "bytes": 36544,
+      "sha256": "5705cc9ebc8cbd66aabb54cb3195bf097bdefa6c7ac6ed4d4e258f744ea8dae0",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserMultiplayerCompat.java",
+      "bytes": 4553,
+      "sha256": "13a23b495f511e78369fce2f35bcfc7fafbf727f51d5018211bc9eeedbe3b416",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserNativePolicy.java",
+      "bytes": 1513,
+      "sha256": "368952a2cac82bc1c6572f0987d99c5396d862854b6df07c24ef5bd16ca17845",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserPackHttp.java",
+      "bytes": 14544,
+      "sha256": "373bf666bc65aa0aef0cf82b051b4c463bef325a3a92fd2a0d19e56a26a722e5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserPersistentStorage.java",
+      "bytes": 14898,
+      "sha256": "3a31ba3144a6087da2885b79ad91cd33602a5c288b31cfaf2ce852f15f5ed19a",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserReloadDiagnostics.java",
+      "bytes": 43905,
+      "sha256": "f0bb7feb9143a4aa18f26252014feed71fdc2afc1a4580b336ebcad360dc7ce6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserSkinTextureCompat.java",
+      "bytes": 26947,
+      "sha256": "f5c8fc3ae691635b75258dcd35bb06f3d1bc6102f0c0734023b1242798c8647b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserTerrainEntryGate.java",
+      "bytes": 1997,
+      "sha256": "5242c59f22b65888584c24c48533db0372d91e133657cf0b0a373ed496e4dcb2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserTextInput.java",
+      "bytes": 14871,
+      "sha256": "8b0ec417844c9e0179b863bffc8665cf04aecb7637c00c578d7a5893491356b6",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserThreadingDetectorCompat.java",
+      "bytes": 2964,
+      "sha256": "1624ab58a0dbf4d2742a1625a49343ca43491437a6f111846e5e9c18fa2f1cbb",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserWindowCompat.java",
+      "bytes": 2207,
+      "sha256": "aea51c70c792ff3b5784049b8d5615e3ebd616af44308d9dabe2f1351122f7c9",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/BrowserWorldgenSteps.java",
+      "bytes": 6998,
+      "sha256": "531cfe1aa8a262a10256b3b9226b4745fa26cc4b978059ee9a555d216dcfe43a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/InlineExecutorService.java",
+      "bytes": 1732,
+      "sha256": "0f857d2b5df1cc5af538c7ac00867acaaefe8e32734a8a88873d71c3b53f1767",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/McWebRuntimeMode.java",
+      "bytes": 3043,
+      "sha256": "4b9c7ef066f213e0cdd00585f989b94ab3d391f6c9adef7c5e7133deb2600af5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/McWebThreadRole.java",
+      "bytes": 1370,
+      "sha256": "4586235303ace99f26badd267d46ff19a31402650d541615d2715cb814765f51",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/MinecraftInitProgress.java",
+      "bytes": 2585,
+      "sha256": "6ffac7b2a7ad3231c2b624d2ff9f8405ffa2501686e2c3808e7697327052d20b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/ReentrantInlineExecutorService.java",
+      "bytes": 2448,
+      "sha256": "c0237b7f387bd3498f050aec8ee3ea79f3dc9d659a1561a9b7e3e9afef7a583d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/ServerOwnedExecutorService.java",
+      "bytes": 9845,
+      "sha256": "23266134ec7266e957a49096fd312cc95a0a7a23d8ee50ef48b82b9fb1483cb0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/log/McwebSlf4jProvider.java",
+      "bytes": 4468,
+      "sha256": "5f17a7eaa844c7d6d4ab61bbb544a9554b7b9797d63b8cdcb30923dd6451b24d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/net/BrowserNet.java",
+      "bytes": 5148,
+      "sha256": "bd9428d035f4927f49e77f449df735a01dfff5d56f690b54e701384449b98bd2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/net/BrowserSocketPump.java",
+      "bytes": 8296,
+      "sha256": "6dd9f1dec6606f6d2808da52567ce7c5e0a523baa6b663d4f0289d2a0a8190bc",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/net/PacketWire.java",
+      "bytes": 1873,
+      "sha256": "f506eed7fffbfc3aa22b8ecf06f33d106a227267de1b7273ee4df02e5a19ab44",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/net/WebSocketChannel.java",
+      "bytes": 10979,
+      "sha256": "e89791dc1b25fa5dccaed87903956f4d77f5e0fbcbeef281a6d949e0e2abb2fa",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/stb/PngDecoder.java",
+      "bytes": 22731,
+      "sha256": "15d02ee49d50c429ef82befd50b89c0f0999b0993b7980df97da2d94736b76ec",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/BrowserGpu.java",
+      "bytes": 46222,
+      "sha256": "97fcfbce2ee3c2ba3d806c9915a9ac317a2bcd88afa11ad0f0346c7084d2dd2d",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuBackend.java",
+      "bytes": 1489,
+      "sha256": "5b3d0e4e3d374647e77e1e084d817a089807177a1fd5c58e2a2bf2d1fbb03ad1",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuBuffer.java",
+      "bytes": 33300,
+      "sha256": "932f7d8a6b9e8b80410165547ccfa4d716abc4324e290bf6b90def2eaae0222a",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuCommandEncoderBackend.java",
+      "bytes": 17557,
+      "sha256": "1f611ace37e0482116b00f513277d01286a44be2808562990d43799394ade612",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuCompiledPipeline.java",
+      "bytes": 2054,
+      "sha256": "aad2bb0bdc49bb8089e2c54794a059263fb9d3afb31d87394961d44f564041f6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuDevice.java",
+      "bytes": 7514,
+      "sha256": "7c333ad3936c7f956625384c852ad30f55c3b1d438aa3cd7747b3aaa691b93da",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuDeviceBackend.java",
+      "bytes": 26738,
+      "sha256": "f887b04fe30d4c3f7c4bcd38cb95f670999a24ec5f9c7749965b215bd4a4c02a",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuFence.java",
+      "bytes": 279,
+      "sha256": "7fdbbec088b95221bc02608cda7b58dbd71c288493a49c91571dfc5a6144ba83",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuQueryPool.java",
+      "bytes": 995,
+      "sha256": "73a1edc579d8255e313926c475031f2197eade41f903069242bae2572a33eec0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuRenderPass.java",
+      "bytes": 27975,
+      "sha256": "2b7bc20bd425d3dc6ef61376b44a39620c2b4df1e153c9e66108c793ea04c6a7",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuSampler.java",
+      "bytes": 2515,
+      "sha256": "7b26e30225fc827ad7df05fb2e16426517b377e7646f7e2224eb3ca8c138747f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuSurfaceBackend.java",
+      "bytes": 2261,
+      "sha256": "401fb4342de76ff513b64d7575cf35ff8eb0b29ffb735d4b6ceaf00cc6dd1c69",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuTexture.java",
+      "bytes": 1163,
+      "sha256": "078f198550cf526ffff099560d06a90fe4dc12aee8b34057f7740bd31dab2e0c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuTextureView.java",
+      "bytes": 1245,
+      "sha256": "50795769408c573f509fa57474351c3e9d1cb34a1b6ecb8a0ab99883547cb58a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/dev/mcweb/graal/webgpu/WebGpuTransientMemory.java",
+      "bytes": 13052,
+      "sha256": "a7b261f18be8821b86670c1e69475bd0486621d511dbcf93648858abe4f0af94",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/io/netty/util/internal/CleanerJava24Linker.java",
+      "bytes": 1013,
+      "sha256": "85a9b480bcddfbb6e83c502999770a45aee52acaecdda1acf736effb9a9d3593",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/io/netty/util/internal/CleanerJava25.java",
+      "bytes": 897,
+      "sha256": "b97e7c6c6123fcfde7c09b7f4d299dc43fd5feb8592ef6027ba5673994cfa9eb",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/io/netty/util/internal/PlatformDependent0.java",
+      "bytes": 16226,
+      "sha256": "cf7fd614b173cb97d44843f64189f30520395423183b288b6f82329178c6db96",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/io/netty/util/internal/VarHandleFactory.java",
+      "bytes": 5758,
+      "sha256": "e9e14690cea09d2a5b414350635eb9561afe8923c2fce064a77dafeedf687037",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/net/minecraft/client/sounds/SoundManager.java",
+      "bytes": 13857,
+      "sha256": "976f19d4a6336e396585e33b4f89911e881300200f9e16144a1d0ff3325028b1",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/BufferUtils.java",
+      "bytes": 2885,
+      "sha256": "8231fb97c0edf0bb779a2a471cab13e354ea3b5cf58a5a37f20ba7a028c519fb",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLClipboard.java",
+      "bytes": 535,
+      "sha256": "fbe2885e2d8476859b049192d1a9521f9e301aeb6bb3075eae931a8e36b7da29",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLError.java",
+      "bytes": 468,
+      "sha256": "21a5f9c223632c7159e5f03faa128fbdec4ab7077274b9e0c6ad46b98420951f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLEvents.java",
+      "bytes": 2269,
+      "sha256": "d9d9e660ef4627bd598272969d69b987e12078947527be9d8110d239a712777f",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLHints.java",
+      "bytes": 272,
+      "sha256": "1f584b79339ce01f192124c249449d4997b58be849c8e9d2ef42e3b123f92c9c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLInit.java",
+      "bytes": 671,
+      "sha256": "43be60e27973b2b67a2ee34ded808d5c115dd7856f0115c229c390e40155d5f0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLKeyboard.java",
+      "bytes": 2651,
+      "sha256": "8e9cef8955ee5e515c95f4bd477a852b800f9b5da6a59d858ada120db3993497",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLMessageBox.java",
+      "bytes": 937,
+      "sha256": "43dc10694fe12bd20f800ed53af8d395b8ec3386c2c4e4008476fef9b172a0fe",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLMisc.java",
+      "bytes": 511,
+      "sha256": "703561e4e9442821fd84dcf4abaf381f0ad68192eb6e79c71d86cb6583a024ce",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLMouse.java",
+      "bytes": 1552,
+      "sha256": "d3cad65d4b1d91bc06d8e5e7db26369a5078d789ce535e6b2aa244b7397ba35f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLPixels.java",
+      "bytes": 1833,
+      "sha256": "bf8e63171a68333e17059883e1701ac9966d129526990c2d68492ba0d3184c66",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLPlatform.java",
+      "bytes": 247,
+      "sha256": "533e66d285df80092ff1242b1cd644579dba1d8d9919c3e70859dbcdcef8e6ef",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLStdinc.java",
+      "bytes": 548,
+      "sha256": "e427f0161b7b6311722604da90e58e32bb7905de7c726ba79a94775d03ee3305",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLSurface.java",
+      "bytes": 1079,
+      "sha256": "5e232dbfeaaac6c0d6b8d479b2cd3f237bd46e8bd8ebed6946afb27cbd7de24d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLTimer.java",
+      "bytes": 521,
+      "sha256": "c6a5f4c4ef2e35a1a1fb30ad634f758abab847ac58b7172fc5550d7306d5608f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/sdl/SDLVideo.java",
+      "bytes": 6927,
+      "sha256": "2c5c3e3a0c85c4db33f27888a5afff38c291ff4ed704d29f39b1f9563060841c",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/stb/STBImage.java",
+      "bytes": 5157,
+      "sha256": "5469cbab513d54b6cfb7963a77b323cc434baa9a741ee8317e2fa0828e3bfb52",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/stb/STBImageResize.java",
+      "bytes": 3340,
+      "sha256": "a46b1b582cb745f71ff51b8fc13f66c24a1b390824c904cb8250146bc23b4101",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/stb/STBImageWrite.java",
+      "bytes": 519,
+      "sha256": "31514b9d9dca5454381f8116b13ce49bd43245f63e39e79ba3fb5b2953a2d2e6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/BrowserBufferAddresses.java",
+      "bytes": 2358,
+      "sha256": "4091d964590f367070e4b6b13165fae6783f8b8be54be1f63b6838bf3bddaaf6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/BrowserMemoryBackend.java",
+      "bytes": 20625,
+      "sha256": "a4727d0a050a33e47b11c7a1dc658d03cec1984f94efad81ee5bcc850f03e297",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/BrowserNativeMemory.java",
+      "bytes": 36551,
+      "sha256": "6af0698dab8a9a257edfb06bd0d191cef397637de9936a7fe8d088371e25aa11",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/Library.java",
+      "bytes": 3047,
+      "sha256": "8de2965616ef9d0ede9647515e018dfadd85c9eeb77d76fac96eb0896c86c87d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/MemoryAccessJNI.java",
+      "bytes": 3585,
+      "sha256": "76087a77e35f1963167e6fbee52d47a2b66643437d384627af44772372609a91",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/MemoryManage.java",
+      "bytes": 1846,
+      "sha256": "99577ed0e73ee4d59e21e39b516721eec9583e70fe3811d5bbf72a73a7b7fc3d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/MemoryUtil.java",
+      "bytes": 48964,
+      "sha256": "6c098e3639259017767e2a16164fb1333ec1956533f72e37ed5836711acff725",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/jni/JNINativeInterface.java",
+      "bytes": 12848,
+      "sha256": "3710484983d68f1ab9c03d8eef5cff559b5ea1e59dd44e3f08e2fb558ae00c84",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/libffi/FFICIF.java",
+      "bytes": 5615,
+      "sha256": "b1578bc485eaf99cff9889ddf9b525a4397e2f14770dc6725814d9d2734ea903",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/libffi/FFIClosure.java",
+      "bytes": 4800,
+      "sha256": "1e55a3255282e3f4876b170a5961e554d1468b8c6bcf3f29240cad788c6b2c9e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/org/lwjgl/system/libffi/LibFFI.java",
+      "bytes": 6165,
+      "sha256": "b9c697ced6479c35e204bef1843e6102bca47ef0c2108eb1a745a20c9f97935f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/java/oshi/SystemInfo.java",
+      "bytes": 1167,
+      "sha256": "c5033eac465f580dfcbe6916d308dac0867ddf1afc6dc83de928e43238adb0f8",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "src/graal/resources/META-INF/services/org.slf4j.spi.SLF4JServiceProvider",
+      "bytes": 39,
+      "sha256": "76e04203f8371c430bc46c635f8a2b9f32f9e5a48cbed9b184fba1135e6b1454",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/audio-settings.test.mjs",
+      "bytes": 13323,
+      "sha256": "85570f276660ac2b97e9bab76bc7dc27cc68bf8b94a55975faea08f6d3f43b60",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/audio-streaming.test.mjs",
+      "bytes": 35057,
+      "sha256": "f9828f42d6964a6b1089e764c30a18c4805fa5b745a6791aa49e53d9a646edb4",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/audio.iter.spec.ts",
+      "bytes": 21159,
+      "sha256": "10e13273c444962337108f8f0ba73bea02a397931f6313cf7351dc33687a980e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/browser-native-memory-long.test.mjs",
+      "bytes": 14256,
+      "sha256": "c78821bf79b8facd156254ef7d18e65d22f4dbc20351fe67579619f644af76ec",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/chunk-runtime.test.mjs",
+      "bytes": 8599,
+      "sha256": "b8ffc0eebbae9b16cee4669412992a4c4e701f54d03877108880c1f7fddb6508",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/frame-pacing.spec.ts",
+      "bytes": 7576,
+      "sha256": "634527653ad6a6bdd0d3096165e55938b475db7d61b7b08d64986f32796babb1",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/gateway-target-policy.test.mjs",
+      "bytes": 4253,
+      "sha256": "e24de725d9be0ee47e0b65c47b10944e587714a9a51c08a54900f5358c3515d0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/jit-residence.test.mjs",
+      "bytes": 17799,
+      "sha256": "001433b7d69b29ceacdd5c37374d738100ea2318f22bd3a0f3fba4e1a06097e3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/launch-options.test.mjs",
+      "bytes": 3585,
+      "sha256": "3bad3adcf49607e875fadad7f6e2636505869ece1982c3e5aa0e1ea469d0daa0",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/local-playtest-server.test.mjs",
+      "bytes": 9455,
+      "sha256": "8ded2a1d325ee059bb9a1b00bccc46b492fbcef30bfdb3bae64e4fb16cf34b5b",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/mc-net-exchange.test.mjs",
+      "bytes": 12727,
+      "sha256": "87c0285a61731d4e04710be5d0dbb468f73a36f552364086dd4213637a3399ea",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/mc-relay-profile.test.mjs",
+      "bytes": 3661,
+      "sha256": "6f8f8397a31652f5c60bf739da0843747f0560460cd4bd3747c58b0314a76120",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/memory-budget.test.mjs",
+      "bytes": 32151,
+      "sha256": "41b0c35d8a95d93eb0b721e68731b10ff4f7a5bfeee76b0a76478cf62677ed4a",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/microsoft-auth.test.mjs",
+      "bytes": 3818,
+      "sha256": "306bcfe87a6ce4aec2564135339ef5099961f8569308cb76ec90e39df567fde4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/mobile-launcher.test.mjs",
+      "bytes": 13632,
+      "sha256": "0d8c176567b2c3c0f9f0ca078399a28e335ec051ce31d58b233247e6ada8bbb9",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/mobile-runtime.test.mjs",
+      "bytes": 26200,
+      "sha256": "8dfa76a0639050e8a323c9ea8cf351356b5808d6249cdbe119a02952b8e3aff9",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/mojang-upstream.test.mjs",
+      "bytes": 7504,
+      "sha256": "b60e41dc79f1e980fd252783d30ae7691e9d4c1460f9afecd8659d361c713456",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/naga-wasm.test.mjs",
+      "bytes": 2352,
+      "sha256": "c407b69b73d4d6c92cda6fa1c90abf6a44bccdd781d7b342591ddfc720709caf",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/offheap-gpu-buffer.spec.ts",
+      "bytes": 3965,
+      "sha256": "1b176d2c0cadbc9ca12ad849546da8c173361d47c39163711b9dc5c5b2c54502",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/offscreen-present-probe.iter.spec.ts",
+      "bytes": 1019,
+      "sha256": "06c13441b14fe628d6914d525acf77eccbe9db8cddcb0f469056512e3c346ef2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/own-profile-startup.test.mjs",
+      "bytes": 10770,
+      "sha256": "789792067be1ebbf79b9eeead65aea02178e382c81ff38839ca3dde9c6162376",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/pack-http.test.mjs",
+      "bytes": 12122,
+      "sha256": "c2f20dcd8c843e9b18dbbe4efe55d6d8544a6f2d702f2906a6269d9806f1599d",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/persistent-storage.spec.ts",
+      "bytes": 2264,
+      "sha256": "2621cccd922c4ba092ef44a828defb9acedf6d0195ab652f5f158884738aff0b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/pointer-lock-release.test.mjs",
+      "bytes": 10652,
+      "sha256": "a3f56084167b1f98031dd7a03d47890e74c5a1f17d783f8bc277bd95caf53e8b",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/preferred-canvas-format.test.mjs",
+      "bytes": 4365,
+      "sha256": "b83b81be17c49f3d6650cbfef03b7821c5fdb5110c3e4460198ef8c4343284f4",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/profile-property-verifier.test.mjs",
+      "bytes": 1751,
+      "sha256": "b9a9a83f239e0bab4af56e42a0c01f4adf201ef848f7d3bb3d2468ae57c6d59b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/relay-identity.spec.ts",
+      "bytes": 3041,
+      "sha256": "d1f1fdb01598b8c5494b67a4c086f36f6e00f1798f988f6d2838e2b50d3ec8c0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/render-command-stream.spec.ts",
+      "bytes": 5624,
+      "sha256": "2c74ffa692375bee22844422f2b2a1cd0bc1142097508f1e947b827906ad4316",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/resource-census.test.mjs",
+      "bytes": 11144,
+      "sha256": "2e25dcf2105f74fac9bd965fec764dee38a125ba19cf1d4512804307b6ad36bd",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/rpc-progress.test.mjs",
+      "bytes": 6697,
+      "sha256": "e93c2079a0c81389fbde9433a54a6c2dfe7df6704d4d077ccc5f344a94da550b",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/runtime-discard.test.mjs",
+      "bytes": 15303,
+      "sha256": "ac713f6c7dae2a361b27bd10efff66db72c634fad1d0c296bbc7e659c5aa5dd9",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/scene-fingerprint.test.mjs",
+      "bytes": 8130,
+      "sha256": "5dd3b9700d4007d35dfdb800b4614c9032098a22334a1c2f18597e3c710410a5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/shader-glue.test.mjs",
+      "bytes": 9231,
+      "sha256": "f1711ab5825555cd008b135a7dbd39d3d354de72878eff815bd3320352895f66",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/shader-host-translate.test.mjs",
+      "bytes": 17917,
+      "sha256": "4214aa93d0967ff8d40e2644299f36df0b73b72bc090c3644853e6789b8958e3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/shader-uniformity.spec.ts",
+      "mode": "100644",
+      "change": "added",
+      "bytes": 5306,
+      "sha256": "bbc8bcac50d8c04337b471323447ab8b4e03875ffaf9c88cdb01c3b0fcf49cbe"
+    },
+    {
+      "path": "tests/skin-fetch.spec.ts",
+      "bytes": 4632,
+      "sha256": "5f8747c2beb149a81221dbec067d5a4a42563849542b44ac5db170d78b11b858",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/stutter-timeline.test.mjs",
+      "bytes": 11286,
+      "sha256": "e7250cfa35ad32c6699447c2b38aefed7deff5aec61c3348041ad24fcfc2eebc",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/text-input-host.test.mjs",
+      "bytes": 6193,
+      "sha256": "b840a34c269320d51a768777bd3ca140e61ff2e45a2aecd6b2bd4d37645481ba",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/text-input.spec.ts",
+      "bytes": 18536,
+      "sha256": "062d385f33290e1a56a2053be8555c5b5b452da7ca062cdc84a04d277645b38a",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tests/texture-history.test.mjs",
+      "bytes": 32603,
+      "sha256": "7313405b8b9517ac0cfa1d257fff6c5785d86b672088757509bd8a641cda1114",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/texture-readback.spec.ts",
+      "bytes": 30626,
+      "sha256": "c09b75e16e10bf658ed539594b7a381bb4c978760a8f536d9f243a778803b27c",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/touch-controls.spec.ts",
+      "bytes": 5796,
+      "sha256": "e47bfa2c6ec6f36f7f0097488be4990ec499a6be7abfd4811b536ec42ea75c1a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/wasmjvm-bundle-audit.test.mjs",
+      "bytes": 13945,
+      "sha256": "bb90a36c08e044e8fe0aa9cff590dd58d101cf7542bc7954da424c39118e6a6a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/wasmjvm-play.spec.ts",
+      "bytes": 4501,
+      "sha256": "7c3ae8b95d22262e47e3ba753a41072b7305b066561f9000c1f491b230467190",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/wasmjvm-provenance.test.mjs",
+      "bytes": 10890,
+      "sha256": "73d8486bf2e48df3582886e5396c1991246f3cd92b8e18c5cb1a04a42619ea71",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tests/wasmjvm-upstream-bundle.test.mjs",
+      "bytes": 27003,
+      "sha256": "f48b4414233781b199f489c746c53e54fbf96be93db02efef40a785097d783cd",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/webgpu-texture-lifetime.test.mjs",
+      "bytes": 11131,
+      "sha256": "97ba1c73659a5795d1772171707b3d3179c4592d2b1f3ea0a486a4fe952d79c8",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tests/webgpu-transient-memory.test.mjs",
+      "bytes": 10438,
+      "sha256": "62f1c312562a496e1648061389b0e4480fe9ce9551ebe01f25fc51acf029d841",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tools/WalkEquiv.java",
+      "bytes": 4449,
+      "sha256": "ddd132ac7d992221b18e34b9f8a4cdf4ceb46d5d174a245caa39d1849453a025",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/ab-jitflags.sh",
+      "bytes": 932,
+      "sha256": "965cbec5ee7e97b0275879bd1058c1b2b2ab40bde510be677de00f79d7621fa0",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/audit-wasmjvm-bundle.mjs",
+      "bytes": 4965,
+      "sha256": "e2e969413cda7c3fd53349691902f06518f062619706607f0708998d3c576a06",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/boot-log.mjs",
+      "bytes": 2561,
+      "sha256": "d53dcad8a0b2d3308b3e6e9e577606ee9877357e954fdad4caf8ecae1ee2105c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/build-wasmjvm.mjs",
+      "bytes": 80397,
+      "sha256": "50200a22a1e5216f6d412ebb6922c2508a34cc9dc6df53e345d32734a928aa59",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tools/capture-boot.mjs",
+      "bytes": 2387,
+      "sha256": "b50899916ad63b165cc4286a09a0fc6865d492bc7ceb2895ed970d519cd816a6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/capture-break.mjs",
+      "bytes": 4613,
+      "sha256": "73b3b1d1389620a43484a1661aaa37201af80bbc6355d1cb3bdfdf0266167bdd",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/class-calls.mjs",
+      "bytes": 4275,
+      "sha256": "1821020085497f1575393cf7029d3f44ba8aecf9004a29a1e85f142ccf19be17",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/compare-lanes.mjs",
+      "bytes": 58503,
+      "sha256": "9915333d39b0df6a1163b1c55be173075d51012886779dbd466217fcdc5930f9",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tools/compare-scenes.mjs",
+      "bytes": 1522,
+      "sha256": "01c2b92b27b1714db31b1d98dc5164ca554a75b782b951364348f0b37a4a0d87",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/eula-screen/SimScreen.java",
+      "bytes": 14750,
+      "sha256": "ec66780bdfaa09344390d92d875031c082ba4b2ad4e3cd79b221f48693912824",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/flicker-score.sh",
+      "bytes": 1094,
+      "sha256": "d140a5b3d27199e1e3799baae0d78d01cd4f75ba91c42bcbce4e99dd21f69888",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/flow-summary.mjs",
+      "bytes": 2905,
+      "sha256": "b78f5a82655c3dd60e9367305bf4d90bf492786e98428101d666d5d4331bbc6b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/graphics-pack-cycle.mjs",
+      "bytes": 7202,
+      "sha256": "84e9f1d185b0af60a3c6954440ab162538872565bde2b99135cf9707d4999ea7",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tools/graphics-pack-fixture.mjs",
+      "bytes": 9399,
+      "sha256": "ec520f485bcbe10eac3c45593379869c52b4f34bc7cfa50d0d606527c4e4837d",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tools/host-jdk.mjs",
+      "bytes": 1074,
+      "sha256": "dc2d5bb8a9b815d91ffdea390d340f578b901364e4440d957b8e0b8b24397494",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/lane-summary.py",
+      "bytes": 4425,
+      "sha256": "75fee3ce7e4189535c40955eeed56fa6e2b29e174dda224bed3e18867f52e036",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/local-playtest-server.mjs",
+      "bytes": 13610,
+      "sha256": "c5180d335c31f7e3a0af716b8f2c8399e75f2e83f25d6b570bba7e13d482c2fb",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tools/local-playtest.mjs",
+      "bytes": 34405,
+      "sha256": "5190984ed4c7cc85c5c804b408f33e69499603846cfb678508263b1362be220d",
+      "mode": "100755",
+      "change": "added"
+    },
+    {
+      "path": "tools/massage-plan-probe.mjs",
+      "bytes": 2764,
+      "sha256": "407b0990ac06aff780123bac2467f3b3174ed066a503478a53296b0b066e2d6c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mc-installation.mjs",
+      "bytes": 15808,
+      "sha256": "48ddf57b74a31ff8fd709b9dae61e0df5b8beccc2bb34851935ce730420754a5",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mc-relay-check.mjs",
+      "bytes": 4583,
+      "sha256": "293e84168856ba8fb5ee4ca38797896b77cbeb1d912d0529947953e7bb31ebbd",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mc-relay.mjs",
+      "bytes": 58316,
+      "sha256": "dbb29961b10b07b2b2c00817bd4f79aac53ad050c1f0afca4af3429859678385",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mc-version.mjs",
+      "bytes": 532,
+      "sha256": "7b1202106930395ec3aea29a713f4dc6584a3d9312b689205c57895f60f351da",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/menu-graphics-check.mjs",
+      "bytes": 9127,
+      "sha256": "79adf24f9bdf3c6873ab92c7c65b508e51630954677158bb77a3bf690b54a2ce",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "tools/microsoft-auth.mjs",
+      "bytes": 11241,
+      "sha256": "04a4df2feecebf6056f5a4966e74319007de27893208385c0bca8fa885f18e87",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mp-block-check.mjs",
+      "bytes": 7850,
+      "sha256": "b69b1ef3b1ecae6c9f598ffabc45ff55ddf0424ba1ab782344a2ed883885664e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mp-join-check.mjs",
+      "bytes": 4572,
+      "sha256": "cf174d42d5d4363b79c1416daf0f7841cff144b8b39f9376e9fde7e2ab580cbe",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mp-lifecycle-check.mjs",
+      "bytes": 9182,
+      "sha256": "008819baa253413c1686094dd555f32b07ecbf2ad84ce128054d02f54f4946c6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/mp-pack-check.mjs",
+      "bytes": 3500,
+      "sha256": "45e0e8ccfc6c5ab1234939e714521fbaf98d5608377e79c9df813a7dfc30cbd0",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/naga-wasm/Cargo.lock",
+      "bytes": 7574,
+      "sha256": "3aa3cbda42b6869669caff27659dd18a23c0a099dcefb7410489401dc828519c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/naga-wasm/Cargo.toml",
+      "bytes": 303,
+      "sha256": "5a436fee44a0db3bd5584356e8105d42b7a2c09e17998a139ba33a30a0602905",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/naga-wasm/build.sh",
+      "bytes": 2161,
+      "sha256": "f6586c83072f3d86db09478d293128be814b1508eee32a9ecf677eb3d6457e97",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/naga-wasm/src/lib.rs",
+      "bytes": 2297,
+      "sha256": "1e903b412c83ce480edc3f38d7b38cbf3f67e6a518df0a11ab833e921a20fdda",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/native-memory-check/NativeMemoryCheck.java",
+      "bytes": 4707,
+      "sha256": "be71e54f4b8cd49a0a3070e56546b1dd7e40ddf5a9df51941ced20e50df3b4e6",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/native-memory-check/run.sh",
+      "bytes": 1505,
+      "sha256": "57b6fb52fcc311a1139dddca135c383c4bcda7b01c49ad34b9c7ab3c0fbfe6a1",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/native-memory-check/stub/dev/mcweb/graal/MinecraftInitProgress.java",
+      "bytes": 111,
+      "sha256": "802330f4e92657c76771337de1a4f5dcb05cdd3552b7a0b01cea623e90082ffc",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/native-memory-check/stub/dev/mcweb/graal/webgpu/BrowserGpu.java",
+      "bytes": 153,
+      "sha256": "7d586249c06863a90366bc84dac020a2130627fbd4ed51ffdfdd2cd6189191b2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/pace-summary.py",
+      "bytes": 3184,
+      "sha256": "5f2279455c69e22dd9ac154c7f4eda91567dd1ddb3d426771eea5fc005390cb3",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/profile-property-verifier.mjs",
+      "bytes": 3526,
+      "sha256": "ca36d33d509b498734f06b5bfb86c2b30b3ca028d3ca657714e2d1a7b48331d2",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/render-gate.mjs",
+      "bytes": 5470,
+      "sha256": "c36fb5dd505d06cc650d02724a9a120eb9b4bd67fe6feb0a3de06892e5d4ae28",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tools/scene-fingerprint.mjs",
+      "bytes": 9132,
+      "sha256": "aa7f9430a757612ef534fbb6da2954a1f224f276b7fbdaa39553ee2fa63e189f",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/sdl-shim-gate/classes.mjs",
+      "bytes": 6244,
+      "sha256": "f1d2a36e66d23cd0a3302f461bb3c2bf23f58e12bcebc7a2e136f48f50b429bb",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/sdl-shim-gate/gate.mjs",
+      "bytes": 7846,
+      "sha256": "bc0cb46653b35e515e47bf019bb5aacbec8551e2a676faa7bb85031be723dd24",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/shader-check/index.html",
+      "bytes": 3165,
+      "sha256": "d178b62698526fbd50aae2d6be4d8dbe747c333ce77a996c2d68cc45a37c1980",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/shader-corpus/DumpShaderCorpus.java",
+      "bytes": 15229,
+      "sha256": "b4612f3e000023d45490b9130199bef04e06d72e6e37cccda02b836bf42e3311",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/shader-device-check.mjs",
+      "bytes": 2015,
+      "sha256": "24ab83782881800b9752700ad4f6d66e22d09a98d1228eede53165dafb1edfd4",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/shader-translate-check.mjs",
+      "bytes": 4398,
+      "sha256": "8c4b8367e0ff04f81cf6d5e1d2881d42fe32638e84f6b6ba33c9b6d8c3ff3238",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/stutter-probe.mjs",
+      "bytes": 3029,
+      "sha256": "4c6df0ce6d9bda9ab8e3ca7c0c3f96f743f9b5a5ec0e4b54626b5257da379106",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/stutter-timeline.mjs",
+      "bytes": 19939,
+      "sha256": "49188fef3a4c785697c27d9192a23f6deff63cecccc3249732936ccbb493443c",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/terrain-pixels-check.mjs",
+      "bytes": 2182,
+      "sha256": "280791c9af0bd2cebc37879a53bce745faca8197965fc64429ae74b7a41defa8",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/terrain-pixels.mjs",
+      "bytes": 4348,
+      "sha256": "acf6e7c75abc0d1e71dff1d7d08c8ae82877cc0cd7f0c66ceadd1af82b1a4ed1",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/test-display.mjs",
+      "bytes": 3538,
+      "sha256": "2c0743e4d69be468c057ebc7bdb50b33fe86cd5363c4d6a0e2354b1fa42c6d73",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/test-display.sh",
+      "bytes": 2055,
+      "sha256": "de89e4eca3f252badb56d2699c2c8a81ac3dfc856b6be09ec2ea102c832ca57d",
+      "mode": "100755",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/verify-massaged-jar.mjs",
+      "bytes": 3253,
+      "sha256": "93e58fd02eaf86a75c1356b82f327359f1a9e706bc9c4e5bae7538bc6cb46414",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/wasm-compile-bench.mjs",
+      "bytes": 6487,
+      "sha256": "0d212f8e07d4e9a686cf0f0fab4262ad34362a4f5b8da82778f7d650ddfc240a",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "tools/wasmjvm-massage-plan.mjs",
+      "bytes": 40841,
+      "sha256": "a6a042c24bdafa73cdb38278549f4bd5559c9cde933318a29ddbb7e7d80c1224",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "tools/wasmjvm-provenance.mjs",
+      "bytes": 29174,
+      "sha256": "00fa88e15b4fa9e2484a47b78e1275cc015c8f6e74ae609b85cb6f07e27691ce",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/aes-js.LICENSE.txt",
+      "bytes": 1081,
+      "sha256": "f355888c279a510c9c36210feea122aee628c79a989d89ca7e86ec4b54f699aa",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/aes-js.js",
+      "bytes": 63732,
+      "sha256": "579277f6e64049ff523b1fd6d6ce1bc9bd2b16b6253dac9862a02665e9bf103d",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/audio-check.html",
+      "bytes": 1973,
+      "sha256": "d226bee8aa8cf7f8b90577a98fd147cd93059ace447111ac74bc34b64dd62768",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/audio-host.js",
+      "bytes": 35928,
+      "sha256": "f11ac8094dad393f9e3622874360a1ed53e25eca82fa0725a36b86f8887f7b62",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "web/frame-backpressure.mjs",
+      "bytes": 2150,
+      "sha256": "0be2f9bfee25671b8d6afb64db3085c12b03c3f0109688192749d4d822558a71",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/frame-pacing-check.html",
+      "bytes": 366,
+      "sha256": "0c08d4037ad725b7a1ca72380883443e6e54777f556f4c6c3bb8689f17d5ec8e",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/game-controls.css",
+      "bytes": 11604,
+      "sha256": "c5cee6de6ee1c4fcbe44c199b893af94de5994c80a714d6ae12e4ce23dd60116",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/game-controls.js",
+      "bytes": 95846,
+      "sha256": "80499d964ec486625b51bdda90357a6634a9f45cd5b1b3dea6bf591dcb94d0c6",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/launch-display.js",
+      "bytes": 8836,
+      "sha256": "73d117fac31434511fe03d76bd51397c244dbab41d9a7081add698b725b5cbd9",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/mc-net.js",
+      "bytes": 16942,
+      "sha256": "5ccb52b80d9717c3e3527a6d553495df92589d5d572c48bc8f5f941be270c517",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "web/mc-wisp-socket.js",
+      "bytes": 2723,
+      "sha256": "0fb9a20aa48efc9be9c7b471c26cc07ca5f78851ff93cd38cda0c6834c71ec4a",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/mc-wisp-worker.js",
+      "bytes": 11983,
+      "sha256": "6f9f006b3b68905af78149e974c1aebe3711d433b9fe0ad69d0c5f329511c901",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/memory-profile-worker.js",
+      "bytes": 18794,
+      "sha256": "b1b9d3b9c7c25c9364873f8708c49757d096269c947d7f52ab1a0f1c269a7ba5",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/memory-profile.js",
+      "bytes": 38813,
+      "sha256": "8b78225c280ce9a4dd1e494e8d810522f892829b0f38f9df8c0b5bcd61759614",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/mobile-runtime.js",
+      "bytes": 24490,
+      "sha256": "bef91364de2c5a9d1b9c4262e60b4c88a3a029497dff79c0fb0dce08dd0196a4",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "web/orientation.js",
+      "bytes": 3739,
+      "sha256": "de74960cad8a69df2f67ca06fd66c5fcd380f7fd1d1f325997b966f48769b9bf",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/pack-http.js",
+      "bytes": 9028,
+      "sha256": "37945dc6719d43db2ace105cce8b2ad9b80666f73bc4a6f041fb8e74babbd891",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "web/persistent-storage-check.html",
+      "bytes": 222,
+      "sha256": "b7034a66215c88708dde3d7bc2237d1e8e14c8c6312936d2852bf1a17b7e9010",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/persistent-storage.js",
+      "bytes": 10217,
+      "sha256": "7799c53ab4de56a3527a4b6774eaceac18d4139e2e88771140ef5954da99872b",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/player-textures.mjs",
+      "bytes": 4394,
+      "sha256": "2ce34af1c4c263fcedb2ebffb09573f2e82cb0b2dadf87de6c129dfcea5cbc05",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/render-command-stream.js",
+      "bytes": 5668,
+      "sha256": "261e0929ab20092efb98a8484e1a0bf0b197e97bef2cc4bb64c8c79c3a05ce07",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/resource-packs.js",
+      "bytes": 13643,
+      "sha256": "460adf734cdc08f9191c410d1db517ce99a68364fe4e1a05bf39f5c0beb0b3ae",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/shader-glue.js",
+      "bytes": 24946,
+      "sha256": "4c52138bd46af0c7155f0c8e81e0f8500cd805a987e6ac0f551e3b48e565f9e8",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "web/skin-fetch-check.html",
+      "bytes": 170,
+      "sha256": "ca3598d8b258b954fbaae1b703da206491b3b7517486908fb12cc8d380b4b2dc",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/skin-fetch.js",
+      "bytes": 5661,
+      "sha256": "c18489b3bde1345ad68c87024efb960a19705ab34c2802d4b92666610f92525d",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/text-input-check.html",
+      "bytes": 3162,
+      "sha256": "1cd53d2b620a8f779f64374773817762a1a61fa16d1750bd9b073d400c418bd1",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/touch-controls.css",
+      "bytes": 5192,
+      "sha256": "cb19295f2e9db289d49405b67c84524a6be4953a88107d56c2d50c1bc5f2bd08",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/touch-controls.html",
+      "bytes": 3242,
+      "sha256": "610835fed53c2f3dd56de0dc95a22cde99583309de9038357522a61d56a6a687",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/touch-controls.js",
+      "bytes": 7891,
+      "sha256": "e0ff341fdb95b69fdbb541d89fded9db64b75737cf1a1e0eec342bc7135b52f1",
+      "mode": "100644",
+      "change": "unchanged"
+    },
+    {
+      "path": "web/vm-identity.mjs",
+      "bytes": 2297,
+      "sha256": "73cb80ebba0591a289dee65e8722cbb80a3bae35bbdfe7a27637dbc9d9273494",
+      "mode": "100644",
+      "change": "added"
+    },
+    {
+      "path": "web/webgpu-host.js",
+      "bytes": 328217,
+      "sha256": "6d94bef6bceffd9b8516471fe6f2a59f1ba7990f9df07582243f4aad8dc2a444",
+      "mode": "100644",
+      "change": "modified"
+    },
+    {
+      "path": "web/webgpu-texture-lifetime.js",
+      "bytes": 7382,
+      "sha256": "e06530d0c25537f6f7a953fe6d4f9b5c6da81818231926cbcf19fb25c3dd1b74",
+      "mode": "100644",
+      "change": "modified"
+    }
+  ],
+  "sourceTreeHashEncoding": "SHA-256 of files array as UTF-8 JSON with recursively sorted keys and compact separators; all fields including change and mode are included",
+  "reproduction": {
+    "verification": "npm run verify:source",
+    "build": "npm run build:runtime -- --jobs 8",
+    "note": "Build from this repository revision or its corresponding-source archive. The immutable source patch records an earlier import against the upstream base; current tracked sources and this file manifest are authoritative for this release."
+  },
+  "nativeBuild": {
+    "fresh": false,
+    "reused": true,
+    "nativeObjectsReused": true,
+    "compilerCacheReused": false,
+    "nativeJvmRecompiled": false,
+    "jniRecompiled": true,
+    "javaPortRecompiled": true,
+    "wrapperRelinked": false,
+    "note": "Incremental launcher build; unchanged JVM and native browser wrapper reused, Java port rebuilt and current host scripts repackaged.",
+    "libjvm": {
+      "bytes": 4940726,
+      "sha256": "b9f56ceb5735e0c2724b10a59074b4c9d4749aeeec46e8531acfb14f06adbcbb"
+    },
+    "port": {
+      "schema": 1,
+      "compileJarSha256": "a37f15b8e329241e658b6775ce4f07e630ef33ceefada88fce20f45d855734d9",
+      "planSha256": "59d750ba40be8d92544efb604555f36ff51ea3eac9764a0da539ac03acc5de76",
+      "sourcesSha256": "50bddc797dcf85a180f8456d20aff4a9dae6925f5c39818a1cd87d54665ed15c",
+      "portJarSha256": "89d42ab0a9d6723bbdb2f1a25e7dbe184e52de8b14b170ab4fba56fa2743cbbc"
+    },
+    "nativePolicy": {
+      "schema": 1,
+      "name": "mcweb-native-policy-5635a4ea13d32a36880875e631b78863d2d25a460ac319f795a76e250bc44792.jar",
+      "sha256": "5635a4ea13d32a36880875e631b78863d2d25a460ac319f795a76e250bc44792",
+      "bytes": 2786
+    },
+    "runtimeManifest": {
+      "schema": 1,
+      "linkedAt": "2026-10-25T06:13:28Z",
+      "inputs": {
+        "pre.js": "ba98ab6c3fa4a9b6d9ac6ddd40a1ac5c2787470c570a5a157c673a0c1c4e1b08",
+        "jsbridge.c.shims.js": "2325fc8ac795cd87722ddbfed056b2acbc54664c80393dc6d7cc210c697a9b71",
+        "libmcwebjs.so": "2a900bc0f2c2b8a5b0f90d0cb0963ed7cd0b5f7965f771507a5827fbca881139"
+      }
+    },
+    "evidence": [
+      {
+        "file": "package.log",
+        "bytes": 3370,
+        "sha256": "613a08cb4b4e6a55ff1fc9e0fd5ae01383f42ef9119168575b959182a08e1d44"
+      },
+      {
+        "file": "repack.log",
+        "bytes": 2412,
+        "sha256": "3361699604786a284a0a1716ee5955fc517a4e0760f8311c64602b187900ab54"
+      }
+    ]
+  },
+  "toolchains": {
+    "buildHost": "Linux x86_64",
+    "emscripten": "6.0.10 (d6c521a7f05449857c76bd99e396895583cf2083)",
+    "hostJdk": "Eclipse Temurin 25.0.4.1+1-LTS",
+    "make": "GNU Make 4.4.1",
+    "hostClang": "Ubuntu clang 22.1.8 (1ubuntu1)",
+    "autoconf": "2.73",
+    "python": "3.14.8",
+    "node": "24.19.0",
+    "rust": "1.99.0 (b940084d7eb6a299eb4bfeb8e34901bc051e7ac4)",
+    "rustLlvm": "23.1.1",
+    "sdkFiles": [
+      {
+        "path": "emsdk.py",
+        "bytes": 121093,
+        "sha256": "b4fe4d1ba2798208410d530846e564900ba53d080095b9d89bf15f7e586a1250"
+      },
+      {
+        "path": "upstream/emscripten/emcc.py",
+        "bytes": 23798,
+        "sha256": "5ccd3b66c9433389b0338706182197340bfdf241777cc8985821e7d150818e46"
+      },
+      {
+        "path": "upstream/bin/clang",
+        "bytes": 147560552,
+        "sha256": "806335be4f760c553d3d541dd74403cef69da764f9daeec74e41d7fad63f1a50"
+      },
+      {
+        "path": "upstream/bin/wasm-ld",
+        "bytes": 81886000,
+        "sha256": "732fbc0a22e936c32643a0afa2db74dcf7fbfb10cd46ab7f88484b780cd1db69"
+      },
+      {
+        "path": "upstream/bin/llvm-ar",
+        "bytes": 11113144,
+        "sha256": "b770d0319c9eb9e4191e72a74578e8e31b48c2a645dd5abe8cc5942ae124a95e"
+      },
+      {
+        "path": ".emscripten",
+        "bytes": 166,
+        "sha256": "001c6ae86c1ec65b8a41d0db23c239f7e2348bd5fb68c98fbc628cd86a7c3f65"
+      }
+    ],
+    "rustReceipt": {
+      "file": ".rustc_info.json",
+      "bytes": 2631,
+      "sha256": "9c85c2d5beb8131165f61bcaef1e3efd2b23603f512d8231a7bdd03ba447874d"
+    },
+    "libffiRevision": "c575818ce67cb471467c580a01ae8f7b6538a6e2",
+    "openJdkTag": "jdk-25-ga"
+  },
+  "browserFeatures": {
+    "terminalOwnership": "Idempotent terminal-only page storage flush before owned pthread/GPU/audio release; failed persistence stays retryable, late startup cannot resurrect, Return remains usable; BFCache/ordinary hide/SaveQuitTitle excluded; GPU ack or1s termination fallback without queue-fence wait; no physical reclamation claim",
+    "sanitizedSkinDiagnostics": "Opt-in finite profile booleans/counts use Minecraft Bootstrap original stdout so logger redirection cannot swallow them; no identities, credentials, signatures or raw texture properties. Visual skin/cape acceptance remains unresolved.",
+    "profilingRecovery": "Lifecycle-noted page-left and interrupted runs require explicit browser-ended acknowledgement before Apply; last durable filled checkpoint only, Stop/cancel/failed-checkpoint/foreign-browser/cross-tab checks retained",
+    "heapPolicyV3": "Java caps floor to actual32MiB JVM alignment; exact savedv2 entries derive no-larger Java caps read-only, preserving raw budget bytes and Wasm bound; default448/96 and1152Wasm unchanged",
+    "iPadDirectImportDiagnostic": "Only exact incoming -XX:ZeroWasmJITDisable=524288 is preserved once for iPad with JIT already enabled; phone, default policy and all other JIT override filtering remain unchanged",
+    "transientPoolRetention": "After submission, retains at most64MiB transient GPU backing,16MiB shadow-eligible backing and512buffers across usage pools; releases unused slots and capacities above1MiB when over4times latest demand through existing deferred GPU destruction. Full allocations remain permitted, common reuse remains, and the unchanged CpuArena and native replay guard are preserved",
+    "desktopSafariJitDiagnostic": "Exact mcweb_webkit_render_jit=1 only, desktopSafari with existingJIT; selects captured34roots+Names+2048/320frame pads. NormalSafari,Chrome,phone,iPad,memory/thread/quality defaults unchanged",
+    "preferredCanvasDiagnostic": "Explicit mcweb_preferred_canvas_format=1 in GPU worker only selects preferred format at three final-canvas descriptor sites; default/nonworker and internal virtual-canvas RGBA remain unchanged",
+    "loadingFeedback": "Canvas loading overlay reports startup stages and remains visible until the first positive singular or periodic frame marker; terminal and late-factory guards prevent stale readiness",
+    "resourceCensus": "Explicit mcweb_resource_census=1 only; five scalar-only requests at30/60/120/180/240seconds after first positive frame, with timeouts/cleanup, no default listeners/timers/UI or promise reactions and no process-memory ownership claim; capped snapshot rows render as accessibility descendants of at most350characters and at most31nodes total",
+    "mobileFrameChoice": "Page inserts saved choices after generated device defaults before classpath; explicit query wins; missing/invalid saved choices retain iPad120 or phone20",
+    "iPadPolicy": "Preserves the exact 34-root JIT selector, JIT names, 2048/320 frame pads, two server threads, inline trampoline, 4 MiB shadow limit and default 120 FPS. Applied memory profiles and saved FPS remain authoritative; no current physical-device performance claim.",
+    "pointerEscape": "Escape and native pointer-lock loss release on the page before asynchronous Java handling; a fresh false-to-true cursor request rearms capture, while modal and noncanvas clicks cannot capture",
+    "gpuCacheOwnership": "Device bind groups retain only live native resources; resource close, async shader replacement and virtual canvas backing replacement evict dependent groups, with existing deferred destruction preserved",
+    "packFolderBridge": "Owned Java source and exact plan redirect compiled into fresh port; marker [MCWEB-OPEN-RESOURCEPACKS]",
+    "playerTextures": "Owned Java adapter and exact-counted plan redirects; ephemeral matching signed own-profile preload before Java; identity/name-bound single-use ProfileResult replaces the exact offline constructor completedFuture(null) call without changing offline service mode; server-side signature verification and authlib parsing/domain validation retained; automatic direct HTTPS resource-pack fetch and ordinary vanilla failure; cross-origin pack GET omits optional preflight-triggering client metadata; hosts must permit CORS and no automatic file picker or Worker proxy is used",
+    "portableStoragePump": "Source guard Boolean.getBoolean(\"mcweb.pageOwnedStorage\") skips automatic scan only; page supplies true, startup and explicit quit remain intact",
+    "frameBackpressure": "Two GPU-completion credits remain separate from copied RPC transport slots; see testing/frame-backpressure.json for actual new-build output identities.",
+    "vmIdentity": "Desktop SHA-256 and size verification of both mounted libjvm paths before main; iOS preserves pinned compiled external modules",
+    "measuredRefreshLabel": "SDL display-mode label reads finite launch-measured mcweb.displayHz between20and500; fallback60, float and rational fields agree. This label correction does not change the frame pacer or establish120Hz browser callbacks.",
+    "playerTextureAllocation": "Real authlib retains its Gson adapters and field parsing; constructor-only MinecraftProfileTexture uses an InstanceCreator because portable runtime has no sun.misc.Unsafe facade. Signature/domain/HTTPS policy remains unchanged.",
+    "clearAttachmentViews": "Full and regional clears share views keyed by native GPUTexture and bounded mip/layer; all clear subresources/passes and upload ordering remain unchanged. Weak texture keys, actual-destroy deletion and terminal reset bound cache ownership.",
+    "progressQuiet": "Background Java threads retain their last progress stage without throwing. Ordinary gameplay retains bounded stage history while suppressing repetitive console, DOM and page-message telemetry. Explicit diagnostics restore progress logging; milestone, error, input and frame completion delivery remain enabled.",
+    "desktopWebKitRuntime": {
+      "scope": "Desktop WebKit uses the existing bounded allocation and asynchronous verified module preparation path; touch input, mobile wake behavior, stored iPad memory budgets and real platform detection remain separate.",
+      "defaults": {
+        "javaMaxMiB": 448,
+        "javaInitialMiB": 96,
+        "wasmMaxMiB": 1152,
+        "prewarmedWorkers": 2,
+        "maxFps": 120,
+        "serverThreads": 2,
+        "jitRoots": 34,
+        "jitNames": true,
+        "jitFramePad": 2048,
+        "interpreterFramePad": 320,
+        "gpuOnlyShadowLimitMB": 4,
+        "terrainMiB": [
+          16,
+          4,
+          8
+        ]
+      },
+      "preserved": "Phone and iPad arguments, Chrome and Helium arguments, signed textures/auth, storage, text input, resolution, graphics settings and two GPU completion credits."
+    },
+    "audioSettings": "Loads saved master/category volumes, applies live setting changes to active sounds, and suppresses music/ambient event playback when category volume is zero.",
+    "audioPositionAndCleanup": "Delivers camera position, forward and up together, including stationary rotation; preserves poses before AudioContext creation; cleans failed/completed sources.",
+    "jitCacheEviction": "Ranks compiled entries by recent use, drops a quarter during gentle sweeps, and spares entries compiled within the grace period.",
+    "jitStringHash": "Uses cached Java String hash values with zero-hash correctness and an interpreter fallback for uncached strings.",
+    "audioRecovery": "Retries failed sound definitions and buffer fetch/decode on later playback, while sharing in-flight and successful cached work.",
+    "audioAttenuation": "Uses vanilla linear attenuation from zero to sample attenuation_distance (default16) multiplied by max(1, instance volume * sample volume); volume4 explosions reach64 blocks.",
+    "launcherResolution": "Supports saved exact custom framebuffer dimensions and arbitrary aspect ratios, with input validation and matching canvas display fit.",
+    "multiplayerAvailability": "Uses Minecraft GameConfig.disableMultiplayer when no paired local relay or selected self-hosted relay is ready at launch.",
+    "chunkBuilderPreference": "Seeds Semi Blocking for fresh options, preserves the saved Chunk Builder setting thereafter, and applies an explicit blockUpdates query override only when supplied."
+  },
+  "webModuleUpdate": {
+    "baseProjectRevision": "188623a29056b90ba0f1c13b1fa40451727c8348",
+    "baseSourceTreeSha256": "979473f04b17c3ebd2e2fff77918e247f436f210f2a0b930aecf450d898fa28b",
+    "files": [
+      "web/shader-glue.js"
+    ],
+    "nativeRuntimeRebuilt": false
+  }
+}

@@ -1,0 +1,1795 @@
+{
+  "schema": 1,
+  "kind": "pinned-dependency-notices",
+  "artifact": "nagamin.wasm",
+  "lockPath": "runtime/tools/naga-wasm/Cargo.lock",
+  "lockSha256": "3aa3cbda42b6869669caff27659dd18a23c0a099dcefb7410489401dc828519c",
+  "provenance": "Unchanged text extracted from local crate archives after verifying each archive against Cargo.lock; selected crates must match the packaged target inventory.",
+  "components": [
+    {
+      "crate": "arrayvec",
+      "version": "0.7.8",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/bluss/arrayvec",
+      "archiveUrl": "https://static.crates.io/crates/arrayvec/arrayvec-0.7.8.crate",
+      "archiveSha256": "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56",
+      "files": [
+        {
+          "path": "licenses/Rust/arrayvec-0.7.8/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/arrayvec-0.7.8/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/arrayvec-0.7.8/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "4da95ec4ecb65b738d470b7d762894ad9c97da93e6cbfb18b570fc2c96f4b871",
+          "publicPath": "/notices/Rust/arrayvec-0.7.8/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "autocfg",
+      "version": "1.5.1",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/cuviper/autocfg",
+      "archiveUrl": "https://static.crates.io/crates/autocfg/autocfg-1.5.1.crate",
+      "archiveSha256": "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53",
+      "files": [
+        {
+          "path": "licenses/Rust/autocfg-1.5.1/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/autocfg-1.5.1/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/autocfg-1.5.1/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1054,
+          "sha256": "27995d58ad5c1145c1a8cd86244ce844886958a35eb2b78c6b772748669999ac",
+          "publicPath": "/notices/Rust/autocfg-1.5.1/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "bit-set",
+      "version": "0.10.0",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/contain-rs/bit-set",
+      "archiveUrl": "https://static.crates.io/crates/bit-set/bit-set-0.10.0.crate",
+      "archiveSha256": "09ec2f926cc3060f09db9ebc5b52823d85268d24bb917e472c0c4bea35780a7d",
+      "files": [
+        {
+          "path": "licenses/Rust/bit-set-0.10.0/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10850,
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "publicPath": "/notices/Rust/bit-set-0.10.0/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/bit-set-0.10.0/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "6b56ddc7cd80419e5e22e075f2252d720f6cbe17e3e2c17383095ee2712bcffa",
+          "publicPath": "/notices/Rust/bit-set-0.10.0/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "bit-vec",
+      "version": "0.9.1",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/contain-rs/bit-vec",
+      "archiveUrl": "https://static.crates.io/crates/bit-vec/bit-vec-0.9.1.crate",
+      "archiveSha256": "b71798fca2c1fe1086445a7258a4bc81e6e49dcd24c8d0dd9a1e57395b603f51",
+      "files": [
+        {
+          "path": "licenses/Rust/bit-vec-0.9.1/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10850,
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "publicPath": "/notices/Rust/bit-vec-0.9.1/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/bit-vec-0.9.1/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "f51ac2c59a222f7476ce507ca879960e2b64ea64bb2786eefdbeb7b0b538d1b7",
+          "publicPath": "/notices/Rust/bit-vec-0.9.1/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "bitflags",
+      "version": "2.13.2",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/bitflags/bitflags",
+      "archiveUrl": "https://static.crates.io/crates/bitflags/bitflags-2.13.2.crate",
+      "archiveSha256": "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06",
+      "files": [
+        {
+          "path": "licenses/Rust/bitflags-2.13.2/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/bitflags-2.13.2/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/bitflags-2.13.2/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+          "publicPath": "/notices/Rust/bitflags-2.13.2/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "cfg-if",
+      "version": "1.0.5",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-lang/cfg-if",
+      "archiveUrl": "https://static.crates.io/crates/cfg-if/cfg-if-1.0.5.crate",
+      "archiveSha256": "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600",
+      "files": [
+        {
+          "path": "licenses/Rust/cfg-if-1.0.5/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/cfg-if-1.0.5/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/cfg-if-1.0.5/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1057,
+          "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
+          "publicPath": "/notices/Rust/cfg-if-1.0.5/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "cfg_aliases",
+      "version": "0.2.2",
+      "license": "MIT",
+      "repository": "https://github.com/katharostech/cfg_aliases",
+      "archiveUrl": "https://static.crates.io/crates/cfg_aliases/cfg_aliases-0.2.2.crate",
+      "archiveSha256": "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527",
+      "files": [
+        {
+          "path": "licenses/Rust/cfg_aliases-0.2.2/LICENSE.txt",
+          "upstreamPath": "LICENSE",
+          "bytes": 1076,
+          "sha256": "31b94860253d8ec7b4529f51901044d3b459d6292d996504a36b1bae3a36a812",
+          "publicPath": "/notices/Rust/cfg_aliases-0.2.2/LICENSE.txt"
+        },
+        {
+          "path": "licenses/Rust/cfg_aliases-0.2.2/NOTICES.md.txt",
+          "upstreamPath": "NOTICES.md",
+          "bytes": 1472,
+          "sha256": "1e2b7ade3fb228130408b9990cae6a7618eb314c75aa0b164bfe485d9d9756ee",
+          "publicPath": "/notices/Rust/cfg_aliases-0.2.2/NOTICES.md.txt"
+        }
+      ]
+    },
+    {
+      "crate": "codespan-reporting",
+      "version": "0.13.1",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/brendanzab/codespan",
+      "archiveUrl": "https://static.crates.io/crates/codespan-reporting/codespan-reporting-0.13.1.crate",
+      "archiveSha256": "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681",
+      "files": [
+        {
+          "path": "licenses/Rust/codespan-reporting-0.13.1/LICENSE.txt",
+          "upstreamPath": "LICENSE",
+          "bytes": 11357,
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "publicPath": "/notices/Rust/codespan-reporting-0.13.1/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "crate": "equivalent",
+      "version": "1.0.2",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/indexmap-rs/equivalent",
+      "archiveUrl": "https://static.crates.io/crates/equivalent/equivalent-1.0.2.crate",
+      "archiveSha256": "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f",
+      "files": [
+        {
+          "path": "licenses/Rust/equivalent-1.0.2/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/equivalent-1.0.2/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/equivalent-1.0.2/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1049,
+          "sha256": "7365cc8878a1d7ce155a58c4ca09c3d7a6be413efa5334a80ea842912b669349",
+          "publicPath": "/notices/Rust/equivalent-1.0.2/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "foldhash",
+      "version": "0.2.0",
+      "license": "Zlib",
+      "repository": "https://github.com/orlp/foldhash",
+      "archiveUrl": "https://static.crates.io/crates/foldhash/foldhash-0.2.0.crate",
+      "archiveSha256": "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb",
+      "files": [
+        {
+          "path": "licenses/Rust/foldhash-0.2.0/LICENSE.txt",
+          "upstreamPath": "LICENSE",
+          "bytes": 856,
+          "sha256": "b1181a40b2a7b25cf66fd01481713bc1005df082c53ef73e851e55071b102744",
+          "publicPath": "/notices/Rust/foldhash-0.2.0/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "crate": "half",
+      "version": "2.7.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/VoidStarKat/half-rs",
+      "archiveUrl": "https://static.crates.io/crates/half/half-2.7.1.crate",
+      "archiveSha256": "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b",
+      "files": [
+        {
+          "path": "licenses/Rust/half-2.7.1/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10173,
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "publicPath": "/notices/Rust/half-2.7.1/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/half-2.7.1/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1036,
+          "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
+          "publicPath": "/notices/Rust/half-2.7.1/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "hashbrown",
+      "version": "0.17.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-lang/hashbrown",
+      "archiveUrl": "https://static.crates.io/crates/hashbrown/hashbrown-0.17.1.crate",
+      "archiveSha256": "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a",
+      "files": [
+        {
+          "path": "licenses/Rust/hashbrown-0.17.1/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/hashbrown-0.17.1/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/hashbrown-0.17.1/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1060,
+          "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+          "publicPath": "/notices/Rust/hashbrown-0.17.1/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "indexmap",
+      "version": "2.14.2",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/indexmap-rs/indexmap",
+      "archiveUrl": "https://static.crates.io/crates/indexmap/indexmap-2.14.2.crate",
+      "archiveSha256": "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855",
+      "files": [
+        {
+          "path": "licenses/Rust/indexmap-2.14.2/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/indexmap-2.14.2/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/indexmap-2.14.2/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1049,
+          "sha256": "ecc269ef87fd38a1d98e30bfac9ba964a9dbd9315c3770fed98d4d7cb5882055",
+          "publicPath": "/notices/Rust/indexmap-2.14.2/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "libm",
+      "version": "0.2.16",
+      "license": "MIT",
+      "repository": "https://github.com/rust-lang/compiler-builtins",
+      "archiveUrl": "https://static.crates.io/crates/libm/libm-0.2.16.crate",
+      "archiveSha256": "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981",
+      "files": [
+        {
+          "path": "licenses/Rust/libm-0.2.16/LICENSE.txt.txt",
+          "upstreamPath": "LICENSE.txt",
+          "bytes": 14088,
+          "sha256": "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7",
+          "publicPath": "/notices/Rust/libm-0.2.16/LICENSE.txt.txt"
+        }
+      ]
+    },
+    {
+      "crate": "log",
+      "version": "0.4.34",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-lang/log",
+      "archiveUrl": "https://static.crates.io/crates/log/log-0.4.34.crate",
+      "archiveSha256": "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6",
+      "files": [
+        {
+          "path": "licenses/Rust/log-0.4.34/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/log-0.4.34/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/log-0.4.34/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+          "publicPath": "/notices/Rust/log-0.4.34/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "naga",
+      "version": "30.0.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/gfx-rs/wgpu",
+      "archiveUrl": "https://static.crates.io/crates/naga/naga-30.0.1.crate",
+      "archiveSha256": "a616d2fb8c89516ac2723a581f69d6c18576046bed761bd6b305e5618e6ae130",
+      "files": [
+        {
+          "path": "licenses/Rust/naga-30.0.1/LICENSE.APACHE.txt",
+          "upstreamPath": "LICENSE.APACHE",
+          "bytes": 10173,
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "publicPath": "/notices/Rust/naga-30.0.1/LICENSE.APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/naga-30.0.1/LICENSE.MIT.txt",
+          "upstreamPath": "LICENSE.MIT",
+          "bytes": 1078,
+          "sha256": "dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21",
+          "publicPath": "/notices/Rust/naga-30.0.1/LICENSE.MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "naga-types",
+      "version": "30.0.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/gfx-rs/wgpu",
+      "archiveUrl": "https://static.crates.io/crates/naga-types/naga-types-30.0.1.crate",
+      "archiveSha256": "590afbf58a6f4f62873cd5cff4468061844bafa1cdf399cc954537c22d768d49",
+      "files": [
+        {
+          "path": "licenses/Rust/naga-types-30.0.1/LICENSE.APACHE.txt",
+          "upstreamPath": "LICENSE.APACHE",
+          "bytes": 10173,
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "publicPath": "/notices/Rust/naga-types-30.0.1/LICENSE.APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/naga-types-30.0.1/LICENSE.MIT.txt",
+          "upstreamPath": "LICENSE.MIT",
+          "bytes": 1078,
+          "sha256": "dc0d97139e8205818c703741c7be7cb3b96888bd5917b8d6fc6133731e403c21",
+          "publicPath": "/notices/Rust/naga-types-30.0.1/LICENSE.MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "num-traits",
+      "version": "0.2.19",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-num/num-traits",
+      "archiveUrl": "https://static.crates.io/crates/num-traits/num-traits-0.2.19.crate",
+      "archiveSha256": "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841",
+      "files": [
+        {
+          "path": "licenses/Rust/num-traits-0.2.19/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/num-traits-0.2.19/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/num-traits-0.2.19/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+          "publicPath": "/notices/Rust/num-traits-0.2.19/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "once_cell",
+      "version": "1.21.4",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/matklad/once_cell",
+      "archiveUrl": "https://static.crates.io/crates/once_cell/once_cell-1.21.4.crate",
+      "archiveSha256": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "files": [
+        {
+          "path": "licenses/Rust/once_cell-1.21.4/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/once_cell-1.21.4/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/once_cell-1.21.4/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/once_cell-1.21.4/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "pp-rs",
+      "version": "0.2.1",
+      "license": "BSD-3-Clause",
+      "repository": "https://github.com/Kangz/glslpp-rs",
+      "archiveUrl": "https://static.crates.io/crates/pp-rs/pp-rs-0.2.1.crate",
+      "archiveSha256": "bb458bb7f6e250e6eb79d5026badc10a3ebb8f9a15d1fff0f13d17c71f4d6dee",
+      "files": [
+        {
+          "path": "licenses/Rust/pp-rs-0.2.1/LICENSE.txt",
+          "upstreamPath": "LICENSE",
+          "bytes": 1523,
+          "sha256": "f1f86507901c4e35cdf3454a62ef96bc998f9ae9602e47975268655f3510fe29",
+          "publicPath": "/notices/Rust/pp-rs-0.2.1/LICENSE.txt"
+        }
+      ]
+    },
+    {
+      "crate": "proc-macro2",
+      "version": "1.0.107",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/proc-macro2",
+      "archiveUrl": "https://static.crates.io/crates/proc-macro2/proc-macro2-1.0.107.crate",
+      "archiveSha256": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "files": [
+        {
+          "path": "licenses/Rust/proc-macro2-1.0.107/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/proc-macro2-1.0.107/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/proc-macro2-1.0.107/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/proc-macro2-1.0.107/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "quote",
+      "version": "1.0.47",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/quote",
+      "archiveUrl": "https://static.crates.io/crates/quote/quote-1.0.47.crate",
+      "archiveSha256": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "files": [
+        {
+          "path": "licenses/Rust/quote-1.0.47/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/quote-1.0.47/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/quote-1.0.47/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/quote-1.0.47/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "rustc-hash",
+      "version": "1.1.0",
+      "license": "Apache-2.0/MIT",
+      "repository": "https://github.com/rust-lang-nursery/rustc-hash",
+      "archiveUrl": "https://static.crates.io/crates/rustc-hash/rustc-hash-1.1.0.crate",
+      "archiveSha256": "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2",
+      "files": [
+        {
+          "path": "licenses/Rust/rustc-hash-1.1.0/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/rustc-hash-1.1.0/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/rustc-hash-1.1.0/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/rustc-hash-1.1.0/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "syn",
+      "version": "2.0.119",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/syn",
+      "archiveUrl": "https://static.crates.io/crates/syn/syn-2.0.119.crate",
+      "archiveSha256": "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297",
+      "files": [
+        {
+          "path": "licenses/Rust/syn-2.0.119/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/syn-2.0.119/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/syn-2.0.119/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/syn-2.0.119/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "syn",
+      "version": "3.0.6",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/syn",
+      "archiveUrl": "https://static.crates.io/crates/syn/syn-3.0.6.crate",
+      "archiveSha256": "8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee",
+      "files": [
+        {
+          "path": "licenses/Rust/syn-3.0.6/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/syn-3.0.6/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/syn-3.0.6/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/syn-3.0.6/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "thiserror",
+      "version": "2.0.21",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/thiserror",
+      "archiveUrl": "https://static.crates.io/crates/thiserror/thiserror-2.0.21.crate",
+      "archiveSha256": "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e",
+      "files": [
+        {
+          "path": "licenses/Rust/thiserror-2.0.21/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/thiserror-2.0.21/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/thiserror-2.0.21/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/thiserror-2.0.21/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "thiserror-impl",
+      "version": "2.0.21",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/thiserror",
+      "archiveUrl": "https://static.crates.io/crates/thiserror-impl/thiserror-impl-2.0.21.crate",
+      "archiveSha256": "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524",
+      "files": [
+        {
+          "path": "licenses/Rust/thiserror-impl-2.0.21/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/thiserror-impl-2.0.21/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/thiserror-impl-2.0.21/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/thiserror-impl-2.0.21/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "unicode-ident",
+      "version": "1.0.26",
+      "license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "repository": "https://github.com/dtolnay/unicode-ident",
+      "archiveUrl": "https://static.crates.io/crates/unicode-ident/unicode-ident-1.0.26.crate",
+      "archiveSha256": "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954",
+      "files": [
+        {
+          "path": "licenses/Rust/unicode-ident-1.0.26/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 9723,
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "publicPath": "/notices/Rust/unicode-ident-1.0.26/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/unicode-ident-1.0.26/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1023,
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "publicPath": "/notices/Rust/unicode-ident-1.0.26/LICENSE-MIT.txt"
+        },
+        {
+          "path": "licenses/Rust/unicode-ident-1.0.26/LICENSE-UNICODE.txt",
+          "upstreamPath": "LICENSE-UNICODE",
+          "bytes": 1995,
+          "sha256": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1",
+          "publicPath": "/notices/Rust/unicode-ident-1.0.26/LICENSE-UNICODE.txt"
+        }
+      ]
+    },
+    {
+      "crate": "unicode-width",
+      "version": "0.2.2",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/unicode-rs/unicode-width",
+      "archiveUrl": "https://static.crates.io/crates/unicode-width/unicode-width-0.2.2.crate",
+      "archiveSha256": "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254",
+      "files": [
+        {
+          "path": "licenses/Rust/unicode-width-0.2.2/COPYRIGHT.txt",
+          "upstreamPath": "COPYRIGHT",
+          "bytes": 321,
+          "sha256": "23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d",
+          "publicPath": "/notices/Rust/unicode-width-0.2.2/COPYRIGHT.txt"
+        },
+        {
+          "path": "licenses/Rust/unicode-width-0.2.2/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/unicode-width-0.2.2/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/unicode-width-0.2.2/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0",
+          "publicPath": "/notices/Rust/unicode-width-0.2.2/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "unicode-xid",
+      "version": "0.2.6",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/unicode-rs/unicode-xid",
+      "archiveUrl": "https://static.crates.io/crates/unicode-xid/unicode-xid-0.2.6.crate",
+      "archiveSha256": "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853",
+      "files": [
+        {
+          "path": "licenses/Rust/unicode-xid-0.2.6/COPYRIGHT.txt",
+          "upstreamPath": "COPYRIGHT",
+          "bytes": 321,
+          "sha256": "23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d",
+          "publicPath": "/notices/Rust/unicode-xid-0.2.6/COPYRIGHT.txt"
+        },
+        {
+          "path": "licenses/Rust/unicode-xid-0.2.6/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 10847,
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "publicPath": "/notices/Rust/unicode-xid-0.2.6/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/unicode-xid-0.2.6/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1071,
+          "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0",
+          "publicPath": "/notices/Rust/unicode-xid-0.2.6/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "zerocopy",
+      "version": "0.8.62",
+      "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/google/zerocopy",
+      "archiveUrl": "https://static.crates.io/crates/zerocopy/zerocopy-0.8.62.crate",
+      "archiveSha256": "86502bf56ac7c77571a32e2647bb2a15894565e981fb2a48d7bde2d91c965a9d",
+      "files": [
+        {
+          "path": "licenses/Rust/zerocopy-0.8.62/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 11350,
+          "sha256": "9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3",
+          "publicPath": "/notices/Rust/zerocopy-0.8.62/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/zerocopy-0.8.62/LICENSE-BSD.txt",
+          "upstreamPath": "LICENSE-BSD",
+          "bytes": 1275,
+          "sha256": "83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32",
+          "publicPath": "/notices/Rust/zerocopy-0.8.62/LICENSE-BSD.txt"
+        },
+        {
+          "path": "licenses/Rust/zerocopy-0.8.62/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1060,
+          "sha256": "1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df",
+          "publicPath": "/notices/Rust/zerocopy-0.8.62/LICENSE-MIT.txt"
+        }
+      ]
+    },
+    {
+      "crate": "zerocopy-derive",
+      "version": "0.8.62",
+      "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/google/zerocopy",
+      "archiveUrl": "https://static.crates.io/crates/zerocopy-derive/zerocopy-derive-0.8.62.crate",
+      "archiveSha256": "5457206954b06561e2608c7e19cf58b1926586d999c246eebe4502f7e2039d1a",
+      "files": [
+        {
+          "path": "licenses/Rust/zerocopy-derive-0.8.62/LICENSE-APACHE.txt",
+          "upstreamPath": "LICENSE-APACHE",
+          "bytes": 11350,
+          "sha256": "9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3",
+          "publicPath": "/notices/Rust/zerocopy-derive-0.8.62/LICENSE-APACHE.txt"
+        },
+        {
+          "path": "licenses/Rust/zerocopy-derive-0.8.62/LICENSE-BSD.txt",
+          "upstreamPath": "LICENSE-BSD",
+          "bytes": 1275,
+          "sha256": "83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32",
+          "publicPath": "/notices/Rust/zerocopy-derive-0.8.62/LICENSE-BSD.txt"
+        },
+        {
+          "path": "licenses/Rust/zerocopy-derive-0.8.62/LICENSE-MIT.txt",
+          "upstreamPath": "LICENSE-MIT",
+          "bytes": 1060,
+          "sha256": "1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df",
+          "publicPath": "/notices/Rust/zerocopy-derive-0.8.62/LICENSE-MIT.txt"
+        }
+      ]
+    }
+  ],
+  "jarComponents": [
+    {
+      "name": "Netty-4.2.16.Final",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/netty/netty",
+      "tag": "netty-4.2.16.Final",
+      "revision": "3703d79669ee024f6483c9d8697ac58ba546df33",
+      "files": [
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/LICENSE.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/LICENSE.txt.txt",
+          "upstreamPath": "LICENSE.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/LICENSE.txt",
+          "gitBlobSha1": "62589edd12a37dd28b6b6fed1e2d728ac9f05c8d",
+          "bytes": 11360,
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/NOTICE.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/NOTICE.txt.txt",
+          "upstreamPath": "NOTICE.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/NOTICE.txt",
+          "gitBlobSha1": "21367472ae93ec2e7e2fc2998589023498b0ef18",
+          "bytes": 9387,
+          "sha256": "1775b0d91666fcb82493a5198f761b59a6d4d050bae6a4d26ecc377354068571"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.aalto-xml.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.aalto-xml.txt.txt",
+          "upstreamPath": "license/LICENSE.aalto-xml.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.aalto-xml.txt",
+          "gitBlobSha1": "db3502e5f7b46d876582c43a0cf9c744532ceb89",
+          "bytes": 573,
+          "sha256": "2dca650805d8e96b8fcd3c2ac8bd17a8813fee479caefce929c75528710f35df"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.base64.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.base64.txt.txt",
+          "upstreamPath": "license/LICENSE.base64.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.base64.txt",
+          "gitBlobSha1": "31ebc840539c1a88450cd6999d7b0d6d0a59c2ed",
+          "bytes": 1592,
+          "sha256": "922754f715103e9366d1099f85bfea7df192d3d457cd7e222786321c9ab01954"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.boringssl.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.boringssl.txt.txt",
+          "upstreamPath": "license/LICENSE.boringssl.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.boringssl.txt",
+          "gitBlobSha1": "37a5b7439bf6d245179326da069fa561e20067ef",
+          "bytes": 13115,
+          "sha256": "827c8d8fc207c2392794eef9e00fe246f9f61fdcc132556c275be3dd8c3cd97f"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.bouncycastle.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.bouncycastle.txt.txt",
+          "upstreamPath": "license/LICENSE.bouncycastle.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.bouncycastle.txt",
+          "gitBlobSha1": "aa21043dc106471ebd674998552113b3c894dc19",
+          "bytes": 1168,
+          "sha256": "3ad769df48f54692f561debc1be6134efb95b63b6e5031b8167f821bd82a204f"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.brotli4j.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.brotli4j.txt.txt",
+          "upstreamPath": "license/LICENSE.brotli4j.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.brotli4j.txt",
+          "gitBlobSha1": "20e4bd85661f5fbc86e0a8aac3934ddabe776160",
+          "bytes": 11359,
+          "sha256": "c1b9df1275e769f3dbab000d1e457a2d4b0f28eb5da6c77e48dc37eeba202ed7"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.caliper.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.caliper.txt.txt",
+          "upstreamPath": "license/LICENSE.caliper.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.caliper.txt",
+          "gitBlobSha1": "62589edd12a37dd28b6b6fed1e2d728ac9f05c8d",
+          "bytes": 11360,
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.commons-lang.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.commons-lang.txt.txt",
+          "upstreamPath": "license/LICENSE.commons-lang.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.commons-lang.txt",
+          "gitBlobSha1": "92a8d0d2e2edb608692ef371d01ab84a399dda1e",
+          "bytes": 10175,
+          "sha256": "3e4af21da9cb8a50d6a8f32225d7630fbf94a263e89945489d4863585f4aca4e"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.commons-logging.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.commons-logging.txt.txt",
+          "upstreamPath": "license/LICENSE.commons-logging.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.commons-logging.txt",
+          "gitBlobSha1": "92a8d0d2e2edb608692ef371d01ab84a399dda1e",
+          "bytes": 10175,
+          "sha256": "3e4af21da9cb8a50d6a8f32225d7630fbf94a263e89945489d4863585f4aca4e"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.compress-lzf.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.compress-lzf.txt.txt",
+          "upstreamPath": "license/LICENSE.compress-lzf.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.compress-lzf.txt",
+          "gitBlobSha1": "d3dfbd0e523917e04ca4865ff13180544d464ad6",
+          "bytes": 551,
+          "sha256": "95eab05f6010cc64dedb668523c01fc9f48665cded448de86404b14a7a557ddd"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.dnsinfo.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.dnsinfo.txt.txt",
+          "upstreamPath": "license/LICENSE.dnsinfo.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.dnsinfo.txt",
+          "gitBlobSha1": "29dd192fcfbcff0e1a324b319a7e9765a0047d59",
+          "bytes": 993,
+          "sha256": "f0bdf5682bf317b1f85c80ed32cb4c7bf77b5a231dee485aa92d983673b7c58f"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.harmony.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.harmony.txt.txt",
+          "upstreamPath": "license/LICENSE.harmony.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.harmony.txt",
+          "gitBlobSha1": "92a8d0d2e2edb608692ef371d01ab84a399dda1e",
+          "bytes": 10175,
+          "sha256": "3e4af21da9cb8a50d6a8f32225d7630fbf94a263e89945489d4863585f4aca4e"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.hpack.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.hpack.txt.txt",
+          "upstreamPath": "license/LICENSE.hpack.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.hpack.txt",
+          "gitBlobSha1": "9b259bdfcf9022e7f4999a318ab7261300644e11",
+          "bytes": 11359,
+          "sha256": "62fb8a3a9621dc2388174caaabe9c2317b694bb9a1d46c98bcf5655b68f51be3"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.hyper-hpack.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.hyper-hpack.txt.txt",
+          "upstreamPath": "license/LICENSE.hyper-hpack.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.hyper-hpack.txt",
+          "gitBlobSha1": "d24c351e1889b5b7837e4c9c1dc59334191c7f2c",
+          "bytes": 1080,
+          "sha256": "763a9342a04df62046c9dc748a5287934eb0a5331c6863b3ca0aee20e18cb4ed"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.jboss-marshalling.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.jboss-marshalling.txt.txt",
+          "upstreamPath": "license/LICENSE.jboss-marshalling.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.jboss-marshalling.txt",
+          "gitBlobSha1": "a4546c5c30633e6ca62d84e2af19f94538ca3fa1",
+          "bytes": 10176,
+          "sha256": "ff420781e0005270cd1894a265e526dec4eb332f99df62a481b06672db202290"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.jbzip2.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.jbzip2.txt.txt",
+          "upstreamPath": "license/LICENSE.jbzip2.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.jbzip2.txt",
+          "gitBlobSha1": "6d6f1d40c06836f2f38b2971e47c96ecf9dad92b",
+          "bytes": 1106,
+          "sha256": "77edfb9953d4a58f573c40280f9703df301b1f28e68b556914a561b03559c5e9"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.jctools.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.jctools.txt.txt",
+          "upstreamPath": "license/LICENSE.jctools.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.jctools.txt",
+          "gitBlobSha1": "92a8d0d2e2edb608692ef371d01ab84a399dda1e",
+          "bytes": 10175,
+          "sha256": "3e4af21da9cb8a50d6a8f32225d7630fbf94a263e89945489d4863585f4aca4e"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.jfastlz.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.jfastlz.txt.txt",
+          "upstreamPath": "license/LICENSE.jfastlz.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.jfastlz.txt",
+          "gitBlobSha1": "6f27e141f6b7ce98b44aa9b5dd2a8130216f95dd",
+          "bytes": 1075,
+          "sha256": "06c1bf4cd5304c64bb72a6e03b461c389c35af26d623e3add7d828c398482e1d"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.jsr166y.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.jsr166y.txt.txt",
+          "upstreamPath": "license/LICENSE.jsr166y.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.jsr166y.txt",
+          "gitBlobSha1": "b1c292b54cb2b24b1b0b9481cc59ba45bd4c7a7e",
+          "bytes": 1592,
+          "sha256": "17869cb6184447de9663a752a7663c118a9ed0d4ce0a2208986afc75206e1bbb"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.jzlib.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.jzlib.txt.txt",
+          "upstreamPath": "license/LICENSE.jzlib.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.jzlib.txt",
+          "gitBlobSha1": "29ad562af0a5ed0b2c0171dc77ae1e7dfced01de",
+          "bytes": 1465,
+          "sha256": "2ce9cdc96c015e5bb03fb1b565f33ffc7590c35ff2a33abe923e299135c01ce1"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.libdivsufsort.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.libdivsufsort.txt.txt",
+          "upstreamPath": "license/LICENSE.libdivsufsort.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.libdivsufsort.txt",
+          "gitBlobSha1": "3bad2dcc18c42901a3f47ebfb6d64161adf4ae9b",
+          "bytes": 1079,
+          "sha256": "a801f489b279d91b8afc67d41e3769ec4df476fda218d63f4326c005db881541"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.log4j.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.log4j.txt.txt",
+          "upstreamPath": "license/LICENSE.log4j.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.log4j.txt",
+          "gitBlobSha1": "92a8d0d2e2edb608692ef371d01ab84a399dda1e",
+          "bytes": 10175,
+          "sha256": "3e4af21da9cb8a50d6a8f32225d7630fbf94a263e89945489d4863585f4aca4e"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.lz4.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.lz4.txt.txt",
+          "upstreamPath": "license/LICENSE.lz4.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.lz4.txt",
+          "gitBlobSha1": "62589edd12a37dd28b6b6fed1e2d728ac9f05c8d",
+          "bytes": 11360,
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.lzma-java.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.lzma-java.txt.txt",
+          "upstreamPath": "license/LICENSE.lzma-java.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.lzma-java.txt",
+          "gitBlobSha1": "62589edd12a37dd28b6b6fed1e2d728ac9f05c8d",
+          "bytes": 11360,
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.mvn-wrapper.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.mvn-wrapper.txt.txt",
+          "upstreamPath": "license/LICENSE.mvn-wrapper.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.mvn-wrapper.txt",
+          "gitBlobSha1": "62589edd12a37dd28b6b6fed1e2d728ac9f05c8d",
+          "bytes": 11360,
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.nghttp2-hpack.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.nghttp2-hpack.txt.txt",
+          "upstreamPath": "license/LICENSE.nghttp2-hpack.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.nghttp2-hpack.txt",
+          "gitBlobSha1": "80201792ec7234674ea584ef1303d5f428558ae9",
+          "bytes": 1156,
+          "sha256": "6b94f3abc1aabd0c72a7c7d92a77f79dda7c8a0cb3df839a97890b4116a2de2a"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.protobuf.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.protobuf.txt.txt",
+          "upstreamPath": "license/LICENSE.protobuf.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.protobuf.txt",
+          "gitBlobSha1": "0ab3bdb01a4266fed543846ae5e16677993de192",
+          "bytes": 1832,
+          "sha256": "8fa16eae6ec99dfa982ab552ecbf9e98421bf5062356538cac4cd0c7bacd0093"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.quiche.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.quiche.txt.txt",
+          "upstreamPath": "license/LICENSE.quiche.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.quiche.txt",
+          "gitBlobSha1": "c044775c1d9e6065434d079e852e1a4865dfdf0b",
+          "bytes": 1306,
+          "sha256": "2ef4b5abfce387a83933bda738e72467a79d15c1c17679143ec55011dae66b84"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.slf4j.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.slf4j.txt.txt",
+          "upstreamPath": "license/LICENSE.slf4j.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.slf4j.txt",
+          "gitBlobSha1": "777b1de8451092f845a4832d8e68872d0c12151d",
+          "bytes": 1203,
+          "sha256": "e45deaad2824e38410545e2ed8ced91eccd13bc03b41643a4bd79c96e106e106"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.snappy.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.snappy.txt.txt",
+          "upstreamPath": "license/LICENSE.snappy.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.snappy.txt",
+          "gitBlobSha1": "ba6a3ae553a5eb2d501b46a2a6fac267f088b8e4",
+          "bytes": 1463,
+          "sha256": "38139f9e51ce002fccec3b6cf2011a24e18e5096b8e6ad715f718828fa0b57d1"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.webbit.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.webbit.txt.txt",
+          "upstreamPath": "license/LICENSE.webbit.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.webbit.txt",
+          "gitBlobSha1": "47a75441060a4d9c3a8aed483a137e12910a7bb0",
+          "bytes": 1598,
+          "sha256": "9a746c7a218e6ee1ef719a39a0a66454c82ada93c60f06f9f819b505f6401046"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/LICENSE.zstd-jni.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/LICENSE.zstd-jni.txt.txt",
+          "upstreamPath": "license/LICENSE.zstd-jni.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/LICENSE.zstd-jni.txt",
+          "gitBlobSha1": "7bdccb6a9c343a2215525dee0d3af915bf969f72",
+          "bytes": 1359,
+          "sha256": "101b8b218e3784b326bcbf7fb4a6b0138f63e8df53242d9b10eb80a0056a1133"
+        },
+        {
+          "path": "licenses/Java/Netty-4.2.16.Final/license/NOTICE.harmony.txt.txt",
+          "publicPath": "/notices/Java/Netty-4.2.16.Final/license/NOTICE.harmony.txt.txt",
+          "upstreamPath": "license/NOTICE.harmony.txt",
+          "upstreamUrl": "https://raw.githubusercontent.com/netty/netty/3703d79669ee024f6483c9d8697ac58ba546df33/license/NOTICE.harmony.txt",
+          "gitBlobSha1": "c37ec28276ed63eaaa4fc3c8165beb6c60764a01",
+          "bytes": 172,
+          "sha256": "9cea0d3fe0550735946cec78eaf6cfccce153ae06bdcdf17fa3b9f8d9b22196a"
+        }
+      ],
+      "jars": [
+        {
+          "maven": "io.netty:netty-buffer:4.2.16.Final",
+          "file": "netty-buffer-4.2.16.Final.jar",
+          "sha256": "cc36ae9fbd0b03fe755eb4eb4424ca53b59cfd297d7fd47d49e5b1059beded6c"
+        },
+        {
+          "maven": "io.netty:netty-codec-base:4.2.16.Final",
+          "file": "netty-codec-base-4.2.16.Final.jar",
+          "sha256": "feb410225938d9970de6b624a0c031d079804fa5cc5e1ec6e9298f16db5998a7"
+        },
+        {
+          "maven": "io.netty:netty-codec-compression:4.2.16.Final",
+          "file": "netty-codec-compression-4.2.16.Final.jar",
+          "sha256": "13c8565414dd2115281303ef4ad1f7cc69bd7771d8d12c7d2fb31307dff26d11"
+        },
+        {
+          "maven": "io.netty:netty-codec-http:4.2.16.Final",
+          "file": "netty-codec-http-4.2.16.Final.jar",
+          "sha256": "0d16f981de8d0d304a2ab1a81f0a674892089fbaa8a583100aebb4a5b00456ec"
+        },
+        {
+          "maven": "io.netty:netty-common:4.2.16.Final",
+          "file": "netty-common-4.2.16.Final.jar",
+          "sha256": "9825ee68a0dc4cd2b53e2f532502401b2211bad9b77e8b04882d9e64487283ff"
+        },
+        {
+          "maven": "io.netty:netty-handler:4.2.16.Final",
+          "file": "netty-handler-4.2.16.Final.jar",
+          "sha256": "a259ca496da05ac1981f95cd856211f894a328056a6129e9cd70dbbd5df401f7"
+        },
+        {
+          "maven": "io.netty:netty-resolver:4.2.16.Final",
+          "file": "netty-resolver-4.2.16.Final.jar",
+          "sha256": "c9eca6a99036485cf1d186b4a6a595b0a54c53808319ee03924270eae04c32bb"
+        },
+        {
+          "maven": "io.netty:netty-transport-classes-epoll:4.2.16.Final",
+          "file": "netty-transport-classes-epoll-4.2.16.Final.jar",
+          "sha256": "9f2b53210db9c8d24e787ed43f3896aaf30d686ed270c7afbb29ab6330c6aa23"
+        },
+        {
+          "maven": "io.netty:netty-transport-classes-kqueue:4.2.16.Final",
+          "file": "netty-transport-classes-kqueue-4.2.16.Final.jar",
+          "sha256": "6599b495f69420cb240ab0a1aa60a19a2df3bc72791729170e0993727637a689"
+        },
+        {
+          "maven": "io.netty:netty-transport-native-unix-common:4.2.16.Final",
+          "file": "netty-transport-native-unix-common-4.2.16.Final.jar",
+          "sha256": "41ca8fe192083d17917be7ddcecded4da4fc1db1d1656d03d0bcb14e2f431155"
+        },
+        {
+          "maven": "io.netty:netty-transport:4.2.16.Final",
+          "file": "netty-transport-4.2.16.Final.jar",
+          "sha256": "cfa3f654caff906653385f4b7ddaa539d795b78f5711a622482b17d2b73484c0"
+        }
+      ]
+    },
+    {
+      "name": "LWJGL-3.4.3",
+      "license": "BSD-3-Clause",
+      "repository": "https://github.com/LWJGL/lwjgl3",
+      "tag": "3.4.3",
+      "revision": "30fac9b95f99cda97312232be25ba55297bf9951",
+      "files": [
+        {
+          "path": "licenses/Java/LWJGL-3.4.3/LICENSE.md.txt",
+          "publicPath": "/notices/Java/LWJGL-3.4.3/LICENSE.md.txt",
+          "upstreamPath": "LICENSE.md",
+          "upstreamUrl": "https://raw.githubusercontent.com/LWJGL/lwjgl3/30fac9b95f99cda97312232be25ba55297bf9951/LICENSE.md",
+          "gitBlobSha1": "a17ad0af9bd1978feb0b8d18be49b8c5ea4c1b26",
+          "bytes": 1518,
+          "sha256": "4c2f770897d0cfda4d9a65bb4d6d6983dccfd57d4c7eb74ea5ded0762cbc0e75"
+        }
+      ],
+      "jars": [
+        {
+          "maven": "org.lwjgl:lwjgl-freetype:3.4.3",
+          "file": "lwjgl-freetype-3.4.3.jar",
+          "sha256": "b331b9d2a29c1b330c3887d33c14dab9d7eed3f763bb8f5ca559eec02d73f075"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-jemalloc:3.4.3",
+          "file": "lwjgl-jemalloc-3.4.3.jar",
+          "sha256": "f34062b6489454f7e2c3bf5979e37667e62c7c85cd00f73760f441557cb1978a"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-openal:3.4.3",
+          "file": "lwjgl-openal-3.4.3.jar",
+          "sha256": "4a0049c8554d6890718fee76507572f2f9f8f3f6144d25d7d2ea76bccc2d9605"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-opengl:3.4.3",
+          "file": "lwjgl-opengl-3.4.3.jar",
+          "sha256": "a92cf30f25b6fb6066f3508511f83c5c4fe2a0cff14fc2e7373bc1f6c726374f"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-sdl:3.4.3",
+          "file": "lwjgl-sdl-3.4.3.jar",
+          "sha256": "dcb33abcbd946553176bb668be80d7adc60cb9d919ab5c71fb01fc51cacc4c8f"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-shaderc:3.4.3",
+          "file": "lwjgl-shaderc-3.4.3.jar",
+          "sha256": "82c7b5270d2c78458f5720c639459710c8f086ca050eea9ab0c44256fee7a626"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-spvc:3.4.3",
+          "file": "lwjgl-spvc-3.4.3.jar",
+          "sha256": "d737eba8512caa2f53db7a8dbea4c08d9c3d94493bb0a244e6d64af95541f742"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-stb:3.4.3",
+          "file": "lwjgl-stb-3.4.3.jar",
+          "sha256": "544753f5e49c53580949b9f1fc341f0e434991303c93d5a428fbaafaacc2cd69"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-vma:3.4.3",
+          "file": "lwjgl-vma-3.4.3.jar",
+          "sha256": "254162ef94bd213663a417368902ea916d51e0e0fa3054d07ea0ce9a8b7ac9e6"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl-vulkan:3.4.3",
+          "file": "lwjgl-vulkan-3.4.3.jar",
+          "sha256": "acdb40767775ed1223dc3b2a8c9d3ce740c9e3c4af074444ce2dfe2ea9ba62e0"
+        },
+        {
+          "maven": "org.lwjgl:lwjgl:3.4.3",
+          "file": "lwjgl-3.4.3.jar",
+          "sha256": "46eeca5471833c3cf5da3c1da015b41e3bb3eb16dd3da03f366886da10096751"
+        }
+      ]
+    },
+    {
+      "name": "JOrbis-0.0.17",
+      "license": "LGPL-2.0-or-later",
+      "repository": "https://www.jcraft.com/jorbis/",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/org/jcraft/jorbis/0.0.17/jorbis-0.0.17-sources.jar",
+        "bytes": 83365,
+        "sha256": "1643dd368b9c160276caf8d1f6a8c0aae43ca5bf49b53348a2a01623641708e5",
+        "upstreamSha1": "5446be5d62e4c6b347c8e6cd28dc00a936417ba2",
+        "note": "Verified Maven Central source archive for the exact redistributed coordinates. The old JCraft ZIP download currently returns HTML.",
+        "accompanyBinary": true,
+        "publicPath": "/notices/sources/JOrbis-0.0.17-sources.jar"
+      },
+      "files": [
+        {
+          "path": "licenses/Java/JOrbis-0.0.17/COPYRIGHT.txt",
+          "publicPath": "/notices/Java/JOrbis-0.0.17/COPYRIGHT.txt",
+          "upstreamPath": "COPYRIGHT",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/org/jcraft/jorbis/0.0.17/jorbis-0.0.17-sources.jar",
+          "gitBlobSha1": null,
+          "bytes": 1003,
+          "sha256": "31f6a71a1e5bbabbbc7224cf67b176f38c68c2d9fc5d7635377b7262bdd9e4d6",
+          "extraction": "Distinct original JOrbis/JOgg leading copyright and license comment blocks from the pinned source JAR, joined with blank lines; excludes implementation code."
+        },
+        {
+          "path": "licenses/Java/JOrbis-0.0.17/COPYING.LIB.txt",
+          "publicPath": "/notices/Java/JOrbis-0.0.17/COPYING.LIB.txt",
+          "upstreamPath": "COPYING.LIB",
+          "upstreamUrl": "https://www.gnu.org/licenses/old-licenses/lgpl-2.0.txt",
+          "gitBlobSha1": null,
+          "bytes": 25270,
+          "sha256": "cc535c21133c895b56b374c8a1dc1eb948d99003ed2b47372069456b62f42b24"
+        }
+      ],
+      "jars": [
+        {
+          "maven": "org.jcraft:jorbis:0.0.17",
+          "file": "jorbis-0.0.17.jar",
+          "sha256": "e067f29a3701426b67ed973036949c6e58ca5bb53eef7240b2e71e286d252a9e"
+        }
+      ]
+    },
+    {
+      "name": "lz4-java-1.10.1",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/yawkat/lz4-java",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/at/yawk/lz4/lz4-java/1.10.1/lz4-java-1.10.1-sources.jar",
+        "bytes": 101013,
+        "sha256": "d79505506c595dfb5c655933d33abcef4e034998ba49821bdbdba4353bc550ab",
+        "upstreamSha1": "4f7f994f3034599c521ef1d3d650b0c019499639"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/at/yawk/lz4/lz4-java/1.10.1/lz4-java-1.10.1.pom",
+        "bytes": 41572,
+        "sha256": "54423695b3a75c67e9dad0382c1b30daf808b32f9d78ebcd30220f00ae466980",
+        "declaredLicenses": [
+          {
+            "name": "Apache License, Version 2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0",
+            "distribution": "repo"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "at.yawk.lz4:lz4-java:1.10.1",
+          "file": "lz4-java-1.10.1.jar",
+          "sha256": "a58a84c4271e50df4c96ed916ccb7e48a869f8ed9cdcda1ad5d3d4c33b0214a3"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/lz4-java-1.10.1/LICENSE.txt.txt",
+          "publicPath": "/notices/Java/lz4-java-1.10.1/LICENSE.txt.txt",
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "upstreamUrl": "https://raw.githubusercontent.com/yawkat/lz4-java/33d180cb70c4d93c80fb0dc3ab3002f457e93840/LICENSE.txt",
+          "upstreamPath": "LICENSE.txt",
+          "revision": "33d180cb70c4d93c80fb0dc3ab3002f457e93840"
+        },
+        {
+          "path": "licenses/Java/lz4-java-1.10.1/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/lz4-java-1.10.1/COPYRIGHT-HEADERS.txt",
+          "bytes": 4252,
+          "sha256": "a7473b448707f1dda9f2e1fb394fb99ecd605b40da0394abecd5e74ef8eaf8e4",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/at/yawk/lz4/lz4-java/1.10.1/lz4-java-1.10.1-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "v1.10.1",
+      "revision": "33d180cb70c4d93c80fb0dc3ab3002f457e93840"
+    },
+    {
+      "name": "azure-json-1.4.0",
+      "license": "MIT AND Apache-2.0",
+      "repository": "https://github.com/Azure/azure-sdk-for-java",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/com/azure/azure-json/1.4.0/azure-json-1.4.0-sources.jar",
+        "bytes": 359530,
+        "sha256": "8adb8ed01481f6f1603b4a4f773713e0633f5f68236319dbe469c3bdd4945071",
+        "upstreamSha1": "1aa682f6aad24c331dddf779ec3e40aa7d4ca556"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/com/azure/azure-json/1.4.0/azure-json-1.4.0.pom",
+        "bytes": 10723,
+        "sha256": "8bcb096939195ae0510fa00c4503fd7d3606b4f874df51f0033b1f8e4d7a3117",
+        "declaredLicenses": [
+          {
+            "name": "The MIT License (MIT)",
+            "url": "http://opensource.org/licenses/MIT",
+            "distribution": "repo"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "com.azure:azure-json:1.4.0",
+          "file": "azure-json-1.4.0.jar",
+          "sha256": "c50bc998cd1a6c689f8644b51c206217bf2da09d5b949e777490a60290cc3a0d"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/azure-json-1.4.0/LICENSE.txt.txt",
+          "publicPath": "/notices/Java/azure-json-1.4.0/LICENSE.txt.txt",
+          "bytes": 1075,
+          "sha256": "18cc155157d07d5ac0b227e5f58ae9f815ccd817487fd10c6e4f4f0ec4411ce1",
+          "upstreamUrl": "https://raw.githubusercontent.com/Azure/azure-sdk-for-java/56c7913cf53e4502d6011997baf43e488be18076/LICENSE.txt",
+          "upstreamPath": "LICENSE.txt",
+          "revision": "56c7913cf53e4502d6011997baf43e488be18076"
+        },
+        {
+          "path": "licenses/Java/azure-json-1.4.0/NOTICE.txt.txt",
+          "publicPath": "/notices/Java/azure-json-1.4.0/NOTICE.txt.txt",
+          "bytes": 30283,
+          "sha256": "ff04e3db9d75d52184f0e575c5bc20e3c08998be98d524c7e20732c7d1de294e",
+          "upstreamUrl": "https://raw.githubusercontent.com/Azure/azure-sdk-for-java/56c7913cf53e4502d6011997baf43e488be18076/NOTICE.txt",
+          "upstreamPath": "NOTICE.txt",
+          "revision": "56c7913cf53e4502d6011997baf43e488be18076"
+        },
+        {
+          "path": "licenses/Java/azure-json-1.4.0/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/azure-json-1.4.0/COPYRIGHT-HEADERS.txt",
+          "bytes": 2474,
+          "sha256": "7ad13de7d555315ffa4d8e38edf3e72a20bfd201aa8e9284157f2ac0fba87cfa",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/com/azure/azure-json/1.4.0/azure-json-1.4.0-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "azure-json_1.4.0",
+      "revision": "56c7913cf53e4502d6011997baf43e488be18076"
+    },
+    {
+      "name": "oshi-core-6.9.0",
+      "license": "MIT",
+      "repository": "https://github.com/oshi/oshi",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/com/github/oshi/oshi-core/6.9.0/oshi-core-6.9.0-sources.jar",
+        "bytes": 618439,
+        "sha256": "8c18534d5fed8ffb2a584762f8a606e68f67c511ddf71910f37001ca8ce73b1f",
+        "upstreamSha1": "4827976de844bcfe0c5c6d760b7d1a2dccd85af1"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/com/github/oshi/oshi-core/6.9.0/oshi-core-6.9.0.pom",
+        "bytes": 3881,
+        "sha256": "4e2087195cb5f1b3be52357999def3601cda70240f4f64b08ffbc3db11d3fedf",
+        "declaredLicenses": []
+      },
+      "jars": [
+        {
+          "maven": "com.github.oshi:oshi-core:6.9.0",
+          "file": "oshi-core-6.9.0.jar",
+          "sha256": "b29ba9bce041e6ea822203d5b5a692660c87551241510ebc76eedffe684844c7"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/oshi-core-6.9.0/LICENSE.txt",
+          "publicPath": "/notices/Java/oshi-core-6.9.0/LICENSE.txt",
+          "bytes": 1141,
+          "sha256": "e5936ec705d2fb0515b0d3e9a76acb52c1eef3e8ff88c7b9f80269b7909c959c",
+          "upstreamUrl": "https://raw.githubusercontent.com/oshi/oshi/193674c6bff7c3439e01308de548df4b3e99d880/LICENSE",
+          "upstreamPath": "LICENSE",
+          "revision": "193674c6bff7c3439e01308de548df4b3e99d880"
+        },
+        {
+          "path": "licenses/Java/oshi-core-6.9.0/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/oshi-core-6.9.0/COPYRIGHT-HEADERS.txt",
+          "bytes": 22250,
+          "sha256": "0740309911eb5554b2f758486840aa3aed95bdffd51a826b0ecf86972a1b491a",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/com/github/oshi/oshi-core/6.9.0/oshi-core-6.9.0-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "oshi-parent-6.9.0",
+      "revision": "193674c6bff7c3439e01308de548df4b3e99d880"
+    },
+    {
+      "name": "gson-2.14.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/google/gson",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0-sources.jar",
+        "bytes": 213519,
+        "sha256": "a4873f0ef88981cab520c3d7449cd89a68e605f15e9fe46e1aa2c77d5f87eb6f",
+        "upstreamSha1": "cc6b911babf29b06357fce701395a9c1b5b44b0d"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.pom",
+        "bytes": 22768,
+        "sha256": "1fa0122c0e3733192642861c36be4c6f799a795327a23bdd2922691b6e9ba480",
+        "declaredLicenses": [
+          {
+            "name": "Apache-2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "com.google.code.gson:gson:2.14.0",
+          "file": "gson-2.14.0.jar",
+          "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/gson-2.14.0/LICENSE.txt",
+          "publicPath": "/notices/Java/gson-2.14.0/LICENSE.txt",
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "upstreamUrl": "https://raw.githubusercontent.com/google/gson/3ff35d6269894901ab8006258395aafc4b9765cd/LICENSE",
+          "upstreamPath": "LICENSE",
+          "revision": "3ff35d6269894901ab8006258395aafc4b9765cd"
+        },
+        {
+          "path": "licenses/Java/gson-2.14.0/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/gson-2.14.0/COPYRIGHT-HEADERS.txt",
+          "bytes": 13743,
+          "sha256": "a6a84a4d5db80452274ff06f4e031cc1752bd6f0b5fb589d72bbb90af02bdd12",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "gson-parent-2.14.0",
+      "revision": "3ff35d6269894901ab8006258395aafc4b9765cd"
+    },
+    {
+      "name": "icu4j-78.3",
+      "license": "Unicode-3.0",
+      "repository": "https://github.com/unicode-org/icu",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/com/ibm/icu/icu4j/78.3/icu4j-78.3-sources.jar",
+        "bytes": 2645358,
+        "sha256": "b8458be1c296aec6c52ea8f195f27e833c5d6030fa15a4b361a0e83030c3c3fe",
+        "upstreamSha1": "d35cc984f04785c4cdd26a1b28ac0435df56a2b9"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/com/ibm/icu/icu4j/78.3/icu4j-78.3.pom",
+        "bytes": 1472,
+        "sha256": "3b5940df133c35ab1d511a4b34e271d152e1a51609bc5cad2ee22829fae6adca",
+        "declaredLicenses": [
+          {
+            "name": "Unicode-3.0",
+            "url": "https://raw.githubusercontent.com/unicode-org/icu/maint/maint-78/LICENSE",
+            "distribution": "repo"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "com.ibm.icu:icu4j:78.3",
+          "file": "icu4j-78.3.jar",
+          "sha256": "e962c1758d9659ea1e1fbab99c58683f654d304e1126ace19aaabfe39e0edb25"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/icu4j-78.3/LICENSE.txt",
+          "publicPath": "/notices/Java/icu4j-78.3/LICENSE.txt",
+          "bytes": 27718,
+          "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+          "upstreamUrl": "https://raw.githubusercontent.com/unicode-org/icu/21d1eb0f306e1141c10931e914dfc038c06121da/LICENSE",
+          "upstreamPath": "LICENSE",
+          "revision": "21d1eb0f306e1141c10931e914dfc038c06121da"
+        },
+        {
+          "path": "licenses/Java/icu4j-78.3/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/icu4j-78.3/COPYRIGHT-HEADERS.txt",
+          "bytes": 141466,
+          "sha256": "a2682fc7c654b5015cf5e62d8609058570ee5e058be32086529d81cb1273a877",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/com/ibm/icu/icu4j/78.3/icu4j-78.3-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "release-78.3",
+      "revision": "21d1eb0f306e1141c10931e914dfc038c06121da"
+    },
+    {
+      "name": "msal4j-1.24.1",
+      "license": "MIT",
+      "repository": "https://github.com/AzureAD/microsoft-authentication-library-for-java",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/com/microsoft/azure/msal4j/1.24.1/msal4j-1.24.1-sources.jar",
+        "bytes": 235740,
+        "sha256": "2f946e2d258c0822171217f8a098527ce9960a412cb6d40fad9ec2e7d8633f5c",
+        "upstreamSha1": "97ff2753f918cf4a9d62ef8a79fe71797b1d83bc"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/com/microsoft/azure/msal4j/1.24.1/msal4j-1.24.1.pom",
+        "bytes": 12953,
+        "sha256": "1b362e350a6ef65dbfeeae33bd6b60b18f047659df2ca859ed2209dbe0a660c7",
+        "declaredLicenses": [
+          {
+            "name": "MIT License"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "com.microsoft.azure:msal4j:1.24.1",
+          "file": "msal4j-1.24.1.jar",
+          "sha256": "12e62f79d1a71d176a41c168c0587f8167f0add99b78f006f39595bd7242aebe"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/msal4j-1.24.1/LICENSE.txt",
+          "publicPath": "/notices/Java/msal4j-1.24.1/LICENSE.txt",
+          "bytes": 1162,
+          "sha256": "27ebda9d51f0a56b7e281ccd8230a27236dcb51c05f64b07869ecf6e965d68b0",
+          "upstreamUrl": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-java/932b4daa8861fcb50c122ea45e76d551227997f0/LICENSE",
+          "upstreamPath": "LICENSE",
+          "revision": "932b4daa8861fcb50c122ea45e76d551227997f0"
+        },
+        {
+          "path": "licenses/Java/msal4j-1.24.1/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/msal4j-1.24.1/COPYRIGHT-HEADERS.txt",
+          "bytes": 9925,
+          "sha256": "53d1d8c7892c2e68d59fd96b49ec3dc92132507c12bd93d0549e41088ca3ac1a",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/com/microsoft/azure/msal4j/1.24.1/msal4j-1.24.1-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "v1.24.1",
+      "revision": "932b4daa8861fcb50c122ea45e76d551227997f0"
+    },
+    {
+      "name": "fastutil-8.5.18",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/vigna/fastutil",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/it/unimi/dsi/fastutil/8.5.18/fastutil-8.5.18-sources.jar",
+        "bytes": 22621434,
+        "sha256": "65223a891cb0b1ad3f444794a00ee458bf31780658b54c2d41192ad4cf3ece67",
+        "upstreamSha1": "0d49bcbf212cca0ba085bff99870a77f2322e0a7"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/it/unimi/dsi/fastutil/8.5.18/fastutil-8.5.18.pom",
+        "bytes": 1586,
+        "sha256": "184dbca49a7d03e3a1df9f0f97b462096e849f5ad05c5cf7b386226ec159ef79",
+        "declaredLicenses": []
+      },
+      "jars": [
+        {
+          "maven": "it.unimi.dsi:fastutil:8.5.18",
+          "file": "fastutil-8.5.18.jar",
+          "sha256": "9094ae67d01d0ad246f886f11ad557fc2e79c72cbf3feed83e1512a8ae90a74a"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/fastutil-8.5.18/LICENSE-2.0.txt",
+          "publicPath": "/notices/Java/fastutil-8.5.18/LICENSE-2.0.txt",
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "upstreamUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "upstreamPath": "LICENSE-2.0.txt",
+          "note": "Canonical license copy; licensing choice is established by the pinned original source copyright headers, not inferred from this text."
+        },
+        {
+          "path": "licenses/Java/fastutil-8.5.18/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/fastutil-8.5.18/COPYRIGHT-HEADERS.txt",
+          "bytes": 152671,
+          "sha256": "9e51c7d85405fd2dbff06166629e5276e1805a95487b401ed0bd1c0bfcbeb584",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/it/unimi/dsi/fastutil/8.5.18/fastutil-8.5.18-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "provenanceNote": "No matching upstream Git release tag found; the exact published Maven source archive establishes original copyright/licensing comments. Canonical Apache-2.0 text accompanies those notices."
+    },
+    {
+      "name": "jopt-simple-5.0.4",
+      "license": "MIT",
+      "repository": "https://github.com/jopt-simple/jopt-simple",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4-sources.jar",
+        "bytes": 85484,
+        "sha256": "06b283801a5a94ef697b7f2c79a048c4e2f848b3daddda61cab74d882bdd97a5",
+        "upstreamSha1": "950831646d014c9162999019a3cb17d5fc01ac0d"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.pom",
+        "bytes": 13968,
+        "sha256": "6a67763b76afcd9c80b95e5c5e24782d18cc1b0e3d9b454ad3f8754c76b76815",
+        "declaredLicenses": [
+          {
+            "name": "The MIT License",
+            "url": "http://www.opensource.org/licenses/mit-license.php",
+            "distribution": "repo"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "net.sf.jopt-simple:jopt-simple:5.0.4",
+          "file": "jopt-simple-5.0.4.jar",
+          "sha256": "df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/jopt-simple-5.0.4/LICENSE.txt.txt",
+          "publicPath": "/notices/Java/jopt-simple-5.0.4/LICENSE.txt.txt",
+          "bytes": 1109,
+          "sha256": "91d37fd637f457bd1f95b288f8eb6d33df6ea9de7a76e766ec8cf71f2bf71406",
+          "upstreamUrl": "https://raw.githubusercontent.com/jopt-simple/jopt-simple/2a41140d8448d67c30b94b5990d7a3df82c2d8f6/LICENSE.txt",
+          "upstreamPath": "LICENSE.txt",
+          "revision": "2a41140d8448d67c30b94b5990d7a3df82c2d8f6"
+        },
+        {
+          "path": "licenses/Java/jopt-simple-5.0.4/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/jopt-simple-5.0.4/COPYRIGHT-HEADERS.txt",
+          "bytes": 4120,
+          "sha256": "bc7f1ea5f57b20be5dd6207a5cabc333f94f7d724c0969dad897eba8603f8830",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "jopt-simple-5.0.4",
+      "revision": "2a41140d8448d67c30b94b5990d7a3df82c2d8f6"
+    },
+    {
+      "name": "joml-1.10.9",
+      "license": "MIT",
+      "repository": "https://github.com/JOML-CI/JOML",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/org/joml/joml/1.10.9/joml-1.10.9-sources.jar",
+        "bytes": 760958,
+        "sha256": "dca378f0e00ec9d13cd3c099629b38d6457e65f124c0c28e4c5479a8a60c1d60",
+        "upstreamSha1": "f100d496eb78e06518f33bb3282db195d2703500"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/org/joml/joml/1.10.9/joml-1.10.9.pom",
+        "bytes": 1434,
+        "sha256": "d5e047e8cae7e021a7b0a96ea406fa6831be7741172331e3c32b62d715bcf016",
+        "declaredLicenses": [
+          {
+            "name": "MIT License",
+            "url": "https://www.opensource.org/licenses/mit-license.php"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "org.joml:joml:1.10.9",
+          "file": "joml-1.10.9.jar",
+          "sha256": "feca4db853371704338621c120acc5cc32300d8af635fa42414b6213301e216b"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/joml-1.10.9/LICENSE.txt",
+          "publicPath": "/notices/Java/joml-1.10.9/LICENSE.txt",
+          "bytes": 1076,
+          "sha256": "c043070fc7376139226cea94e02afd1af2f264699589484d3cbce91b29ffb2c5",
+          "upstreamUrl": "https://raw.githubusercontent.com/JOML-CI/JOML/faf9eef2511242122beb6055fe3da92daed214c5/LICENSE",
+          "upstreamPath": "LICENSE",
+          "revision": "faf9eef2511242122beb6055fe3da92daed214c5"
+        },
+        {
+          "path": "licenses/Java/joml-1.10.9/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/joml-1.10.9/COPYRIGHT-HEADERS.txt",
+          "bytes": 17687,
+          "sha256": "ac5a594a0a9f3af9541f38be3503b26299e3c6e083ba14031a04258094d63161",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/org/joml/joml/1.10.9/joml-1.10.9-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "1.10.9",
+      "revision": "faf9eef2511242122beb6055fe3da92daed214c5"
+    },
+    {
+      "name": "jspecify-1.0.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/jspecify/jspecify/",
+      "source": {
+        "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar",
+        "bytes": 11996,
+        "sha256": "adf0898191d55937fb3192ba971826f4f294292c4a960740f3c27310e7b70296",
+        "upstreamSha1": "f1a67bbcf2f9f282baf3821046563983f16ca9b2"
+      },
+      "pom": {
+        "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.pom",
+        "bytes": 1511,
+        "sha256": "cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6",
+        "declaredLicenses": [
+          {
+            "name": "The Apache License, Version 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+          }
+        ]
+      },
+      "jars": [
+        {
+          "maven": "org.jspecify:jspecify:1.0.0",
+          "file": "jspecify-1.0.0.jar",
+          "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+        }
+      ],
+      "files": [
+        {
+          "path": "licenses/Java/jspecify-1.0.0/LICENSE.txt",
+          "publicPath": "/notices/Java/jspecify-1.0.0/LICENSE.txt",
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "upstreamUrl": "https://raw.githubusercontent.com/jspecify/jspecify/b2a10e14bb81c1b7cb6e488c112fe55cb2218d7d/LICENSE",
+          "upstreamPath": "LICENSE",
+          "revision": "b2a10e14bb81c1b7cb6e488c112fe55cb2218d7d"
+        },
+        {
+          "path": "licenses/Java/jspecify-1.0.0/COPYRIGHT-HEADERS.txt",
+          "publicPath": "/notices/Java/jspecify-1.0.0/COPYRIGHT-HEADERS.txt",
+          "bytes": 1471,
+          "sha256": "819630b71ed306fae00cf6f77b9fffe98db9873574b3cc8f998fe3d3295c5ca0",
+          "upstreamUrl": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar",
+          "upstreamPath": "Original copyright and licensing comment blocks from the pinned Maven source archive",
+          "extraction": "Distinct original comment blocks, with entry names for attribution; no implementation code."
+        }
+      ],
+      "tag": "v1.0.0",
+      "revision": "b2a10e14bb81c1b7cb6e488c112fe55cb2218d7d"
+    }
+  ],
+  "jarNoticeReview": {
+    "note": "Every redistributed JAR lacking embedded LICENSE/NOTICE files now has a pinned supplemental upstream license/copyright notice set. This covers notice delivery, not a legal determination of every license duty. Embedded JAR notices remain intact.",
+    "remainingWithoutEmbeddedLicense": [],
+    "furtherReview": [
+      "JOrbis exact source JAR is supplied as a generated same-origin download; the interface-compatible user replacement mechanism and any broader LGPL duties still need deployment-specific verification.",
+      "Supplemental notice sets preserve full upstream notices, including references to optional components that may not be shipped."
+    ]
+  }
+}

@@ -1,0 +1,185 @@
+Source archive entries: oshi/hardware/common/package-info.java, oshi/hardware/package-info.java, oshi/hardware/platform/linux/package-info.java, oshi/hardware/platform/mac/package-info.java, oshi/hardware/platform/unix/freebsd/package-info.java, oshi/hardware/platform/unix/solaris/package-info.java, oshi/hardware/platform/windows/package-info.java, oshi/jna/platform/linux/package-info.java, oshi/jna/platform/mac/package-info.java, oshi/jna/platform/unix/package-info.java, oshi/jna/platform/windows/package-info.java, oshi/package-info.java, oshi/software/common/package-info.java, oshi/software/os/linux/package-info.java, oshi/software/os/mac/package-info.java, oshi/software/os/package-info.java, oshi/software/os/unix/freebsd/package-info.java, oshi/software/os/unix/solaris/package-info.java, oshi/software/os/windows/package-info.java, oshi/util/package-info.java, oshi/util/platform/linux/package-info.java, oshi/util/platform/mac/package-info.java, oshi/util/platform/unix/freebsd/package-info.java, oshi/util/platform/unix/solaris/package-info.java, oshi/util/platform/windows/package-info.java
+/*
+ * Copyright (c) 2016-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/annotation/concurrent/package-info.java, oshi/driver/linux/package-info.java, oshi/driver/linux/proc/package-info.java, oshi/driver/mac/disk/package-info.java, oshi/driver/mac/net/package-info.java, oshi/driver/mac/package-info.java, oshi/driver/unix/aix/package-info.java, oshi/driver/unix/aix/perfstat/package-info.java, oshi/driver/unix/freebsd/disk/package-info.java, oshi/driver/unix/freebsd/package-info.java, oshi/driver/unix/package-info.java, oshi/driver/unix/solaris/disk/package-info.java, oshi/driver/unix/solaris/kstat/package-info.java, oshi/driver/unix/solaris/package-info.java, oshi/driver/windows/package-info.java, oshi/driver/windows/perfmon/package-info.java, oshi/driver/windows/registry/package-info.java, oshi/driver/windows/wmi/package-info.java, oshi/hardware/platform/unix/aix/package-info.java, oshi/software/os/unix/aix/package-info.java, oshi/util/tuples/package-info.java
+/*
+ * Copyright (c) 2020-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/unix/openbsd/disk/package-info.java, oshi/hardware/platform/unix/package-info.java, oshi/util/platform/unix/openbsd/package-info.java
+/*
+ * Copyright (c) 2021 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/platform/unix/openbsd/package-info.java, oshi/software/os/unix/openbsd/package-info.java
+/*
+ * Copyright (c) 2021-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/jna/package-info.java
+/*
+ * Copyright (c) 2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/PlatformEnum.java, oshi/hardware/Baseboard.java, oshi/hardware/ComputerSystem.java, oshi/hardware/Display.java, oshi/hardware/Firmware.java, oshi/hardware/GlobalMemory.java, oshi/hardware/HWDiskStore.java, oshi/hardware/HWPartition.java, oshi/hardware/HardwareAbstractionLayer.java, oshi/hardware/NetworkIF.java, oshi/hardware/PowerSource.java, oshi/hardware/UsbDevice.java, oshi/hardware/common/AbstractBaseboard.java, oshi/hardware/common/AbstractComputerSystem.java, oshi/hardware/common/AbstractDisplay.java, oshi/hardware/common/AbstractFirmware.java, oshi/hardware/common/AbstractHardwareAbstractionLayer.java, oshi/hardware/common/AbstractSensors.java, oshi/hardware/platform/linux/LinuxBaseboard.java, oshi/hardware/platform/linux/LinuxComputerSystem.java, oshi/hardware/platform/linux/LinuxFirmware.java, oshi/hardware/platform/linux/LinuxGlobalMemory.java, oshi/hardware/platform/linux/LinuxHardwareAbstractionLayer.java, oshi/hardware/platform/linux/LinuxUsbDevice.java, oshi/hardware/platform/mac/MacBaseboard.java, oshi/hardware/platform/mac/MacComputerSystem.java, oshi/hardware/platform/mac/MacFirmware.java, oshi/hardware/platform/mac/MacHardwareAbstractionLayer.java, oshi/hardware/platform/mac/MacPowerSource.java, oshi/hardware/platform/unix/freebsd/FreeBsdComputerSystem.java, oshi/hardware/platform/unix/freebsd/FreeBsdFirmware.java, oshi/hardware/platform/unix/freebsd/FreeBsdGlobalMemory.java, oshi/hardware/platform/unix/freebsd/FreeBsdHardwareAbstractionLayer.java, oshi/hardware/platform/unix/solaris/SolarisFirmware.java, oshi/hardware/platform/unix/solaris/SolarisGlobalMemory.java, oshi/hardware/platform/unix/solaris/SolarisHardwareAbstractionLayer.java, oshi/hardware/platform/unix/solaris/SolarisPowerSource.java, oshi/hardware/platform/unix/solaris/SolarisSensors.java, oshi/hardware/platform/unix/solaris/SolarisUsbDevice.java, oshi/hardware/platform/windows/WindowsComputerSystem.java, oshi/hardware/platform/windows/WindowsDisplay.java, oshi/hardware/platform/windows/WindowsFirmware.java, oshi/hardware/platform/windows/WindowsHardwareAbstractionLayer.java, oshi/hardware/platform/windows/WindowsPowerSource.java, oshi/hardware/platform/windows/WindowsUsbDevice.java, oshi/jna/platform/mac/IOKit.java, oshi/jna/platform/mac/SystemB.java, oshi/jna/platform/windows/PowrProf.java, oshi/software/common/AbstractFileSystem.java, oshi/software/common/AbstractOperatingSystem.java, oshi/software/os/OSFileStore.java, oshi/software/os/unix/freebsd/FreeBsdFileSystem.java, oshi/software/os/unix/solaris/SolarisFileSystem.java, oshi/util/ExecutingCommand.java, oshi/util/platform/unix/freebsd/BsdSysctlUtil.java, oshi/util/platform/unix/solaris/KstatUtil.java
+/*
+ * Copyright 2016-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/SystemInfo.java, oshi/hardware/common/AbstractPowerSource.java, oshi/hardware/common/AbstractUsbDevice.java, oshi/hardware/platform/mac/MacSensors.java, oshi/hardware/platform/mac/MacUsbDevice.java, oshi/hardware/platform/unix/freebsd/FreeBsdPowerSource.java, oshi/hardware/platform/unix/freebsd/FreeBsdSensors.java, oshi/hardware/platform/unix/freebsd/FreeBsdUsbDevice.java, oshi/hardware/platform/unix/solaris/SolarisComputerSystem.java, oshi/software/os/unix/freebsd/FreeBsdOperatingSystem.java, oshi/software/os/unix/solaris/SolarisOperatingSystem.java, oshi/software/os/windows/WindowsFileSystem.java, oshi/util/platform/mac/SmcUtil.java, oshi/util/platform/windows/WmiUtil.java
+/*
+ * Copyright 2016-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/CentralProcessor.java, oshi/hardware/common/AbstractCentralProcessor.java, oshi/hardware/platform/linux/LinuxPowerSource.java, oshi/hardware/platform/mac/MacCentralProcessor.java, oshi/hardware/platform/mac/MacGlobalMemory.java, oshi/hardware/platform/unix/freebsd/FreeBsdCentralProcessor.java, oshi/hardware/platform/unix/solaris/SolarisCentralProcessor.java, oshi/hardware/platform/windows/WindowsCentralProcessor.java, oshi/hardware/platform/windows/WindowsGlobalMemory.java, oshi/jna/platform/windows/Kernel32.java, oshi/software/os/OSProcess.java, oshi/util/platform/mac/SysctlUtil.java
+/*
+ * Copyright 2016-2024 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/Sensors.java, oshi/hardware/common/AbstractGlobalMemory.java, oshi/hardware/platform/linux/LinuxCentralProcessor.java, oshi/hardware/platform/linux/LinuxSensors.java, oshi/hardware/platform/mac/MacDisplay.java, oshi/hardware/platform/windows/WindowsBaseboard.java, oshi/hardware/platform/windows/WindowsSensors.java, oshi/software/os/FileSystem.java, oshi/software/os/OperatingSystem.java, oshi/software/os/linux/LinuxFileSystem.java, oshi/software/os/linux/LinuxOperatingSystem.java, oshi/software/os/mac/MacFileSystem.java, oshi/software/os/mac/MacOperatingSystem.java, oshi/software/os/windows/WindowsOperatingSystem.java, oshi/util/EdidUtil.java, oshi/util/FileUtil.java, oshi/util/FormatUtil.java, oshi/util/ParseUtil.java, oshi/util/Util.java
+/*
+ * Copyright 2016-2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/jna/platform/unix/CLibrary.java, oshi/software/os/NetworkParams.java, oshi/software/os/linux/LinuxNetworkParams.java, oshi/software/os/unix/solaris/SolarisNetworkParams.java
+/*
+ * Copyright 2017-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/software/common/AbstractNetworkParams.java, oshi/software/os/windows/WindowsNetworkParams.java
+/*
+ * Copyright 2017-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/software/os/mac/MacNetworkParams.java, oshi/software/os/unix/freebsd/FreeBsdNetworkParams.java
+/*
+ * Copyright 2017-2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/SoundCard.java, oshi/hardware/common/AbstractSoundCard.java, oshi/hardware/platform/linux/LinuxSoundCard.java, oshi/hardware/platform/mac/MacSoundCard.java, oshi/hardware/platform/unix/freebsd/FreeBsdSoundCard.java, oshi/hardware/platform/unix/solaris/SolarisSoundCard.java, oshi/hardware/platform/windows/WindowsSoundCard.java
+/*
+ * Copyright 2018-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/util/platform/windows/PerfDataUtil.java
+/*
+ * Copyright 2018-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/VirtualMemory.java, oshi/hardware/common/AbstractVirtualMemory.java, oshi/hardware/platform/linux/LinuxVirtualMemory.java, oshi/hardware/platform/mac/MacVirtualMemory.java, oshi/hardware/platform/unix/freebsd/FreeBsdVirtualMemory.java, oshi/hardware/platform/unix/solaris/SolarisVirtualMemory.java, oshi/hardware/platform/windows/WindowsVirtualMemory.java, oshi/software/os/OSService.java, oshi/util/platform/windows/WmiQueryHandler.java
+/*
+ * Copyright 2019-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/jna/platform/linux/LinuxLibc.java, oshi/util/platform/windows/PerfCounterQueryHandler.java
+/*
+ * Copyright 2019-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/PhysicalMemory.java, oshi/util/Constants.java, oshi/util/platform/windows/PerfCounterQuery.java, oshi/util/platform/windows/PerfCounterWildcardQuery.java
+/*
+ * Copyright 2019-2024 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/util/GlobalConfig.java, oshi/util/Memoizer.java
+/*
+ * Copyright 2019-2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/annotation/concurrent/GuardedBy.java, oshi/annotation/concurrent/Immutable.java, oshi/annotation/concurrent/NotThreadSafe.java, oshi/annotation/concurrent/ThreadSafe.java, oshi/driver/linux/Lshal.java, oshi/driver/linux/proc/DiskStats.java, oshi/driver/linux/proc/UpTime.java, oshi/driver/mac/ThreadInfo.java, oshi/driver/mac/disk/Fsstat.java, oshi/driver/mac/net/NetStat.java, oshi/driver/unix/NetStat.java, oshi/driver/unix/Xrandr.java, oshi/driver/unix/aix/Ls.java, oshi/driver/unix/aix/Lscfg.java, oshi/driver/unix/aix/Lspv.java, oshi/driver/unix/aix/Lssrad.java, oshi/driver/unix/aix/Uptime.java, oshi/driver/unix/aix/perfstat/PerfstatConfig.java, oshi/driver/unix/aix/perfstat/PerfstatCpu.java, oshi/driver/unix/aix/perfstat/PerfstatDisk.java, oshi/driver/unix/aix/perfstat/PerfstatMemory.java, oshi/driver/unix/aix/perfstat/PerfstatNetInterface.java, oshi/driver/unix/aix/perfstat/PerfstatProcess.java, oshi/driver/unix/aix/perfstat/PerfstatProtocol.java, oshi/driver/unix/freebsd/disk/GeomDiskList.java, oshi/driver/unix/freebsd/disk/GeomPartList.java, oshi/driver/unix/freebsd/disk/Mount.java, oshi/driver/unix/solaris/disk/Iostat.java, oshi/driver/unix/solaris/disk/Lshal.java, oshi/driver/unix/solaris/disk/Prtvtoc.java, oshi/driver/unix/solaris/kstat/SystemPages.java, oshi/driver/windows/perfmon/MemoryInformation.java, oshi/driver/windows/perfmon/PagingFile.java, oshi/driver/windows/perfmon/PhysicalDisk.java, oshi/driver/windows/perfmon/ProcessInformation.java, oshi/driver/windows/perfmon/SystemInformation.java, oshi/driver/windows/registry/HkeyPerformanceDataUtil.java, oshi/driver/windows/registry/HkeyUserData.java, oshi/driver/windows/registry/NetSessionData.java, oshi/driver/windows/registry/ProcessWtsData.java, oshi/driver/windows/registry/SessionWtsData.java, oshi/driver/windows/wmi/MSAcpiThermalZoneTemperature.java, oshi/driver/windows/wmi/OhmHardware.java, oshi/driver/windows/wmi/OhmSensor.java, oshi/driver/windows/wmi/Win32Bios.java, oshi/driver/windows/wmi/Win32ComputerSystem.java, oshi/driver/windows/wmi/Win32ComputerSystemProduct.java, oshi/driver/windows/wmi/Win32DiskDrive.java, oshi/driver/windows/wmi/Win32DiskDriveToDiskPartition.java, oshi/driver/windows/wmi/Win32DiskPartition.java, oshi/driver/windows/wmi/Win32Fan.java, oshi/driver/windows/wmi/Win32LogicalDiskToPartition.java, oshi/driver/windows/wmi/Win32OperatingSystem.java, oshi/driver/windows/wmi/Win32Process.java, oshi/driver/windows/wmi/Win32ProcessCached.java, oshi/driver/windows/wmi/Win32Processor.java, oshi/driver/windows/wmi/Win32VideoController.java, oshi/hardware/GraphicsCard.java, oshi/hardware/common/AbstractGraphicsCard.java, oshi/hardware/common/AbstractHWDiskStore.java, oshi/hardware/platform/mac/MacHWDiskStore.java, oshi/hardware/platform/mac/MacNetworkIF.java, oshi/hardware/platform/unix/aix/AixBaseboard.java, oshi/hardware/platform/unix/aix/AixComputerSystem.java, oshi/hardware/platform/unix/aix/AixFirmware.java, oshi/hardware/platform/unix/aix/AixHWDiskStore.java, oshi/hardware/platform/unix/aix/AixHardwareAbstractionLayer.java, oshi/hardware/platform/unix/aix/AixNetworkIF.java, oshi/hardware/platform/unix/aix/AixPowerSource.java, oshi/hardware/platform/unix/aix/AixSensors.java, oshi/hardware/platform/unix/aix/AixSoundCard.java, oshi/hardware/platform/unix/aix/AixUsbDevice.java, oshi/hardware/platform/unix/aix/AixVirtualMemory.java, oshi/hardware/platform/unix/freebsd/FreeBsdGraphicsCard.java, oshi/hardware/platform/unix/freebsd/FreeBsdHWDiskStore.java, oshi/hardware/platform/unix/solaris/SolarisGraphicsCard.java, oshi/hardware/platform/unix/solaris/SolarisHWDiskStore.java, oshi/hardware/platform/unix/solaris/SolarisNetworkIF.java, oshi/hardware/platform/windows/WindowsNetworkIF.java, oshi/software/common/AbstractInternetProtocolStats.java, oshi/software/common/AbstractOSFileStore.java, oshi/software/common/AbstractOSProcess.java, oshi/software/os/OSThread.java, oshi/software/os/linux/LinuxOSFileStore.java, oshi/software/os/mac/MacOSFileStore.java, oshi/software/os/mac/MacOSThread.java, oshi/software/os/unix/aix/AixFileSystem.java, oshi/software/os/unix/aix/AixInternetProtocolStats.java, oshi/software/os/unix/aix/AixNetworkParams.java, oshi/software/os/unix/aix/AixOSFileStore.java, oshi/software/os/unix/aix/AixOSThread.java, oshi/software/os/unix/freebsd/FreeBsdInternetProtocolStats.java, oshi/software/os/unix/freebsd/FreeBsdOSFileStore.java, oshi/software/os/unix/freebsd/FreeBsdOSThread.java, oshi/software/os/unix/solaris/SolarisInternetProtocolStats.java, oshi/software/os/unix/solaris/SolarisOSFileStore.java, oshi/software/os/unix/solaris/SolarisOSThread.java, oshi/software/os/windows/WindowsInternetProtocolStats.java, oshi/software/os/windows/WindowsOSFileStore.java, oshi/util/platform/unix/freebsd/ProcstatUtil.java, oshi/util/tuples/Pair.java, oshi/util/tuples/Quartet.java, oshi/util/tuples/Quintet.java, oshi/util/tuples/Triplet.java
+/*
+ * Copyright 2020-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/annotation/SuppressForbidden.java, oshi/annotation/package-info.java, oshi/driver/linux/Dmidecode.java, oshi/driver/linux/Lshw.java, oshi/driver/linux/Who.java, oshi/driver/mac/Who.java, oshi/driver/unix/Who.java, oshi/driver/unix/aix/Who.java, oshi/driver/unix/freebsd/Who.java, oshi/driver/unix/solaris/Who.java, oshi/driver/windows/registry/ProcessPerformanceData.java, oshi/hardware/common/AbstractNetworkIF.java, oshi/hardware/platform/mac/MacGraphicsCard.java, oshi/hardware/platform/unix/aix/AixGraphicsCard.java, oshi/hardware/platform/windows/WindowsHWDiskStore.java, oshi/software/common/AbstractOSThread.java, oshi/software/os/InternetProtocolStats.java, oshi/software/os/OSSession.java, oshi/software/os/linux/LinuxOSThread.java, oshi/software/os/mac/MacInternetProtocolStats.java, oshi/software/os/mac/MacOSProcess.java, oshi/software/os/unix/aix/AixOSProcess.java, oshi/software/os/unix/freebsd/FreeBsdOSProcess.java, oshi/software/os/unix/solaris/SolarisOSProcess.java, oshi/software/os/windows/WindowsOSThread.java
+/*
+ * Copyright 2020-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/linux/Devicetree.java, oshi/driver/linux/Sysfs.java, oshi/driver/linux/proc/CpuInfo.java, oshi/driver/windows/perfmon/ProcessorInformation.java, oshi/driver/windows/wmi/Win32PhysicalMemory.java, oshi/hardware/platform/linux/LinuxHWDiskStore.java, oshi/hardware/platform/linux/LinuxNetworkIF.java, oshi/hardware/platform/unix/aix/AixCentralProcessor.java, oshi/hardware/platform/unix/aix/AixGlobalMemory.java, oshi/software/os/linux/LinuxOSProcess.java
+/*
+ * Copyright 2020-2024 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/linux/proc/CpuStat.java, oshi/driver/linux/proc/ProcessStat.java, oshi/driver/windows/LogicalProcessorInformation.java, oshi/driver/windows/perfmon/ThreadInformation.java, oshi/driver/windows/registry/ThreadPerformanceData.java, oshi/driver/windows/wmi/Win32BaseBoard.java, oshi/driver/windows/wmi/Win32LogicalDisk.java, oshi/hardware/platform/linux/LinuxGraphicsCard.java, oshi/hardware/platform/windows/WindowsGraphicsCard.java, oshi/software/os/linux/LinuxInternetProtocolStats.java, oshi/software/os/unix/aix/AixOperatingSystem.java, oshi/software/os/windows/WindowsOSProcess.java, oshi/util/platform/linux/ProcPath.java
+/*
+ * Copyright 2020-2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/mac/WindowInfo.java, oshi/driver/unix/Xwininfo.java, oshi/driver/unix/openbsd/disk/Disklabel.java, oshi/driver/windows/DeviceTree.java, oshi/driver/windows/EnumWindows.java, oshi/driver/windows/wmi/MSFTStorage.java, oshi/hardware/LogicalVolumeGroup.java, oshi/hardware/common/AbstractLogicalVolumeGroup.java, oshi/hardware/platform/mac/MacLogicalVolumeGroup.java, oshi/hardware/platform/unix/BsdNetworkIF.java, oshi/hardware/platform/unix/UnixBaseboard.java, oshi/hardware/platform/unix/UnixDisplay.java, oshi/hardware/platform/unix/openbsd/OpenBsdComputerSystem.java, oshi/hardware/platform/unix/openbsd/OpenBsdFirmware.java, oshi/hardware/platform/unix/openbsd/OpenBsdGlobalMemory.java, oshi/hardware/platform/unix/openbsd/OpenBsdGraphicsCard.java, oshi/hardware/platform/unix/openbsd/OpenBsdHWDiskStore.java, oshi/hardware/platform/unix/openbsd/OpenBsdHardwareAbstractionLayer.java, oshi/hardware/platform/unix/openbsd/OpenBsdPowerSource.java, oshi/hardware/platform/unix/openbsd/OpenBsdSensors.java, oshi/hardware/platform/unix/openbsd/OpenBsdSoundCard.java, oshi/hardware/platform/unix/openbsd/OpenBsdUsbDevice.java, oshi/hardware/platform/unix/openbsd/OpenBsdVirtualMemory.java, oshi/hardware/platform/windows/WindowsLogicalVolumeGroup.java, oshi/jna/platform/mac/CoreGraphics.java, oshi/jna/platform/mac/SystemConfiguration.java, oshi/jna/platform/unix/AixLibc.java, oshi/jna/platform/unix/FreeBsdLibc.java, oshi/jna/platform/unix/OpenBsdLibc.java, oshi/jna/platform/unix/SolarisLibc.java, oshi/jna/platform/windows/NtDll.java, oshi/software/os/OSDesktopWindow.java, oshi/software/os/unix/openbsd/OpenBsdFileSystem.java, oshi/software/os/unix/openbsd/OpenBsdInternetProtocolStats.java, oshi/software/os/unix/openbsd/OpenBsdNetworkParams.java, oshi/software/os/unix/openbsd/OpenBsdOSFileStore.java, oshi/software/os/unix/openbsd/OpenBsdOSThread.java, oshi/util/FileSystemUtil.java, oshi/util/platform/mac/CFUtil.java, oshi/util/platform/unix/openbsd/FstatUtil.java, oshi/util/platform/unix/openbsd/OpenBsdSysctlUtil.java
+/*
+ * Copyright 2021-2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/unix/aix/PsInfo.java, oshi/driver/unix/solaris/PsInfo.java, oshi/software/os/unix/openbsd/OpenBsdOSProcess.java, oshi/software/os/unix/openbsd/OpenBsdOperatingSystem.java
+/*
+ * Copyright 2021-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/hardware/platform/linux/LinuxLogicalVolumeGroup.java, oshi/hardware/platform/unix/openbsd/OpenBsdCentralProcessor.java
+/*
+ * Copyright 2021-2024 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/jna/platform/mac/CoreFoundation.java
+/*
+ * Copyright 2021-2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/windows/perfmon/LoadAverage.java, oshi/jna/ByRef.java, oshi/jna/Struct.java
+/*
+ * Copyright 2022 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/windows/perfmon/PerfmonConstants.java, oshi/driver/windows/perfmon/PerfmonDisabled.java, oshi/util/UserGroupInfo.java
+/*
+ * Copyright 2022-2023 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/linux/proc/Auxv.java
+/*
+ * Copyright 2022-2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/util/platform/linux/DevPath.java, oshi/util/platform/linux/SysPath.java
+/*
+ * Copyright 2024 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */
+
+Source archive entries: oshi/driver/windows/registry/InstalledAppsData.java, oshi/software/os/ApplicationInfo.java, oshi/software/os/linux/LinuxInstalledApps.java, oshi/software/os/mac/MacInstalledApps.java, oshi/software/os/unix/aix/AixInstalledApps.java, oshi/software/os/windows/WindowsInstalledApps.java, oshi/util/ProcUtil.java
+/*
+ * Copyright 2025 The OSHI Project Contributors
+ * SPDX-License-Identifier: MIT
+ */

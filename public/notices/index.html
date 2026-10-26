@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="/site.css">
+  <link rel="icon" href="/mcweb-icon.svg" type="image/svg+xml">
+  <title>Runtime licenses and source | minecraft.wasm.click</title>
+</head>
+<body><main class="privacy-page"><div class="privacy-shell">
+  <p class="kicker">minecraft.wasm.click / source and licenses</p>
+  <h1>Runtime licenses and source</h1>
+  <section class="privacy-card"><h2>The browser runtime</h2>
+    <p>This launcher distributes a modified OpenJDK 25 runtime, browser adapters and open-source support libraries. The reviewed runtime archive excludes Minecraft client/server code and game assets. Your browser downloads the game client and required libraries from Mojang. Sounds and panorama images use direct browser requests to Mojang first, then a version-pinned GitHub raw-file fallback with size and hash checks.</p>
+    <p>OpenJDK files retain GPL version 2 and the applicable Classpath or assembly exceptions identified in their source. The Classpath exception does not relicense OpenJDK or every JIT file under GPL version 3. Project-authored launcher and adapter code uses GPL version 3. Other dependencies retain their respective licenses.</p>
+    <p>The selected <code>libjvm.so</code> has SHA-256 <code>{{RUNTIME_SHA256}}</code>. These notices accompany that runtime distribution.</p>
+  </section>
+  <section class="privacy-card"><h2>Corresponding source and build instructions</h2>
+    <p><a href="/notices/corresponding-source.tar.gz" download>Download the source and build instructions</a>. The archive contains the runtime adapters, custom OpenJDK and libffi patches, build scripts, dependency pins, source provenance and licenses for this distribution. It excludes game files, account credentials, player data and generated build caches.</p>
+    <p>The selected runtime source-tree SHA-256 is <code>{{SOURCE_TREE_SHA256}}</code>. <a href="/notices/source.json">The source manifest</a> identifies the archive checksum, runtime identity, upstream revisions and custom patches. Follow <code>docs/runtime-build.md</code> in the archive to rebuild the runtime from the pinned upstream sources and included patches.</p>
+    <p>The <a href="https://github.com/vano04/minecraft.wasm.click" target="_blank" rel="noopener noreferrer">source repository</a> includes the Docker installation and development instructions. Use the manifest and source archive to identify the source accompanying this host's runtime.</p>
+  </section>
+  <section class="privacy-card"><h2>Copyright and license texts</h2>
+    <p>These upstream texts cover OpenJDK, selected shared <code>java.base</code> components, libffi, Emscripten and other incorporated dependencies. Retaining a component's notice does not imply that every optional component is enabled.</p>
+    <ul>{{NOTICE_LINKS}}</ul>
+    <p><a href="/notices/THIRD-PARTY.json">The packaged Java and Naga dependency inventory</a> identifies the selected libraries. Supplemental license and copyright texts appear above. Embedded Java-library notices remain in their distributed JARs.</p>
+  </section>
+  <nav class="privacy-links" aria-label="Notice links"><a href="/">Launcher</a><a href="/privacy">Privacy</a><a href="/contact/">Contact</a><a href="https://github.com/vano04/minecraft.wasm.click" target="_blank" rel="noopener noreferrer">GitHub</a></nav>
+  <p>The operator of this installation is responsible for its service. Minecraft and third-party services remain subject to their respective terms.</p>
+  <p class="privacy-disclaimer">NOT AN OFFICIAL MINECRAFT PRODUCT OR SERVICE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
+</div></main></body></html>

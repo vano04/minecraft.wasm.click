@@ -1,0 +1,14 @@
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+@@ -8923,8 +8923,10 @@
+     if (_slot_owner == nullptr || _free_slots == nullptr) return -1;
+   }
+   _takes_total++;
+   if (call_fix(128) && ++_slot_takes >= SLOT_DECAY_TAKES) { _slot_takes = 0; decay_uses(); }
++  // Replace retired browser functions before allocating another table slot.
++  if (_nfree > 0) return _free_slots[--_nfree];
+   if (_next_slot < ZWC_SLOT_COUNT) return _next_slot++;
+   if (_nfree == 0) sweep_slots();
+   return _nfree > 0 ? _free_slots[--_nfree] : -1;
+ }

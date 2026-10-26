@@ -1,0 +1,1052 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index 1faa715..d244169 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -164,6 +164,14 @@ define_pd_global(bool, CompactStrings, true);
+   product(intx, ZeroWasmLinkedArrayMemoryLimitForTest, 0, EXPERIMENTAL,     \
+           "Test-only Wasm int[] memory limit in pages; zero uses active memory") \
+                                                                             \
++  product(bool, UseZeroWasmLinkedRefArrayLoad, false, EXPERIMENTAL,         \
++          "Run the opt-in OSS fixture linked Object[] load through Zero state") \
++                                                                            \
++  product(intx, ZeroWasmLinkedRefArrayMemoryLimitForTest, 0, EXPERIMENTAL,  \
++          "Test-only Wasm Object[] memory limit in pages; zero uses active memory") \
++  product(ccstr, ZeroWasmLinkedRefArrayCacheMutationForTest, nullptr, EXPERIMENTAL, \
++          "Test-only JS cache identity mutation: compiler/digest/bytes/memory/metadata/slot") \
++  \
+   product(bool, ZeroWasmLinkedGroupVerbose, false, EXPERIMENTAL,             \
+           "Report linked-group ABI and real Zero resume state")             \
+                                                                             \
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index d9d0591..948c07a 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -35,6 +35,7 @@
+ 
+ extern uint64_t zbb_linked_array_resume_sequence();
+ extern uint64_t zbb_linked_array_store_resume_sequence();
++extern uint64_t zbb_linked_ref_array_resume_sequence();
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/zeroWasmCompiler.hpp"
+ #include "jvm_io.h"
+@@ -327,7 +328,7 @@ JRT_END
+ // is off or the loop is cold.
+ #ifdef __EMSCRIPTEN__
+ #define DO_BACKEDGE_CHECKS(skip, branch_pc)                                    \
+-  if (UseZeroWasmJIT && (skip) < 0                                             \
++  if (UseZeroWasmJIT && !zero_ref_array_collision && (skip) < 0                \
+       && --ZeroWasmCompiler::_osr_countdown <= 0) {                            \
+     DECACHE_TOS();                                                             \
+     if (ZeroWasmCompiler::maybe_run_osr(METHOD, locals, &pc, &topOfStack, istate)) { \
+@@ -532,6 +533,21 @@ void BytecodeInterpreter::run(interpreterState istate) {
+ #define THREAD istate->thread()
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++  // These locals must be initialized before any computed-goto target can
++  // jump into the dispatch loop.  Keeping the collision decision here also
++  // makes it impossible for a same-frame retry to bypass the fail-closed
++  // guard below.
++  const bool zero_ref_array_collision = UseZeroWasmLinkedRefArrayLoad
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  // Zero's browser runtime is single-threaded. Keep this process-local so a
++  // same-frame retry or a later fixture call cannot emit another collision
++  // marker; the gate requires exactly one bounded diagnostic per launch.
++  static bool zero_ref_array_collision_reported = false;
++#endif
++
+ #ifdef ASSERT
+   assert(labs(istate->stack_base() - istate->stack_limit()) == (istate->method()->max_stack() + 1),
+          "Bad stack limit");
+@@ -790,14 +806,34 @@ void BytecodeInterpreter::run(interpreterState istate) {
+ run:
+ 
+ #ifdef __EMSCRIPTEN__
++  // The reference-array lane has an independent fixture, cache, and ABI. It
++  // must never share a compiler invocation with the existing group, int[],
++  // store, benchmark, method baseline, or trace-JIT lanes. Keep this guard
++  // before maybe_run so a collision cannot install a module and then loop at
++  // the same method entry. One bounded diagnostic is enough for the gate.
++  if (zero_ref_array_collision && pc == METHOD->code_base()
++      && ZeroWasmLinkedGroupVerbose && !zero_ref_array_collision_reported) {
++    tty->print_cr("[zbg] REF_ARRAY_REJECT reason=flag-collision "
++                  "group=%d int-load=%d int-store=%d benchmark=%d "
++                  "baseline=%d jit=%d",
++                  UseZeroWasmLinkedGroup ? 1 : 0,
++                  UseZeroWasmLinkedIntArray ? 1 : 0,
++                  UseZeroWasmLinkedIntArrayStore ? 1 : 0,
++                  UseZeroWasmLinkedBenchmark ? 1 : 0,
++                  UseZeroWasmBaseline ? 1 : 0, UseZeroWasmJIT ? 1 : 0);
++    zero_ref_array_collision_reported = true;
++  }
+   if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+-      || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark)
++      || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++      || UseZeroWasmLinkedRefArrayLoad)
+       // The two incompatible fixture-specific array ABIs fail closed as a
+       // pair. Do not call maybe_run and then retry at the same entry forever;
+       // the real interpreter must own the frame when either incompatible
+       // array-store combination is enabled.
+       && !(UseZeroWasmLinkedIntArrayStore
+-           && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray))
++           && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++               || UseZeroWasmLinkedRefArrayLoad))
++      && !zero_ref_array_collision
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -815,7 +851,8 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // JIT and has its own result protocol: a complete return goes directly to
+   // the existing return machinery, while guard/exception resumes re-enter
+   // this loop at the exact bytecode and stack state supplied by the adapter.
+-  if (UseZeroWasmBaseline && pc == METHOD->code_base()) {
++  if (UseZeroWasmBaseline && !zero_ref_array_collision
++      && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result baseline =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+                                      &pc, &topOfStack, istate);
+@@ -841,7 +878,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // every method entry and resume: a call plus a hash lookup per entry
+   // measured 13.6% on call-heavy code even when nothing compiled. Both
+   // remaining tests are loads the interpreter has already made.
+-  if (UseZeroWasmJIT
++  if (UseZeroWasmJIT && !zero_ref_array_collision
+       && pc == METHOD->code_base()
+       && (uintx)METHOD->code_size() >= ZeroWasmJITMinBytecodes) {
+     ZeroWasmCompiler::maybe_run(METHOD, locals, METHOD->code_base(), &pc, &topOfStack, istate);
+@@ -1657,6 +1694,15 @@ void BytecodeInterpreter::run(interpreterState istate) {
+       CASE(_faload):
+           ARRAY_LOADTO32(T_FLOAT, jfloat, "%f",   STACK_FLOAT, 0);
+       CASE(_aaload): {
++          if (ZeroWasmLinkedGroupVerbose
++              && METHOD->method_holder()->name()->equals("ZeroReferenceArrayLoadFixture")
++              && METHOD->name()->equals("referenceArrayLoad")
++              && METHOD->signature()->equals("([Ljava/lang/Object;I)Ljava/lang/Object;")) {
++            tty->print_cr("[zbg] INTERPRETER_AALOAD seq=%llu bci=%d",
++                          (unsigned long long)
++                              zbb_linked_ref_array_resume_sequence(),
++                          BCI());
++          }
+           ARRAY_INTRO(-2);
+           SET_STACK_OBJECT(((objArrayOop) arrObj)->obj_at(index), -2);
+           UPDATE_PC_AND_TOS_AND_CONTINUE(1, -1);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index ef0555f..bff8d7e 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -25,6 +25,8 @@
+ #include "oops/instanceKlass.inline.hpp"
+ #include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
++#include "oops/objArrayKlass.hpp"
++#include "oops/objArrayOop.inline.hpp"
+ #include "oops/typeArrayKlass.hpp"
+ #include "oops/resolvedMethodEntry.hpp"
+ #include "memory/universe.hpp"
+@@ -274,6 +276,12 @@ struct LinkedIntArrayLayout {
+   int base_offset;
+ };
+ 
++struct LinkedRefArrayLayout {
++  int length_offset;
++  int base_offset;
++  int element_size;
++};
++
+ // Separate cold store-module identity and callable slot.  These are declared
+ // before the installer helper because the helper is emitted above the other
+ // per-thread linked-group state.
+@@ -281,6 +289,8 @@ static THREAD_LOCAL int _linked_array_store_module_id = -1;
+ static THREAD_LOCAL int _linked_array_store_slot = -1;
+ static THREAD_LOCAL bool _linked_array_store_collision_reported = false;
+ static THREAD_LOCAL bool _linked_array_store_exception_reported = false;
++static THREAD_LOCAL int _linked_ref_array_module_id = -1;
++static THREAD_LOCAL int _linked_ref_array_slot = -1;
+ 
+ static const int LINKED_RETURN = 0;
+ static const int LINKED_DEOPT = 1;
+@@ -623,6 +633,73 @@ static void emit_linked_int_array_store(WasmBuf& body,
+   body.u8(0x0b); // function end
+ }
+ 
++// A separate, load-only Object[] lane.  The representation contract is
++// deliberately narrower than Java's full reference-array semantics: raw,
++// uncompressed 32-bit oops in a SerialGC wasm32 heap.  A covariant array is
++// safe for aaload because no store type check is performed; the adapter still
++// requires the runtime klass to be an actual ObjArrayKlass before the call.
++// There are exactly two i32 loads in this body: the array length and one
++// heap-oop element.  All other paths return the packed reexecute status.
++static void emit_linked_ref_array_load(WasmBuf& body,
++                                       const LinkedRefArrayLayout& layout,
++                                       int aaload_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // null
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, aaload_bci);
++  body.u8(0x05);
++
++  // Check array + length header + one length word against effective memory.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.length_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, 2);
++  body.u8(0x58); // i64.le_u
++  body.u8(0x04); body.u8(0x7e);
++
++  // The unsigned comparison rejects negative indexes without converting them
++  // to a large positive host value first.
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x4b); // i32.gt_u: length > index
++  body.u8(0x04); body.u8(0x7e);
++
++  // Check array + base + index * heapOopSize + heapOopSize using widened
++  // unsigned arithmetic before wrapping to the wasm32 load address.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c); // index * heapOopSize
++  body.u8(0x42); body.sleb64(layout.base_offset + layout.element_size);
++  body.u8(0x7c); // array + base + scaled index + element size
++  emit_linked_effective_memory_bytes(body, 2);
++  body.u8(0x58);
++  body.u8(0x04); body.u8(0x7e);
++
++  // Recompute the checked start address and perform the only element load.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0xa7); // i32.wrap_i64 after the end check
++  body.u8(0x28); body.uleb(2); body.uleb(0);
++  body.u8(0xad); // raw32 oop bits become the low half of the i64 result
++  linked_i64_const(body, linked_status(LINKED_RETURN, 0));
++  body.u8(0x7c); // i64.or with status=RETURN/bci=0
++  body.u8(0x05);
++  emit_linked_array_status(body, aaload_bci);
++  body.u8(0x0b);
++  body.u8(0x05);
++  emit_linked_array_status(body, aaload_bci);
++  body.u8(0x0b);
++  body.u8(0x05);
++  emit_linked_array_status(body, aaload_bci);
++  body.u8(0x0b);
++  body.u8(0x0b); // outer null guard
++  body.u8(0x0b); // function end
++}
++
+ // Benchmark-only bodies. They are emitted only in the opt-in benchmark
+ // module, so the production ten-export module remains byte-for-byte stable.
+ // Each wrapper performs its complete N-iteration loop in Wasm; the host makes
+@@ -868,6 +945,46 @@ static int build_linked_array_store_module(
+   return module.length();
+ }
+ 
++// The reference-array lane is a one-function cold module, independent of the
++// ten/eleven-export group and the int[] store module.  Its ABI is
++// (array,index,memory-limit-pages)->packed-i64 and its sole export is exact.
++static int build_linked_ref_array_load_module(
++    WasmBuf& module, const LinkedRefArrayLayout& layout, int aaload_bci) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(1);
++  linked_type(types, 3);
++  module.section(1, types);
++
++  WasmBuf imports;
++  imports.uleb(1);
++  imports.string("env"); imports.string("memory");
++  imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++  module.section(2, imports);
++
++  WasmBuf functions;
++  functions.uleb(1);
++  functions.uleb(0);
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(1);
++  emit_linked_export(exports, "referenceArrayLoad", 0);
++  module.section(7, exports);
++
++  WasmBuf code;
++  WasmBuf body;
++  emit_linked_ref_array_load(body, layout, aaload_bci);
++  code.uleb(1);
++  code.uleb((unsigned)body.length());
++  code.raw(body.data(), body.length());
++  module.section(10, code);
++  return module.length();
++}
++
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+                                int dispatch_bci, int throw_invoke_bci,
+@@ -1166,6 +1283,11 @@ static bool fixture_class(Method* method) {
+   return method->method_holder()->name()->equals("ZeroBaselineFixture");
+ }
+ 
++static bool reference_array_fixture_class(Method* method) {
++  return method != nullptr
++      && method->method_holder()->name()->equals("ZeroReferenceArrayLoadFixture");
++}
++
+ static bool static_int(Method* method, const char* name, const char* sig) {
+   return method->is_static() && method->result_type() == T_INT
+       && method->name()->equals(name) && method->signature()->equals(sig);
+@@ -1554,6 +1676,32 @@ static bool linked_int_array_layout_for_fixture(LinkedIntArrayLayout* layout) {
+       && layout->base_offset < INT_MAX - 4;
+ }
+ 
++static bool linked_ref_array_layout_for_fixture(LinkedRefArrayLayout* layout) {
++  BarrierSet* barrier = BarrierSet::barrier_set();
++  if (layout == nullptr || !UseSerialGC || UseCompressedOops
++      || UseCompressedClassPointers || UseCompactObjectHeaders
++      || sizeof(void*) != 4 || sizeof(oop) != 4 || heapOopSize != 4
++      || Universe::objectArrayKlass() == nullptr
++      || !Universe::objectArrayKlass()->is_objArray_klass()
++      || barrier == nullptr
++      || !barrier->is_a(BarrierSet::CardTableBarrierSet)) {
++    return false;
++  }
++  layout->length_offset = arrayOopDesc::length_offset_in_bytes();
++  layout->base_offset = arrayOopDesc::base_offset_in_bytes(T_OBJECT);
++  layout->element_size = heapOopSize;
++  return layout->length_offset >= 0
++      && layout->length_offset <= INT_MAX - 4
++      && layout->base_offset >= 0
++      && (layout->length_offset % 4) == 0
++      && (layout->base_offset % 4) == 0
++      && layout->base_offset >= layout->length_offset + 4
++      && layout->element_size == (int)sizeof(oop)
++      && layout->element_size == heapOopSize
++      && layout->element_size == 4
++      && layout->base_offset <= INT_MAX - layout->element_size;
++}
++
+ static CardTable::CardValue* linked_card_for(const LinkedOopLayout& layout,
+                                              oop box) {
+   uintptr_t field_address = (uintptr_t)box + (uintptr_t)layout.child_offset;
+@@ -1803,6 +1951,282 @@ EM_JS(int, zbb_array_store_install, (const unsigned char* bytes, int length,
+   }
+ });
+ 
++EM_JS(int, zbb_ref_array_load_install, (const unsigned char* bytes, int length,
++                                        const char* key, int out_slot,
++                                        int dump_bytes), {
++  const install = (bytes, length, key, out_slot, dump_bytes) => {
++    globalThis.__mcwebZeroRefArrayLoadCache ||= Object.create(null);
++    HEAP32[out_slot >> 2] = -1;
++    const metadata = UTF8ToString(key);
++    const compiler = "zero-baseline-abi-v1";
++    const importedMemory = wasmMemory;
++    const memoryBuffer = importedMemory && importedMemory.buffer;
++    const sharedMemory = typeof SharedArrayBuffer !== "undefined"
++        && memoryBuffer instanceof SharedArrayBuffer;
++    const memoryPages = memoryBuffer && memoryBuffer.byteLength / 65536;
++    if (!(importedMemory instanceof WebAssembly.Memory) || !sharedMemory
++        || !Number.isInteger(memoryPages) || memoryPages < 0
++        || memoryPages > 65536) {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=memory-identity-shared-max");
++      return -1;
++    }
++    const binary = HEAPU8.slice(bytes, bytes + length);
++  // The cache identity carries a deterministic content digest in addition to
++  // the metadata key. Two differently-emitted modules must never reuse an
++  // old table slot merely because a caller accidentally reused its key.
++    let digestA = 0x811c9dc5;
++    let digestB = 0x9e3779b9;
++    for (let i = 0; i < binary.length; i++) {
++      digestA = Math.imul(digestA ^ binary[i], 0x01000193) >>> 0;
++      digestB = Math.imul(digestB ^ ((binary[i] + i) & 0xff), 0x85ebca6b) >>> 0;
++    }
++    const digest = digestA.toString(16).padStart(8, "0")
++        + digestB.toString(16).padStart(8, "0");
++    const cache = globalThis.__mcwebZeroRefArrayLoadCache;
++    const cached = cache[metadata];
++    const sameBytes = (left, right) => left instanceof Uint8Array
++        && left.length === right.length
++        && left.every((value, i) => value === right[i]);
++    if (cached) {
++      if (cached.compiler !== compiler || cached.digest !== digest
++          || cached.bytes !== length || !sameBytes(cached.binary, binary)
++          || cached.metadata !== metadata || cached.memory !== importedMemory
++          || !cached.instance || cached.slot < 0
++          || !Number.isInteger(cached.ownedSlot)
++          || cached.slot !== cached.ownedSlot) {
++        const oldSlot = cached.slot;
++        const oldInstance = cached.instance;
++        // ownedSlot is defined non-writable/non-configurable on every cache
++        // record. It is the sole release authority; visible `slot` is
++        // deliberately mutable so corruption tests cannot redirect cleanup.
++        const ownedSlot = cached.ownedSlot;
++        let oldCallable = false;
++        let callableProbe = false;
++        try {
++          if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
++          oldCallable = typeof getWasmTableEntry(ownedSlot) === "function";
++          callableProbe = true;
++        } catch (error) {
++          oldCallable = false;
++        }
++        // Detach the cache before attempting release. Even a missing runtime
++        // cleanup primitive must not leave a poisoned key or last-instance
++        // pointer that a later install could mistake for a valid module.
++        cached.instance = null;
++        cached.slot = -1;
++        cached.binary = null;
++        cached.memory = null;
++        delete cache[metadata];
++        cache.__lastInstance = null;
++        let removed = false;
++        try {
++          if (typeof removeFunction !== "function" || ownedSlot < 0) {
++            throw new Error("missing owned table slot cleanup");
++          }
++          removeFunction(ownedSlot);
++          removed = true;
++        } catch (error) {
++          if (typeof console !== "undefined") console.error(
++              "[zbg] ref-array install reject=cache-release " + error);
++        }
++        let oldCallableAfter = false;
++        try {
++          if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
++          oldCallableAfter = typeof getWasmTableEntry(ownedSlot) === "function";
++        } catch (error) {
++          oldCallableAfter = false;
++        }
++        const cleanupProven = removed && callableProbe && oldCallable
++            && !oldCallableAfter;
++        cache.__lastInvalidation = {
++          oldSlot, ownedSlot, oldInstance, oldCallable, oldCallableAfter, removed,
++          cleanupProven, metadataCleared: !cache[metadata],
++          lastInstanceCleared: cache.__lastInstance === null
++        };
++        if (!cleanupProven) {
++          if (typeof err === "function") err(
++              "[zbg] JS_CACHE_CLEANUP_UNSUPPORTED ref-array-load "
++              + "detached=1 removed=" + (removed ? "1" : "0")
++              + " table-probe=" + (callableProbe ? "1" : "0")
++              + " old-callable-after=" + (oldCallableAfter ? "1" : "0"));
++          return -1;
++        }
++        if (typeof err === "function") err(
++            "[zbg] JS_CACHE_INVALIDATE ref-array-load slot=" + oldSlot
++            + " owned-slot=" + ownedSlot
++            + " removed=" + (removed ? "1" : "0")
++            + " old-callable=" + (oldCallable ? "1" : "0")
++            + " old-callable-after=" + (oldCallableAfter ? "1" : "0")
++            + " instance-cleared=1 cache-cleared=1 last-instance-cleared=1");
++        return -1;
++      }
++      HEAP32[out_slot >> 2] = cached.slot;
++      if (typeof err === "function") {
++        const sameInstance = cached.instance === cache.__lastInstance;
++        err("[zbg] JS_CACHE_HIT ref-array-load id=" + cached.id
++            + " slot=" + cached.slot + " instance-reused="
++            + (sameInstance ? "1" : "0") + " memory-reused="
++            + (cached.memory === importedMemory ? "1" : "0")
++            + " compiler=" + cached.compiler + " digest=" + cached.digest
++            + " bytes-exact=1");
++      }
++      cache.__lastInstance = cached.instance;
++      return cached.id;
++    }
++    let installedSlot = -1;
++    try {
++    if (dump_bytes) {
++      try {
++        const fs = typeof require === "function" ? require("fs") : null;
++        if (fs && typeof Buffer !== "undefined") {
++          fs.writeFileSync("/private/tmp/mcweb-zero-linked-ref-array-load.wasm",
++                           Buffer.from(binary));
++        }
++      } catch (dumpError) {
++        if (typeof err === "function") err("[zbg] ref-array dump failed: " + dumpError);
++      }
++    }
++    if (!WebAssembly.validate(binary)) {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=validate");
++      return -1;
++    }
++    const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
++      env: { memory: wasmMemory }
++    });
++    if (typeof instance.exports.referenceArrayLoad !== "function") {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=missing-export");
++      return -1;
++    }
++    if (typeof addFunction !== "function") {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=missing-addFunction");
++      return -1;
++    }
++    if (typeof removeFunction !== "function") {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=missing-removeFunction");
++      return -1;
++    }
++    installedSlot = addFunction(instance.exports.referenceArrayLoad, "jiii");
++    if (!Number.isInteger(installedSlot) || installedSlot < 0) {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=invalid-slot");
++      return -1;
++    }
++    const id = globalThis.__mcwebZeroRefArrayLoadCache.__nextId || 1;
++    cache.__nextId = id + 1;
++    cache[metadata] = {
++      id, metadata, bytes: length, binary, instance, slot: installedSlot, compiler, digest,
++      memory: importedMemory, memoryPages
++    };
++    Object.defineProperty(cache[metadata], "ownedSlot", {
++      value: installedSlot, writable: false, configurable: false, enumerable: true
++    });
++    cache.__lastInstance = instance;
++    HEAP32[out_slot >> 2] = installedSlot;
++    if (typeof err === "function") {
++      err("[zbg] JS_INSTALL ref-array-load exports=1 slot=" + installedSlot
++          + " bytes=" + length + " compiler=" + compiler
++          + " digest=" + digest + " memory=shared max-pages=65536");
++    }
++    return id;
++    } catch (error) {
++      if (installedSlot >= 0 && typeof removeFunction === "function") {
++        try { removeFunction(installedSlot); } catch (releaseError) {
++          if (typeof console !== "undefined") console.error(
++              "[zbg] ref-array install reject=cache-release " + releaseError);
++        }
++      }
++      const failed = cache[metadata];
++      if (failed && failed.slot === installedSlot) {
++        delete cache[metadata];
++        cache.__lastInstance = null;
++      }
++      HEAP32[out_slot >> 2] = -1;
++      if (typeof console !== "undefined") console.error(
++          "[zbg] ref-array install reject=exception " + error);
++      return -1;
++    }
++  };
++  globalThis.__mcwebZeroRefArrayLoadInstall = install;
++  return install(bytes, length, key, out_slot, dump_bytes);
++});
++
++EM_JS(int, zbb_ref_array_load_cache_mutation, (const unsigned char* bytes,
++                                                int length, const char* key,
++                                                int out_slot,
++                                                const char* mutation_name), {
++  const mutation = UTF8ToString(mutation_name);
++  const metadata = UTF8ToString(key);
++  const cache = globalThis.__mcwebZeroRefArrayLoadCache;
++  const cached = cache && cache[metadata];
++  const install = globalThis.__mcwebZeroRefArrayLoadInstall;
++  HEAP32[out_slot >> 2] = -1;
++  if (!cached || typeof install !== "function") return -1;
++  // Do not let a stale diagnostic object satisfy a later mutation if the
++  // release/install sequence fails before producing a new invalidation.
++  cache.__lastInvalidation = null;
++  switch (mutation) {
++    case "compiler": cached.compiler = "mutated-compiler"; break;
++    case "digest": cached.digest = "deadbeefdeadbeef"; break;
++    case "bytes":
++      cached.binary = cached.binary.slice();
++      cached.binary[0] ^= 1;
++      break;
++    case "slot": cached.slot = cached.ownedSlot + 1; break;
++    case "memory":
++      try {
++        cached.memory = new WebAssembly.Memory({initial: 0, maximum: 65536,
++                                                shared: true});
++      } catch (error) {
++        return -1;
++      }
++      break;
++    case "metadata": cached.metadata = metadata + "#mutated"; break;
++    default: return -1;
++  }
++  const oldId = cached.id;
++  const oldSlot = cached.slot;
++  const oldOwnedSlot = cached.ownedSlot;
++  const oldInstance = cached.instance;
++  const missId = install(bytes, length, key, out_slot, 0);
++  const invalidation = cache.__lastInvalidation;
++  if (missId >= 0 || !invalidation || !invalidation.removed
++      || invalidation.oldSlot !== oldSlot
++      || invalidation.ownedSlot !== oldOwnedSlot
++      || invalidation.oldInstance !== oldInstance
++      || invalidation.oldCallableAfter
++      || !invalidation.cleanupProven
++      || !invalidation.metadataCleared
++      || !invalidation.lastInstanceCleared) {
++    return -1;
++  }
++  const freshId = install(bytes, length, key, out_slot, 0);
++  const fresh = cache[metadata];
++  const newSlot = HEAP32[out_slot >> 2];
++  if (freshId < 0 || !fresh || fresh.id === oldId
++      || fresh.instance === oldInstance || fresh.slot !== newSlot
++      || fresh.ownedSlot !== newSlot
++      || fresh.metadata !== metadata || !fresh.binary
++      || fresh.binary.length !== length
++      || !fresh.binary.every((value, i) => value === HEAPU8[bytes + i])) {
++    return -1;
++  }
++  if (typeof err === "function") err(
++      "[zbg] JS_CACHE_MUTATION_PASS ref-array-load mutation=" + mutation
++      + " miss=-1 old-id=" + oldId + " new-id=" + freshId
++      + " old-slot=" + oldSlot + " new-slot=" + newSlot
++      + " old-owned-slot=" + oldOwnedSlot
++      + " slot-reused=" + (oldSlot === newSlot ? "1" : "0")
++      + " old-callable-before=" + (invalidation.oldCallable ? "1" : "0")
++      + " old-callable-after=0 removed=1 instance-reused=0"
++      + " cache-cleared=1 last-instance-cleared=1 bytes-exact=1");
++  return freshId;
++});
++
+ static bool install_linked_array_store(const LinkedIntArrayLayout& layout,
+                                        int iastore_bci) {
+   if (ZeroWasmBaselineJarHash == nullptr
+@@ -1856,6 +2280,83 @@ static bool install_linked_array_store(const LinkedIntArrayLayout& layout,
+       && _linked_array_store_slot >= 0;
+ }
+ 
++static bool install_linked_ref_array_load(const LinkedRefArrayLayout& layout,
++                                          int aaload_bci) {
++  if (ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr
++      || _linked_ref_array_module_id >= 0) {
++    return _linked_ref_array_module_id >= 0;
++  }
++  char key[2048];
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-ref-array-load-v1;compiler=%s;class=ZeroReferenceArrayLoadFixture;"
++      "method=referenceArrayLoad([Ljava/lang/Object;I)Ljava/lang/Object;aaload-bci=%d;"
++      "jar=%s;classHash=%s;dependencies=%s;features=wasm32-i32-i64-linear-memory-status;"
++      "array-mode=ref-load-only;exports=1;slot=separate;collector=serial;"
++      "compressed-oops=0;compressed-class-pointers=0;compact-headers=0;"
++      "pointer-bytes=%d;oop-bytes=%d;heap-oop-bytes=%d;length-offset=%d;"
++      "base-offset=%d;element-size=%d;memory=shared;memory-max-pages=65536;"
++      "memory-mode=active-min-override;"
++      "memory-limit-pages=%lld",
++      kCompilerVersion, aaload_bci, ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
++      (int)sizeof(void*), (int)sizeof(oop), heapOopSize,
++      layout.length_offset, layout.base_offset, layout.element_size,
++      (long long)ZeroWasmLinkedRefArrayMemoryLimitForTest);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++
++  WasmBuf module;
++  int length = build_linked_ref_array_load_module(module, layout, aaload_bci);
++  if (length <= 0) return false;
++  _linked_ref_array_module_id = zbb_ref_array_load_install(
++      module.data(), length, key, (int)(intptr_t)&_linked_ref_array_slot,
++      ZeroWasmLinkedGroupVerbose ? 1 : 0);
++  if (_linked_ref_array_module_id < 0) {
++    _linked_ref_array_slot = -1;
++    return false;
++  }
++  if (_linked_ref_array_module_id >= 0 && ZeroWasmLinkedGroupVerbose) {
++    int cached_slot = -1;
++    int cached_id = zbb_ref_array_load_install(
++        module.data(), length, key, (int)(intptr_t)&cached_slot, 0);
++    if (cached_id != _linked_ref_array_module_id
++        || cached_slot != _linked_ref_array_slot) {
++      tty->print_cr("[zbg] REF_ARRAY_CACHE_REJECT first-id=%d hit-id=%d "
++                    "first-slot=%d hit-slot=%d",
++                    _linked_ref_array_module_id, cached_id,
++                    _linked_ref_array_slot, cached_slot);
++      _linked_ref_array_module_id = -1;
++      _linked_ref_array_slot = -1;
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedRefArrayCacheMutationForTest != nullptr) {
++    const int fresh_id = zbb_ref_array_load_cache_mutation(
++        module.data(), length, key, (int)(intptr_t)&_linked_ref_array_slot,
++        ZeroWasmLinkedRefArrayCacheMutationForTest);
++    _linked_ref_array_module_id = fresh_id;
++    if (fresh_id < 0) {
++      _linked_ref_array_slot = -1;
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REF_ARRAY_MODULE_KEY abi=referenceArrayLoad:([Ljava/lang/Object;I)"
++                  "Ljava/lang/Object;->(i32,i32,i32)->i64 exports=1 slot=%d "
++                  "collector=serial compressed-oops=0 compressed-class-pointers=0 "
++                  "compact-headers=0 pointer-bytes=%d oop-bytes=%d heap-oop-bytes=%d "
++                  "memory=shared max-pages=65536 length-offset=%d base-offset=%d "
++                  "element-size=%d bytes=%d",
++                  _linked_ref_array_slot, (int)sizeof(void*), (int)sizeof(oop),
++                  heapOopSize, layout.length_offset, layout.base_offset,
++                  layout.element_size, length);
++  }
++  return _linked_ref_array_module_id >= 0
++      && _linked_ref_array_slot >= 0;
++}
++
+ EM_JS(int, zbb_benchmark_install, (const unsigned char* bytes, int length,
+                                    const char* key, int out_slots,
+                                    int dump_bytes), {
+@@ -1942,6 +2443,8 @@ static THREAD_LOCAL uint64_t _linked_array_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_array_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_array_store_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_array_store_resume_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_ref_array_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_ref_array_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ static THREAD_LOCAL int _benchmark_module_id = -1;
+@@ -2000,6 +2503,13 @@ static jlong linked_array_store_call(jint array, jint index, jint value,
+       array, index, value, memory_limit_pages);
+ }
+ 
++static jlong linked_ref_array_load_call(jint array, jint index,
++                                        jint memory_limit_pages) {
++  _linked_calls++;
++  return ((ZbgThreeArg)(intptr_t)_linked_ref_array_slot)(
++      array, index, memory_limit_pages);
++}
++
+ static jlong benchmark_table_call2(int slot, jint first, jint second) {
+   _benchmark_table_calls++;
+   return ((ZbgTwoArg)(intptr_t)slot)(first, second);
+@@ -2138,6 +2648,7 @@ enum LinkedMethodKind {
+   LinkedThrowCallerMethod,
+   LinkedIntArrayLoadMethod,
+   LinkedIntArrayStoreMethod,
++  LinkedRefArrayLoadMethod,
+   LinkedBenchPrimCandidateMethod,
+   LinkedBenchPrimReferenceMethod,
+   LinkedBenchDispatchCandidateMethod,
+@@ -2254,6 +2765,31 @@ static bool linked_int_array_load_shape(Method* method, int* iaload_bci,
+   return *iaload_bci == 2 && *return_bci == 3;
+ }
+ 
++static bool linked_ref_array_load_shape(Method* method, int* aaload_bci,
++                                        int* return_bci) {
++  if (!reference_array_fixture_class(method) || method->is_native()
++      || method->is_synchronized() || !method->is_static()
++      || method->result_type() != T_OBJECT || method->code_size() != 4
++      || method->has_exception_handler() || aaload_bci == nullptr
++      || return_bci == nullptr
++      || !method->name()->equals("referenceArrayLoad")
++      || !method->signature()->equals(
++          "([Ljava/lang/Object;I)Ljava/lang/Object;")) {
++    return false;
++  }
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if ((code[0] != (unsigned char)Bytecodes::_aload_0
++          && code[0] != (unsigned char)Bytecodes::_fast_aload_0)
++      || code[1] != (unsigned char)Bytecodes::_iload_1
++      || code[2] != (unsigned char)Bytecodes::_aaload
++      || code[3] != (unsigned char)Bytecodes::_areturn) {
++    return false;
++  }
++  *aaload_bci = first_opcode(method, (unsigned char)Bytecodes::_aaload);
++  *return_bci = first_opcode(method, (unsigned char)Bytecodes::_areturn);
++  return *aaload_bci == 2 && *return_bci == 3;
++}
++
+ static bool linked_int_array_store_code_shape(Method* method, int* iastore_bci,
+                                               int* return_bci) {
+   if (method == nullptr || method->code_size() != 6
+@@ -2412,7 +2948,15 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* throw_invoke_bci,
+                                              int* throw_handler_bci,
+                                              int* int_array_bci,
+-                                             int* int_array_store_bci) {
++                                             int* int_array_store_bci,
++                                             int* ref_array_bci) {
++  if (reference_array_fixture_class(method)) {
++    if (UseZeroWasmLinkedRefArrayLoad
++        && linked_ref_array_load_shape(method, ref_array_bci, return_bci)) {
++      return LinkedRefArrayLoadMethod;
++    }
++    return LinkedNoMethod;
++  }
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -2649,6 +3193,18 @@ static bool linked_validate_pre_push(interpreterState istate,
+   return true;
+ }
+ 
++static void linked_restore_stack_slots(intptr_t* pre_tos,
++                                       const intptr_t* saved_slots,
++                                       int depth) {
++  // A push writes the slots before linked_prepare_state publishes the new
++  // frame cursor.  Keep the fallback transactional: a future invariant or
++  // exception check must not leave stale oop/int values in the caller's
++  // expression stack when publication is rejected.
++  for (int i = 0; i < depth; i++) {
++    pre_tos[-i] = saved_slots[i];
++  }
++}
++
+ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+                                  address* pc, address resume_pc, int depth) {
+   // push_int/push_oop already moved the downward-growing TOS. Validate the
+@@ -2657,7 +3213,8 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+   // depth is valid for an invokestatic with no arguments.
+   bool valid = istate != nullptr && *tos != nullptr && resume_pc != nullptr
+       && depth >= 0 && *tos >= istate->stack_limit()
+-      && *tos < istate->stack_base();
++      && *tos < istate->stack_base()
++      && !istate->thread()->has_pending_exception();
+   if (valid) {
+     // The post-push TOS must still describe a pre-push pointer strictly below
+     // stack_base when depth slots are restored.
+@@ -2913,12 +3470,13 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+   int unused_throw_handler_bci = -1;
+   int unused_int_array_bci = -1;
+   int unused_int_array_store_bci = -1;
++  int unused_ref_array_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(
+       method, &unused_virtual_bci, &unused_safe_div_bci,
+       &unused_safe_div_handler_bci, &return_bci, &unused_alloc_bci,
+       &unused_init_bci, &unused_dispatch_bci, &unused_throw_invoke_bci,
+       &unused_throw_handler_bci, &unused_int_array_bci,
+-      &unused_int_array_store_bci);
++      &unused_int_array_store_bci, &unused_ref_array_bci);
+   bool primitive = kind == LinkedBenchPrimCandidateMethod
+       || kind == LinkedBenchPrimReferenceMethod;
+   bool dispatch = kind == LinkedBenchDispatchCandidateMethod
+@@ -3091,6 +3649,183 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+   return ZeroWasmBaseline::Returned;
+ }
+ 
++static ZeroWasmBaseline::Result run_linked_ref_array_load(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmLinkedRefArrayLoad || istate == nullptr
++      || istate->thread()->has_pending_exception()
++      || !reference_array_fixture_class(method)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  int aaload_bci = -1;
++  int return_bci = -1;
++  if (!linked_ref_array_load_shape(method, &aaload_bci, &return_bci)) {
++    if (ZeroWasmLinkedGroupVerbose
++        && method != nullptr && method->name()->equals("referenceArrayLoad")) {
++      tty->print_cr("[zbg] REF_ARRAY_CLASSIFY holder=%s method=%s descriptor=%s "
++                    "accepted=0 reason=shape-or-eligibility",
++                    method->method_holder()->name()->as_C_string(),
++                    method->name()->as_C_string(),
++                    method->signature()->as_C_string());
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  LinkedRefArrayLayout layout;
++  if (!linked_ref_array_layout_for_fixture(&layout)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_REJECT stage=array-layout serial=%d "
++                    "compressed-oops=%d compressed-class=%d compact-headers=%d "
++                    "ptr=%d oop=%d heap-oop-size=%d obj-array-klass=%p",
++                    UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
++                    UseCompressedClassPointers ? 1 : 0,
++                    UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                    (int)sizeof(oop), heapOopSize,
++                    (void*)Universe::objectArrayKlass());
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  // All runtime inputs are validated before the cold module is installed.
++  // This keeps malformed frames, an invalid test override, and a primitive
++  // array from creating a cache entry that can never be called safely.
++  if (locals == nullptr) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_REJECT reason=missing-locals");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  // Validate the complete caller frame before installing the cold module.
++  // The fallback can publish two stack values, so reserve/check that full
++  // range up front; this keeps a malformed adapter invocation from creating
++  // a cache entry before the interpreter state is known to be usable.
++  if (code_base == nullptr || pc == nullptr || *pc == nullptr
++      || tos == nullptr || *tos == nullptr
++      || !linked_validate_pre_push(istate, *tos, 2)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_REJECT reason=invalid-frame-before-install");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  jlong memory_limit_pages = (jlong)ZeroWasmLinkedRefArrayMemoryLimitForTest;
++  if (memory_limit_pages < 0 || memory_limit_pages > INT_MAX) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_REJECT reason=invalid-memory-limit pages=%lld",
++                    (long long)memory_limit_pages);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  oop array = cast_to_oop((void*)locals[0]);
++  jint index = (jint)locals[-1];
++  if (array != nullptr && !array->klass()->is_objArray_klass()) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_REJECT reason=non-object-array klass=%s",
++                    array->klass()->name()->as_C_string());
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_linked_ref_array_module_id < 0
++      && !install_linked_ref_array_load(layout, aaload_bci)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_REJECT stage=module-install aaload-bci=%d",
++                    aaload_bci);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_linked_ref_array_slot < 0 || locals == nullptr
++      || _linked_ref_array_module_id < 0) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  const uint64_t sequence = ++_linked_ref_array_sequence;
++  _linked_ref_array_resume_sequence = sequence;
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REF_ARRAY_ENTER seq=%llu method=referenceArrayLoad "
++                  "static=1 params=2 raw32=1 actual-klass=objArrayKlass "
++                  "length-offset=%d base-offset=%d element-size=%d "
++                  "limit-pages=%lld slot=%d",
++                  (unsigned long long)sequence, layout.length_offset,
++                  layout.base_offset, layout.element_size,
++                  (long long)memory_limit_pages, _linked_ref_array_slot);
++    tty->print_cr("[zbg] REF_ARRAY_ADAPTER seq=%llu oop=%p index=%d length=%d "
++                  "klass=%s length-offset=%d base-offset=%d slot=%d",
++                  (unsigned long long)sequence, (void*)array, index,
++                  array == nullptr ? -1 : objArrayOop(array)->length(),
++                  array == nullptr ? "null" : "objArrayKlass",
++                  layout.length_offset, layout.base_offset,
++                  _linked_ref_array_slot);
++    tty->print_cr("[zbg] REF_ARRAY_TABLE_CALL seq=%llu slot=%d oop=%p index=%d "
++                  "limit-pages=%lld",
++                  (unsigned long long)sequence, _linked_ref_array_slot,
++                  (void*)array, index, (long long)memory_limit_pages);
++  }
++  LinkedStatus result = decode_linked_status(linked_ref_array_load_call(
++      (jint)(intptr_t)array, index, (jint)memory_limit_pages));
++  if (result.status == LINKED_RETURN && result.bci == 0) {
++    // Decode the raw32 result before publishing it as an oop.  The push and
++    // same-frame state publication are intentionally adjacent so a future
++    // diagnostic or safepoint cannot observe an unrooted returned reference.
++    oop value = cast_to_oop((void*)(uintptr_t)(uint32_t)result.value);
++    intptr_t* pre_tos = *tos;
++    if (!linked_validate_pre_push(istate, pre_tos, 1)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    const intptr_t saved_slots[1] = { pre_tos[0] };
++    push_oop(tos, value);
++    if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++      linked_restore_stack_slots(pre_tos, saved_slots, 1);
++      *tos = pre_tos;
++      return ZeroWasmBaseline::NotRun;
++    }
++    _linked_returned++;
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REF_ARRAY_STATUS seq=%llu status=%d bci=%d oop-bits=%u "
++                    "expected-bci=%d limit-pages=%lld",
++                    (unsigned long long)sequence, result.status, result.bci,
++                    (unsigned)(uint32_t)result.value, aaload_bci,
++                    (long long)memory_limit_pages);
++      tty->print_cr("[zbg] REF_ARRAY_EXIT seq=%llu status=RETURN bci=0",
++                    (unsigned long long)sequence);
++      tty->print_cr("[zbg] DIRECT_REF_LOAD referenceArrayLoad runtime=1 "
++                    "seq=%llu result-oop=%p",
++                    (unsigned long long)sequence, (void*)value);
++    }
++    return ZeroWasmBaseline::Returned;
++  }
++  if (result.status != LINKED_REEXECUTE || result.bci != aaload_bci) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  intptr_t* pre_tos = *tos;
++  if (!linked_validate_pre_push(istate, pre_tos, 2)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  const intptr_t saved_slots[2] = { pre_tos[0], pre_tos[-1] };
++  push_oop(tos, array);
++  push_int(tos, index);
++  if (!linked_prepare_state(istate, tos, pc, code_base + aaload_bci, 2)) {
++    linked_restore_stack_slots(pre_tos, saved_slots, 2);
++    *tos = pre_tos;
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    const char* reason = array == nullptr ? "null"
++        : ((uint32_t)index >= (uint32_t)objArrayOop(array)->length()
++           ? "bounds" : "memory");
++    tty->print_cr("[zbg] REF_ARRAY_STATUS seq=%llu status=%d bci=%d oop-bits=%u "
++                  "expected-bci=%d limit-pages=%lld",
++                  (unsigned long long)sequence, result.status, result.bci,
++                  (unsigned)(uint32_t)result.value, aaload_bci,
++                  (long long)memory_limit_pages);
++    tty->print_cr("[zbg] REF_ARRAY_EXIT seq=%llu status=REEXECUTE bci=%d reason=%s",
++                  (unsigned long long)sequence, aaload_bci, reason);
++    tty->print_cr("[zbg] REF_ARRAY_OPCODE_REEXECUTE seq=%llu reason=%s "
++                  "resume-bci=%d depth=2 pending=0",
++                  (unsigned long long)sequence, reason, aaload_bci);
++  }
++  _linked_deopt++;
++  return ZeroWasmBaseline::OpcodeResume;
++}
++
+ static ZeroWasmBaseline::Result run_linked_group(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -3120,6 +3855,7 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int throw_handler_bci = -1;
+   int int_array_bci = -1;
+   int int_array_store_bci = -1;
++  int ref_array_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci,
+@@ -3130,7 +3866,8 @@ static ZeroWasmBaseline::Result run_linked_group(
+                                                 &throw_invoke_bci,
+                                                 &throw_handler_bci,
+                                                 &int_array_bci,
+-                                                &int_array_store_bci);
++                                                &int_array_store_bci,
++                                                &ref_array_bci);
+   if (!UseZeroWasmLinkedGroup && kind != LinkedIntArrayLoadMethod
+       && kind != LinkedIntArrayStoreMethod) {
+     return ZeroWasmBaseline::NotRun;
+@@ -3800,9 +4537,23 @@ uint64_t zbb_linked_array_store_resume_sequence() {
+   return _linked_array_store_resume_sequence;
+ }
+ 
++uint64_t zbb_linked_ref_array_resume_sequence() {
++  return _linked_ref_array_resume_sequence;
++}
++
+ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
++  const bool ref_array_collision = UseZeroWasmLinkedRefArrayLoad
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  if (ref_array_collision) return NotRun;
++  if (UseZeroWasmLinkedRefArrayLoad) {
++    Result ref_array = run_linked_ref_array_load(method, locals, code_base,
++                                                  pc, tos, istate);
++    if (ref_array != NotRun) return ref_array;
++  }
+   if (UseZeroWasmLinkedBenchmark) {
+     Result benchmark = run_linked_benchmark(method, locals, code_base, pc,
+                                              tos, istate);

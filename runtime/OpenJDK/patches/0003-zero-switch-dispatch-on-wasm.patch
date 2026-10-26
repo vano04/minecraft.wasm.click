@@ -1,0 +1,22 @@
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 07ec57a6f..d4a460fd1 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -82,6 +83,17 @@
+ #endif
+ #endif
+ 
++/*
++ * wasm has no indirect branch. LLVM's WebAssembly backend lowers the computed
++ * goto by flattening every opcode handler into one irreducible dispatch loop
++ * driven by a state variable, which is the same br_table a switch would give
++ * us plus the loss of every optimisation that flattening prevents. The switch
++ * form is what the backend wants; -DMCWEB_USELABELS restores the original.
++ */
++#if defined(__EMSCRIPTEN__) && !defined(MCWEB_USELABELS)
++#undef USELABELS
++#endif
++
+ #undef CASE
+ #ifdef USELABELS
+ #define CASE(opcode) opc ## opcode

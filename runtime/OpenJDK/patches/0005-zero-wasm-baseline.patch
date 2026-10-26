@@ -1,0 +1,632 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -136,2 +136,20 @@
++                                                                            \
++  product(bool, UseZeroWasmBaseline, false, EXPERIMENTAL,                    \
++          "Run the opt-in OSS fixture method-at-a-time baseline ABI")       \
++                                                                            \
++  product(bool, ZeroWasmBaselineVerbose, false, EXPERIMENTAL,                \
++          "Report baseline module, direct-call, and fallback state")       \
++                                                                            \
++  product(ccstr, ZeroWasmBaselineOnly, nullptr, EXPERIMENTAL,                \
++          "Only run the baseline adapter for matching fixture methods")     \
++                                                                            \
++  product(ccstr, ZeroWasmBaselineJarHash, nullptr, EXPERIMENTAL,              \
++          "Exact local OSS fixture JAR hash for baseline cache identity")   \
++                                                                            \
++  product(ccstr, ZeroWasmBaselineClassHash, nullptr, EXPERIMENTAL,            \
++          "Exact local OSS fixture class hash for baseline cache identity")  \
++                                                                            \
++  product(ccstr, ZeroWasmBaselineDependencyHashes, nullptr, EXPERIMENTAL,     \
++          "Exact local OSS fixture dependency hashes for baseline cache")
+
+ // end of ARCH_FLAGS
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -33,3 +33,4 @@
+ #include "interpreter/interpreter.hpp"
++#include "interpreter/zero/zeroWasmBaseline.hpp"
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/zeroWasmCompiler.hpp"
+@@ -789,2 +789,23 @@
+ #ifdef __EMSCRIPTEN__
++  // Separate, opt-in method-at-a-time ABI lane.  It runs before the trace
++  // JIT and has its own result protocol: a complete return goes directly to
++  // the existing return machinery, while guard/exception resumes re-enter
++  // this loop at the exact bytecode and stack state supplied by the adapter.
++  if (UseZeroWasmBaseline && pc == METHOD->code_base()) {
++    ZeroWasmBaseline::Result baseline =
++        ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
++                                     &pc, &topOfStack, istate);
++    if (baseline == ZeroWasmBaseline::Returned) {
++      // Re-enter at the real ireturn bytecode.  Besides preserving the
++      // interpreter's exact return protocol, this executes its safepoint
++      // poll before the frame is torn down; the adapter has only promised a
++      // GC-visible Zero frame, not a safepoint-free Java ABI.
++      goto run;
++    }
++    if (baseline == ZeroWasmBaseline::DeoptResume
++        || baseline == ZeroWasmBaseline::ExceptionResume) {
++      goto run;
++    }
++  }
++
+   // The wasm JIT's only entry point. Everything it needs is established here
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (c) 2026.
++ *
++ * Opt-in, fixture-only method-at-a-time baseline ABI spike.  This is kept in
++ * a separate class from ZeroWasmCompiler: the latter is the trace JIT and
++ * deliberately retains its interpreter/JS call path.
++ */
++
++#ifndef SHARE_INTERPRETER_ZERO_ZEROWASMSBASELINE_HPP
++#define SHARE_INTERPRETER_ZERO_ZEROWASMSBASELINE_HPP
++
++#include "memory/allStatic.hpp"
++#include "utilities/globalDefinitions.hpp"
++
++#ifdef __EMSCRIPTEN__
++
++class Method;
++
++class ZeroWasmBaseline : AllStatic {
++ public:
++  enum Result {
++    NotRun = 0,
++    Returned = 1,
++    DeoptResume = 2,
++    ExceptionResume = 3
++  };
++
++  // The adapter is called while a real Zero interpreter frame is live.  It
++  // receives the real locals and expression-stack pointer, writes only Java
++  // slots visible to the frame manager, and returns a state transition.
++  static Result maybe_run(Method* method, intptr_t* locals, address code_base,
++                          address* pc, intptr_t** tos, void* istate);
++
++  static void print_statistics();
++};
++
++#endif // __EMSCRIPTEN__
++
++#endif // SHARE_INTERPRETER_ZERO_ZEROWASMSBASELINE_HPP
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -0,0 +1,527 @@
++/*
++ * Copyright (c) 2026.
++ *
++ * This is an intentionally narrow OSS fixture adapter.  It is not a
++ * Minecraft compiler and it does not inspect, copy, upload, or package a
++ * player JAR.  The exact fixture bytecode is verified before this module is
++ * installed.  Everything not matching those shapes remains in Zero.
++ */
++
++#include "interpreter/zero/zeroWasmBaseline.hpp"
++
++#ifdef __EMSCRIPTEN__
++
++#include "interpreter/zero/bytecodeInterpreter.hpp"
++#include "jvm_io.h"
++#include "memory/resourceArea.hpp"
++#include "oops/instanceKlass.inline.hpp"
++#include "oops/method.inline.hpp"
++#include "oops/oop.inline.hpp"
++#include "runtime/globals.hpp"
++#include "utilities/ostream.hpp"
++
++#include <emscripten.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++namespace {
++
++enum FixtureMethod {
++  NoMethod = 0,
++  LeafMethod,
++  CallerMethod,
++  VirtualMethod,
++  SafeDivMethod
++};
++
++enum ModuleFunction {
++  FnLeaf = 0,
++  FnCaller = 1,
++  FnVirtual = 2,
++  FnSafeDiv = 3
++};
++
++static const int32_t DEOPT_SENTINEL = (int32_t)0x80000000u;
++static const char* const kCompilerVersion = "zero-baseline-abi-v1";
++static const char* const kRuntimeAbi =
++    "frame:real-zero-locals-stack;status:return-deopt-exception;resume-bci:2;return:ireturn-safepoint;entry:main-wasm-table-call-indirect;hot-js:none";
++static const char* const kWasmFeatures = "wasm32-i32-pure-functions";
++
++// The fixture has a Java int in every supported result slot and therefore
++// uses exactly one 32-bit Zero Java slot for each operand/result.
++static_assert(sizeof(intptr_t) == 4, "fixture adapter requires wasm32 slots");
++static_assert(sizeof(void*) == 4, "fixture adapter requires wasm32 function pointers");
++
++class WasmBuf {
++  unsigned char _bytes[1024];
++  int _length;
++
++ public:
++  WasmBuf() : _length(0) {}
++  int length() const { return _length; }
++  const unsigned char* data() const { return _bytes; }
++  void u8(unsigned value) { _bytes[_length++] = (unsigned char)value; }
++  void raw(const unsigned char* data, int length) {
++    memcpy(_bytes + _length, data, (size_t)length);
++    _length += length;
++  }
++  void uleb(unsigned value) {
++    do {
++      unsigned byte = value & 0x7fu;
++      value >>= 7;
++      if (value != 0) byte |= 0x80u;
++      u8(byte);
++    } while (value != 0);
++  }
++  void sleb(int value) {
++    bool more = true;
++    while (more) {
++      unsigned byte = (unsigned)value & 0x7fu;
++      value >>= 7;
++      bool sign = (byte & 0x40u) != 0;
++      more = !((value == 0 && !sign) || (value == -1 && sign));
++      if (more) byte |= 0x80u;
++      u8(byte);
++    }
++  }
++  void string(const char* value) {
++    int length = (int)strlen(value);
++    uleb((unsigned)length);
++    raw((const unsigned char*)value, length);
++  }
++  void section(int id, const WasmBuf& body) {
++    u8((unsigned)id);
++    uleb((unsigned)body.length());
++    raw(body.data(), body.length());
++  }
++};
++
++static void type(WasmBuf& b, int params) {
++  b.u8(0x60);                         // func
++  b.uleb((unsigned)params);
++  for (int i = 0; i < params; i++) b.u8(0x7f); // i32
++  b.uleb(1);                          // one i32 result
++  b.u8(0x7f);
++}
++
++static void empty_locals(WasmBuf& b) { b.u8(0); }
++
++static void emit_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);         // local.get 0
++  body.u8(0x41); body.sleb(3);         // i32.const 3
++  body.u8(0x6a);                       // i32.add
++  body.u8(0x0b);                       // end
++}
++
++static void emit_caller(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);         // local.get 0
++  body.u8(0x10); body.uleb(FnLeaf);    // direct Wasm call: caller -> leaf
++  body.u8(0x41); body.sleb(2);
++  body.u8(0x6c);                       // i32.mul
++  body.u8(0x0b);
++}
++
++static void emit_virtual(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);         // guard tag supplied by the adapter
++  body.u8(0x41); body.sleb(1);
++  body.u8(0x46);                       // i32.eq
++  body.u8(0x04); body.u8(0x7f);        // if (result i32)
++  body.u8(0x20); body.uleb(1);         // Good.value(x) = x + 11
++  body.u8(0x41); body.sleb(11);
++  body.u8(0x6a);
++  body.u8(0x05);                       // else: explicit deopt sentinel
++  body.u8(0x41); body.sleb(DEOPT_SENTINEL);
++  body.u8(0x0b);                       // end if
++  body.u8(0x0b);                       // end function
++}
++
++static void emit_safe_div(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(1);         // y
++  body.u8(0x45);                       // i32.eqz
++  body.u8(0x04); body.u8(0x7f);        // if (result i32)
++  body.u8(0x41); body.sleb(DEOPT_SENTINEL);
++  body.u8(0x05);                       // else
++  body.u8(0x20); body.uleb(0);         // x
++  body.u8(0x20); body.uleb(1);         // y
++  body.u8(0x6d);                       // i32.div_s
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
++static void emit_export(WasmBuf& body, const char* name, int index) {
++  body.string(name);
++  body.u8(0x00);                       // function export
++  body.uleb((unsigned)index);
++}
++
++static int build_module(WasmBuf& module) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(2);
++  type(types, 1);                      // leaf/caller
++  type(types, 2);                      // virtual/safeDiv
++  module.section(1, types);
++
++  WasmBuf functions;
++  functions.uleb(4);
++  functions.uleb(0); functions.uleb(0);
++  functions.uleb(1); functions.uleb(1);
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(4);
++  emit_export(exports, "leaf", FnLeaf);
++  emit_export(exports, "caller", FnCaller);
++  emit_export(exports, "virtualValue", FnVirtual);
++  emit_export(exports, "safeDiv", FnSafeDiv);
++  module.section(7, exports);
++
++  WasmBuf code;
++  WasmBuf body;
++  code.uleb(4);
++  emit_leaf(body); code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  body = WasmBuf();
++  emit_caller(body); code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  body = WasmBuf();
++  emit_virtual(body); code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  body = WasmBuf();
++  emit_safe_div(body); code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++  module.section(10, code);
++  return module.length();
++}
++
++static uint64_t fnv1a(const char* text) {
++  uint64_t hash = 1469598103934665603ULL;
++  for (const unsigned char* p = (const unsigned char*)text; *p != 0; p++) {
++    hash ^= *p;
++    hash *= 1099511628211ULL;
++  }
++  return hash;
++}
++
++static void append_hex(char* out, int* at, int capacity,
++                       const unsigned char* bytes, int length) {
++  static const char hex[] = "0123456789abcdef";
++  for (int i = 0; i < length && *at + 2 < capacity; i++) {
++    out[(*at)++] = hex[(bytes[i] >> 4) & 0xf];
++    out[(*at)++] = hex[bytes[i] & 0xf];
++  }
++  out[*at] = 0;
++}
++
++static void append_unit_bytecode(char* out, int* at, int capacity,
++                                 Method* seed, const char* name,
++                                 const char* signature) {
++  int written = jio_snprintf(out + *at, capacity - *at, "%s:", name);
++  if (written > 0) *at += written;
++  Method* found = nullptr;
++  InstanceKlass* holder = seed->method_holder();
++  for (int i = 0; i < holder->methods()->length(); i++) {
++    Method* candidate = holder->methods()->at(i);
++    if (candidate->name()->equals(name) && candidate->signature()->equals(signature)) {
++      found = candidate;
++      break;
++    }
++  }
++  if (found == nullptr) {
++    written = jio_snprintf(out + *at, capacity - *at, "missing");
++    if (written > 0) *at += written;
++    return;
++  }
++  append_hex(out, at, capacity,
++             (const unsigned char*)found->code_base(), found->code_size());
++}
++
++static bool fixture_class(Method* method) {
++  return method->method_holder()->name()->equals("ZeroBaselineFixture");
++}
++
++static bool static_int(Method* method, const char* name, const char* sig) {
++  return method->is_static() && method->result_type() == T_INT
++      && method->name()->equals(name) && method->signature()->equals(sig);
++}
++
++static bool code_is(Method* method, const unsigned char* expected, int length) {
++  return method->code_size() == length
++      && memcmp(method->code_base(), expected, (size_t)length) == 0;
++}
++
++static bool caller_code_is(Method* method) {
++  // The cp index is deliberately ignored; the opcode/operand shape is fixed.
++  const unsigned char* b = method->code_base();
++  return method->code_size() == 7 && b[0] == 0x1a && b[1] == 0xb8
++      && b[4] == 0x05 && b[5] == 0x68 && b[6] == 0xac;
++}
++
++static bool virtual_code_is(Method* method) {
++  // The constant-pool index varies with javac's pool layout; the invoke
++  // opcode, count, zero byte, and return shape are the verified contract.
++  const unsigned char* b = method->code_base();
++  return method->code_size() == 8 && b[0] == 0x2a && b[1] == 0x1b
++      && b[2] == 0xb9 && b[5] == 0x02 && b[6] == 0x00 && b[7] == 0xac;
++}
++
++static FixtureMethod verify(Method* method) {
++  if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
++    return NoMethod;
++  }
++  static const unsigned char leaf[] = {0x1a, 0x06, 0x60, 0xac};
++  static const unsigned char safe_div[] = {0x1a, 0x1b, 0x6c, 0xac,
++                                            0x4d, 0x02, 0xac};
++  if (static_int(method, "leaf", "(I)I") && method->is_final()
++      && code_is(method, leaf, sizeof(leaf))) return LeafMethod;
++  if (static_int(method, "caller", "(I)I") && method->is_final()
++      && caller_code_is(method)) return CallerMethod;
++  if (static_int(method, "virtualValue", "(LZeroBaselineFixture$Shape;I)I")
++      && virtual_code_is(method)) return VirtualMethod;
++  if (static_int(method, "safeDiv", "(II)I")
++      && code_is(method, safe_div, sizeof(safe_div))) return SafeDivMethod;
++  return NoMethod;
++}
++
++EM_JS(int, zbb_install, (const unsigned char* bytes, int length, const char* key,
++                          const char* content_key, int out_slots), {
++  globalThis.__mcwebZeroBaselineCache ||= Object.create(null);
++  const metadata = UTF8ToString(key);
++  const contentKey = UTF8ToString(content_key);
++  const cached = globalThis.__mcwebZeroBaselineCache[contentKey];
++  if (cached && cached.metadata === metadata) {
++    HEAP32[(out_slots >> 2) + 0] = cached.slots[0];
++    HEAP32[(out_slots >> 2) + 1] = cached.slots[1];
++    HEAP32[(out_slots >> 2) + 2] = cached.slots[2];
++    HEAP32[(out_slots >> 2) + 3] = cached.slots[3];
++    return cached.id;
++  }
++  try {
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    if (!WebAssembly.validate(binary)) return -1;
++    const module = new WebAssembly.Module(binary);
++    const instance = new WebAssembly.Instance(module, {});
++    // Installation is the only JS operation.  addFunction places the actual
++    // Wasm exports in the main Emscripten table with typed signatures; C++
++    // subsequently invokes these slots with call_indirect from the JVM Wasm.
++    const slots = [
++      addFunction(instance.exports.leaf, "ii"),
++      addFunction(instance.exports.caller, "ii"),
++      addFunction(instance.exports.virtualValue, "iii"),
++      addFunction(instance.exports.safeDiv, "iii")
++    ];
++    const id = globalThis.__mcwebZeroBaselineCache.__nextId || 1;
++    globalThis.__mcwebZeroBaselineCache.__nextId = id + 1;
++    globalThis.__mcwebZeroBaselineCache[contentKey] = {
++      id, metadata, bytes: length, instance, slots
++    };
++    HEAP32[(out_slots >> 2) + 0] = slots[0];
++    HEAP32[(out_slots >> 2) + 1] = slots[1];
++    HEAP32[(out_slots >> 2) + 2] = slots[2];
++    HEAP32[(out_slots >> 2) + 3] = slots[3];
++    if (typeof err === "function") {
++      err("[zbb] JS_INSTALL table-slots=" + slots.join(",") + " bytes=" + length);
++    }
++    return id;
++  } catch (error) {
++    if (!globalThis.__mcwebZeroBaselineCache.__error) {
++      globalThis.__mcwebZeroBaselineCache.__error = String(error);
++      if (typeof err === "function") err("[zbb] install failed: " + error);
++    }
++    return -1;
++  }
++});
++
++static THREAD_LOCAL int _module_id = -1;
++static THREAD_LOCAL int _table_slots[4] = {-1, -1, -1, -1};
++static THREAD_LOCAL uint64_t _compiled = 0;
++static THREAD_LOCAL uint64_t _js_installs = 0;
++static THREAD_LOCAL uint64_t _table_calls = 0;
++static THREAD_LOCAL uint64_t _returned = 0;
++static THREAD_LOCAL uint64_t _deopt = 0;
++static THREAD_LOCAL uint64_t _exception_resume = 0;
++
++typedef jint (*ZbbOneArg)(jint);
++typedef jint (*ZbbTwoArg)(jint, jint);
++
++static jint table_call1(int slot, jint value) {
++  _table_calls++;
++  if (ZeroWasmBaselineVerbose && _table_calls == 1) {
++    tty->print_cr("[zbb] TABLE_CALL hot=main-wasm slot=%d signature=ii", slot);
++  }
++  return ((ZbbOneArg)(intptr_t)slot)(value);
++}
++
++static jint table_call2(int slot, jint first, jint second) {
++  _table_calls++;
++  if (ZeroWasmBaselineVerbose && _table_calls == 1) {
++    tty->print_cr("[zbb] TABLE_CALL hot=main-wasm slot=%d signature=iii", slot);
++  }
++  return ((ZbbTwoArg)(intptr_t)slot)(first, second);
++}
++
++static int make_module(Method* method, char* metadata, int metadata_capacity,
++                       char* content_key, int content_capacity) {
++  int at = jio_snprintf(metadata, metadata_capacity,
++      "abi=%s;compiler=%s;class=%s;method=leaf(I)I|caller(I)I|"
++      "virtualValue(LZeroBaselineFixture$Shape;I)I|safeDiv(II)I;"
++      "jar=%s;classHash=%s;dependencies=%s;features=%s;unit-bytecode=",
++      kRuntimeAbi, kCompilerVersion, method->method_holder()->name()->as_C_string(),
++      ZeroWasmBaselineJarHash == nullptr ? "unset" : ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash == nullptr ? "unset" : ZeroWasmBaselineClassHash,
++      ZeroWasmBaselineDependencyHashes == nullptr ? "unset" : ZeroWasmBaselineDependencyHashes,
++      kWasmFeatures);
++  if (at < 0 || at >= metadata_capacity) return -1;
++  append_unit_bytecode(metadata, &at, metadata_capacity, method,
++                       "leaf", "(I)I");
++  if (at + 1 < metadata_capacity) metadata[at++] = '|';
++  append_unit_bytecode(metadata, &at, metadata_capacity, method,
++                       "caller", "(I)I");
++  if (at + 1 < metadata_capacity) metadata[at++] = '|';
++  append_unit_bytecode(metadata, &at, metadata_capacity, method,
++                       "virtualValue", "(LZeroBaselineFixture$Shape;I)I");
++  if (at + 1 < metadata_capacity) metadata[at++] = '|';
++  append_unit_bytecode(metadata, &at, metadata_capacity, method,
++                       "safeDiv", "(II)I");
++  if (at + 1 < metadata_capacity) metadata[at++] = 0;
++  uint64_t digest = fnv1a(metadata);
++  jio_snprintf(content_key, content_capacity, "%016llx",
++               (unsigned long long)digest);
++
++  WasmBuf module;
++  int length = build_module(module);
++  if (_module_id < 0) {
++    _module_id = zbb_install(module.data(), length, metadata, content_key,
++                             (int)(intptr_t)_table_slots);
++    if (_module_id >= 0) {
++      _compiled++;
++      _js_installs++;
++      if (ZeroWasmBaselineVerbose) {
++        tty->print_cr("[zbb] JS_INSTALL complete slots=%d,%d,%d,%d",
++                      _table_slots[0], _table_slots[1],
++                      _table_slots[2], _table_slots[3]);
++        tty->print_cr("[zbb] module direct-call caller->leaf wasm-call=0 bytes=%d key=%s content=%s",
++                      length, metadata, content_key);
++      }
++    }
++  }
++  return length;
++}
++
++static void push_int(intptr_t** tos, jint value) {
++  intptr_t* top = *tos;
++  *((jint*)&top[0]) = value;
++  *tos = top - 1;
++}
++
++static void push_oop(intptr_t** tos, oop value) {
++  intptr_t* top = *tos;
++  *((oop*)&top[0]) = value;
++  *tos = top - 1;
++}
++
++static void return_int(intptr_t** tos, jint value, address* pc,
++                       address code_base, int code_size) {
++  push_int(tos, value);
++  *pc = code_base + code_size - 1; // fixture's ireturn
++  _returned++;
++}
++
++} // namespace
++
++ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, void* /*istate*/) {
++  if (!UseZeroWasmBaseline || !fixture_class(method)) return NotRun;
++  if (ZeroWasmBaselineOnly != nullptr
++      && strstr(method->name()->as_C_string(), ZeroWasmBaselineOnly) == nullptr) {
++    return NotRun;
++  }
++
++  FixtureMethod kind = verify(method);
++  if (kind == NoMethod) return NotRun;
++
++  ResourceMark rm; // protects the Symbol C strings used by the cache manifest
++  char metadata[4096];
++  char content_key[32];
++  int module_bytes = make_module(method, metadata, sizeof(metadata),
++                                 content_key, sizeof(content_key));
++  if (module_bytes <= 0 || _module_id < 0) return NotRun;
++
++  switch (kind) {
++    case LeafMethod: {
++      jint result = table_call1(_table_slots[FnLeaf], (jint)locals[0]);
++      return_int(tos, result, pc, code_base, method->code_size());
++      return Returned;
++    }
++    case CallerMethod: {
++      // The only nested call is the Wasm call instruction emitted in
++      // emit_caller. No JS function, Zero frame, or interpreter dispatch is
++      // reached between caller and leaf.
++      jint result = table_call1(_table_slots[FnCaller], (jint)locals[0]);
++      return_int(tos, result, pc, code_base, method->code_size());
++      return Returned;
++    }
++    case VirtualMethod: {
++      oop receiver = cast_to_oop((void*)locals[0]);
++      if (receiver == nullptr) return NotRun; // interpreter throws NPE
++      jint x = (jint)locals[-1];
++      jint tag = receiver->klass()->name()->equals("ZeroBaselineFixture$Good") ? 1 : 0;
++      jint result = table_call2(_table_slots[FnVirtual], tag, x);
++      if (tag == 1 && result != DEOPT_SENTINEL) {
++        return_int(tos, result, pc, code_base, method->code_size());
++        return Returned;
++      }
++      // Rebuild the exact operand stack expected at invokeinterface bci 2.
++      // The receiver remains a real oop in the Zero locals and is copied with
++      // oop type, so a later GC sees the same reference as interpretation.
++      push_oop(tos, receiver);
++      push_int(tos, x);
++      *pc = code_base + 2;
++      _deopt++;
++      if (ZeroWasmBaselineVerbose) {
++        tty->print_cr("[zbb] DEOPT virtualValue @2 receiver-guard tag=%d resume-bci=2", tag);
++      }
++      return DeoptResume;
++    }
++    case SafeDivMethod: {
++      jint x = (jint)locals[0];
++      jint y = (jint)locals[-1];
++      jint result = table_call2(_table_slots[FnSafeDiv], x, y);
++      if (y != 0 && result != DEOPT_SENTINEL) {
++        return_int(tos, result, pc, code_base, method->code_size());
++        return Returned;
++      }
++      // Re-execute idiv at bci 2.  The interpreter then creates the actual
++      // ArithmeticException and searches the real exception table, preserving
++      // the Java-visible catch/uncaught behavior rather than inventing a JS
++      // exception object.
++      push_int(tos, x);
++      push_int(tos, y);
++      *pc = code_base + 2;
++      _exception_resume++;
++      if (ZeroWasmBaselineVerbose) {
++        tty->print_cr("[zbb] EXCEPTION_RESUME safeDiv @2 status=EXCEPTION resume-bci=2");
++      }
++      return ExceptionResume;
++    }
++    default:
++      return NotRun;
++  }
++}
++
++void ZeroWasmBaseline::print_statistics() {
++  tty->print_cr("[zbb] compiled=%llu js-installs=%llu table-calls=%llu returned=%llu deopt=%llu exception-resume=%llu",
++                (unsigned long long)_compiled,
++                (unsigned long long)_js_installs,
++                (unsigned long long)_table_calls,
++                (unsigned long long)_returned,
++                (unsigned long long)_deopt,
++                (unsigned long long)_exception_resume);
++}
++
++#endif // __EMSCRIPTEN__

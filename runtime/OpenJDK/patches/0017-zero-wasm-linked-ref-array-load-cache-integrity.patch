@@ -1,0 +1,278 @@
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -1988,13 +1988,24 @@
+     const sameBytes = (left, right) => left instanceof Uint8Array
+         && left.length === right.length
+         && left.every((value, i) => value === right[i]);
++    let cachedExportMatches = false;
++    if (cached) {
++      try {
++        cachedExportMatches = typeof getWasmTableEntry === "function"
++            && getWasmTableEntry(cached.ownedSlot) === cached.export;
++      } catch (error) {
++        cachedExportMatches = false;
++      }
++    }
+     if (cached) {
+       if (cached.compiler !== compiler || cached.digest !== digest
+           || cached.bytes !== length || !sameBytes(cached.binary, binary)
+           || cached.metadata !== metadata || cached.memory !== importedMemory
+           || !cached.instance || cached.slot < 0
+           || !Number.isInteger(cached.ownedSlot)
+-          || cached.slot !== cached.ownedSlot) {
++          || cached.slot !== cached.ownedSlot || !cachedExportMatches) {
++        const poisoning = cache.__pendingPoison === true;
++        const poisonCallable = cache.__poisonCallable;
+         const oldSlot = cached.slot;
+         const oldInstance = cached.instance;
+         // ownedSlot is defined non-writable/non-configurable on every cache
+@@ -2003,12 +2014,19 @@
+         const ownedSlot = cached.ownedSlot;
+         let oldCallable = false;
+         let callableProbe = false;
++        let poisonVisible = false;
++        let oldExportVisible = false;
+         try {
+           if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
+-          oldCallable = typeof getWasmTableEntry(ownedSlot) === "function";
++          const visible = getWasmTableEntry(ownedSlot);
++          oldCallable = typeof visible === "function";
++          poisonVisible = poisoning && visible === poisonCallable;
++          oldExportVisible = visible === cached.export;
+           callableProbe = true;
+         } catch (error) {
+           oldCallable = false;
++          poisonVisible = false;
++          oldExportVisible = false;
+         }
+         // Detach the cache before attempting release. Even a missing runtime
+         // cleanup primitive must not leave a poisoned key or last-instance
+@@ -2037,10 +2055,33 @@
+         } catch (error) {
+           oldCallableAfter = false;
+         }
++        // In the supported poison sequence the owned slot itself is the
++        // poisoned slot. removeFunction(ownedSlot) above therefore removes
++        // exactly one callable; there is no second slot to release.
++        const poisonRemoved = !poisoning || removed;
++        let poisonCallableAfter = false;
++        if (poisoning) {
++          try {
++            if (typeof getWasmTableEntry !== "function") throw new Error("missing table probe");
++            const after = getWasmTableEntry(ownedSlot);
++            poisonCallableAfter = typeof after === "function"
++                || after === poisonCallable;
++          } catch (error) {
++            poisonCallableAfter = false;
++          }
++        }
++        const cacheIdentityProven = poisoning
++            ? !cachedExportMatches && poisonVisible && !oldExportVisible
++                && poisonRemoved && !poisonCallableAfter
++            : cachedExportMatches;
+         const cleanupProven = removed && callableProbe && oldCallable
+-            && !oldCallableAfter;
++            && cacheIdentityProven && !oldCallableAfter;
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
+         cache.__lastInvalidation = {
+-          oldSlot, ownedSlot, oldInstance, oldCallable, oldCallableAfter, removed,
++          oldSlot, ownedSlot, oldInstance, oldCallable, cachedExportMatches,
++          oldCallableAfter, removed, poisoning, poisonVisible,
++          oldExportVisible, poisonRemoved, poisonCallableAfter,
+           cleanupProven, metadataCleared: !cache[metadata],
+           lastInstanceCleared: cache.__lastInstance === null
+         };
+@@ -2049,7 +2090,11 @@
+               "[zbg] JS_CACHE_CLEANUP_UNSUPPORTED ref-array-load "
+               + "detached=1 removed=" + (removed ? "1" : "0")
+               + " table-probe=" + (callableProbe ? "1" : "0")
+-              + " old-callable-after=" + (oldCallableAfter ? "1" : "0"));
++              + " old-callable-after=" + (oldCallableAfter ? "1" : "0")
++              + " poisoning=" + (poisoning ? "1" : "0")
++              + " poison-visible=" + (poisonVisible ? "1" : "0")
++              + " poison-removed=" + (poisonRemoved ? "1" : "0")
++              + " poison-callable-after=" + (poisonCallableAfter ? "1" : "0"));
+           return -1;
+         }
+         if (typeof err === "function") err(
+@@ -2057,7 +2102,13 @@
+             + " owned-slot=" + ownedSlot
+             + " removed=" + (removed ? "1" : "0")
+             + " old-callable=" + (oldCallable ? "1" : "0")
++            + " export-match=" + (cachedExportMatches ? "1" : "0")
+             + " old-callable-after=" + (oldCallableAfter ? "1" : "0")
++            + " poisoning=" + (poisoning ? "1" : "0")
++            + " poison-visible=" + (poisonVisible ? "1" : "0")
++            + " old-export-visible=" + (oldExportVisible ? "1" : "0")
++            + " poison-removed=" + (poisonRemoved ? "1" : "0")
++            + " poison-callable-after=" + (poisonCallableAfter ? "1" : "0")
+             + " instance-cleared=1 cache-cleared=1 last-instance-cleared=1");
+         return -1;
+       }
+@@ -2095,7 +2146,8 @@
+     const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
+       env: { memory: wasmMemory }
+     });
+-    if (typeof instance.exports.referenceArrayLoad !== "function") {
++    const exportedLoad = instance.exports.referenceArrayLoad;
++    if (typeof exportedLoad !== "function") {
+       if (typeof console !== "undefined") console.error(
+           "[zbg] ref-array install reject=missing-export");
+       return -1;
+@@ -2110,7 +2162,7 @@
+           "[zbg] ref-array install reject=missing-removeFunction");
+       return -1;
+     }
+-    installedSlot = addFunction(instance.exports.referenceArrayLoad, "jiii");
++    installedSlot = addFunction(exportedLoad, "jiii");
+     if (!Number.isInteger(installedSlot) || installedSlot < 0) {
+       if (typeof console !== "undefined") console.error(
+           "[zbg] ref-array install reject=invalid-slot");
+@@ -2122,6 +2174,9 @@
+       id, metadata, bytes: length, binary, instance, slot: installedSlot, compiler, digest,
+       memory: importedMemory, memoryPages
+     };
++    Object.defineProperty(cache[metadata], "export", {
++      value: exportedLoad, writable: false, configurable: false, enumerable: true
++    });
+     Object.defineProperty(cache[metadata], "ownedSlot", {
+       value: installedSlot, writable: false, configurable: false, enumerable: true
+     });
+@@ -2169,6 +2224,8 @@
+   // Do not let a stale diagnostic object satisfy a later mutation if the
+   // release/install sequence fails before producing a new invalidation.
+   cache.__lastInvalidation = null;
++  cache.__pendingPoison = false;
++  cache.__poisonCallable = null;
+   switch (mutation) {
+     case "compiler": cached.compiler = "mutated-compiler"; break;
+     case "digest": cached.digest = "deadbeefdeadbeef"; break;
+@@ -2186,6 +2243,94 @@
+       }
+       break;
+     case "metadata": cached.metadata = metadata + "#mutated"; break;
++    case "poison": {
++      let originalRemoved = false;
++      let allocatedPoisonSlot = -1;
++      try {
++        if (typeof addFunction !== "function"
++            || typeof getWasmTableEntry !== "function"
++            || typeof removeFunction !== "function"
++            || !Number.isInteger(cached.ownedSlot) || cached.ownedSlot < 0) {
++          throw new Error("missing callable table poison primitives");
++        }
++        const original = getWasmTableEntry(cached.ownedSlot);
++        if (typeof original !== "function") {
++          throw new Error("owned table slot is not callable");
++        }
++        // Use only Emscripten's supported table API. The allocator must
++        // recycle the exact owned slot, otherwise this diagnostic is
++        // unsupported and fails closed without touching another slot.
++        removeFunction(cached.ownedSlot);
++        originalRemoved = true;
++        const originalAfter = getWasmTableEntry(cached.ownedSlot);
++        if (typeof originalAfter === "function" || originalAfter === original) {
++          throw new Error("owned callable was not removed");
++        }
++        const poisoned = (...args) => 0n;
++        allocatedPoisonSlot = addFunction(poisoned, "jiii");
++        const poisonCallable = getWasmTableEntry(allocatedPoisonSlot);
++        if (allocatedPoisonSlot !== cached.ownedSlot
++            || typeof poisonCallable !== "function"
++            || poisonCallable === original) {
++          throw new Error("owned table slot was not recycled");
++        }
++        if (getWasmTableEntry(cached.ownedSlot) !== poisonCallable) {
++          throw new Error("poisoned table entry was not visible");
++        }
++        cache.__poisonCallable = poisonCallable;
++        cache.__pendingPoison = true;
++      } catch (error) {
++        // Poison setup is transactional. If allocation or exact-slot reuse
++        // fails after removing the original, remove the allocated poison once
++        // and quarantine the detached cache record; never leave stale
++        // metadata or a callable cache entry for a later hit.
++        let poisonCleanup = allocatedPoisonSlot < 0;
++        if (allocatedPoisonSlot >= 0 && typeof removeFunction === "function") {
++          try {
++            removeFunction(allocatedPoisonSlot);
++            const poisonAfter = getWasmTableEntry(allocatedPoisonSlot);
++            poisonCleanup = typeof poisonAfter !== "function";
++          } catch (cleanupError) {
++            if (typeof console !== "undefined") console.error(
++                "[zbg] ref-array-load cache poison cleanup reject " + cleanupError);
++          }
++        }
++        if (originalRemoved) {
++          cached.slot = -1;
++          cached.instance = null;
++          cached.binary = null;
++          cached.memory = null;
++          delete cache[metadata];
++          cache.__lastInstance = null;
++        }
++        let oldSlotCleared = true;
++        if (originalRemoved && typeof getWasmTableEntry === "function") {
++          try {
++            oldSlotCleared = typeof getWasmTableEntry(cached.ownedSlot) !== "function";
++          } catch (probeError) {
++            oldSlotCleared = false;
++          }
++        }
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
++        cache.__lastInvalidation = {
++          setupFailed: true, originalRemoved, allocatedPoisonSlot,
++          poisonCleanup, oldSlotCleared, metadataCleared: !cache[metadata],
++          lastInstanceCleared: cache.__lastInstance === null
++        };
++        if (typeof console !== "undefined") console.error(
++            "[zbg] ref-array-load cache poison reject " + error
++            + " original-removed=" + (originalRemoved ? "1" : "0")
++            + " poison-slot=" + allocatedPoisonSlot
++            + " poison-cleanup=" + (poisonCleanup ? "1" : "0")
++            + " old-slot-cleared=" + (oldSlotCleared ? "1" : "0")
++            + " metadata-cleared=" + (!cache[metadata] ? "1" : "0")
++            + " last-instance-cleared="
++            + (cache.__lastInstance === null ? "1" : "0"));
++        return -1;
++      }
++      break;
++    }
+     default: return -1;
+   }
+   const oldId = cached.id;
+@@ -2194,10 +2339,17 @@
+   const oldInstance = cached.instance;
+   const missId = install(bytes, length, key, out_slot, 0);
+   const invalidation = cache.__lastInvalidation;
++  const poisonProof = mutation === "poison"
++      ? invalidation && invalidation.poisoning
++          && !invalidation.cachedExportMatches
++          && invalidation.poisonVisible && !invalidation.oldExportVisible
++          && invalidation.poisonRemoved && !invalidation.poisonCallableAfter
++      : invalidation && invalidation.cachedExportMatches;
+   if (missId >= 0 || !invalidation || !invalidation.removed
+       || invalidation.oldSlot !== oldSlot
+       || invalidation.ownedSlot !== oldOwnedSlot
+       || invalidation.oldInstance !== oldInstance
++      || !poisonProof
+       || invalidation.oldCallableAfter
+       || !invalidation.cleanupProven
+       || !invalidation.metadataCleared
+@@ -2222,6 +2374,12 @@
+       + " old-owned-slot=" + oldOwnedSlot
+       + " slot-reused=" + (oldSlot === newSlot ? "1" : "0")
+       + " old-callable-before=" + (invalidation.oldCallable ? "1" : "0")
++      + " export-match=" + (invalidation.cachedExportMatches ? "1" : "0")
++      + " poisoning=" + (invalidation.poisoning ? "1" : "0")
++      + " poison-visible=" + (invalidation.poisonVisible ? "1" : "0")
++      + " old-export-visible=" + (invalidation.oldExportVisible ? "1" : "0")
++      + " poison-removed=" + (invalidation.poisonRemoved ? "1" : "0")
++      + " poison-callable-after=" + (invalidation.poisonCallableAfter ? "1" : "0")
+       + " old-callable-after=0 removed=1 instance-reused=0"
+       + " cache-cleared=1 last-instance-cleared=1 bytes-exact=1");
+   return freshId;
+

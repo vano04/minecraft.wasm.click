@@ -1,0 +1,885 @@
+{
+  "schema": 1,
+  "kind": "public-browser-runtime",
+  "version": "26.3",
+  "base": {
+    "release": "20261025-server-pack-shaders-7ee89eb8",
+    "manifestSha256": "05b50c993086dbae8ab3ba873bf4884054fa19bebf00890e3278209aac695f3d",
+    "sourceTreeSha256": "7ee89eb850b124ea3851fbb804cc4468790fd2f5daf3b20ad5dbe2e230eb9632"
+  },
+  "archive": {
+    "path": "runtime.tar.gz",
+    "bytes": 83317663,
+    "sha256": "dd8e7c7f7cad4c7db26b1253c9ff865579d45a40c9ccb0d0ab95218f9658807a",
+    "filesBytes": 126860780,
+    "tarBytes": 126939648
+  },
+  "excluded": [
+    {
+      "path": "mc-relay.mjs",
+      "bytes": 58316,
+      "sha256": "dbb29961b10b07b2b2c00817bd4f79aac53ad050c1f0afca4af3429859678385",
+      "reason": "development server module"
+    },
+    {
+      "path": "serve.mjs",
+      "bytes": 5161,
+      "sha256": "069a5c83a98b6acb8a101a2faf4132d616f4d0eb25934ed84acfd8ad1b31a387",
+      "reason": "development server module"
+    }
+  ],
+  "files": {
+    "THIRD-PARTY.json": {
+      "bytes": 16691,
+      "sha256": "3dcbfad9b5fbb87cecfab173db7831b30d247bcbc716c6ca2cadc3f40ba89061",
+      "baseBytes": 16691,
+      "baseSha256": "3dcbfad9b5fbb87cecfab173db7831b30d247bcbc716c6ca2cadc3f40ba89061",
+      "operations": []
+    },
+    "aes-js.LICENSE.txt": {
+      "bytes": 1081,
+      "sha256": "f355888c279a510c9c36210feea122aee628c79a989d89ca7e86ec4b54f699aa",
+      "baseBytes": 1081,
+      "baseSha256": "f355888c279a510c9c36210feea122aee628c79a989d89ca7e86ec4b54f699aa",
+      "operations": []
+    },
+    "aes-js.js": {
+      "bytes": 63732,
+      "sha256": "579277f6e64049ff523b1fd6d6ce1bc9bd2b16b6253dac9862a02665e9bf103d",
+      "baseBytes": 63732,
+      "baseSha256": "579277f6e64049ff523b1fd6d6ce1bc9bd2b16b6253dac9862a02665e9bf103d",
+      "operations": []
+    },
+    "audio-host.js": {
+      "bytes": 35928,
+      "sha256": "f11ac8094dad393f9e3622874360a1ed53e25eca82fa0725a36b86f8887f7b62",
+      "baseBytes": 35928,
+      "baseSha256": "f11ac8094dad393f9e3622874360a1ed53e25eca82fa0725a36b86f8887f7b62",
+      "operations": []
+    },
+    "frame-backpressure.mjs": {
+      "bytes": 2150,
+      "sha256": "0be2f9bfee25671b8d6afb64db3085c12b03c3f0109688192749d4d822558a71",
+      "baseBytes": 2150,
+      "baseSha256": "0be2f9bfee25671b8d6afb64db3085c12b03c3f0109688192749d4d822558a71",
+      "operations": []
+    },
+    "game-controls.css": {
+      "bytes": 11604,
+      "sha256": "c5cee6de6ee1c4fcbe44c199b893af94de5994c80a714d6ae12e4ce23dd60116",
+      "baseBytes": 11604,
+      "baseSha256": "c5cee6de6ee1c4fcbe44c199b893af94de5994c80a714d6ae12e4ce23dd60116",
+      "operations": []
+    },
+    "game-controls.js": {
+      "bytes": 95846,
+      "sha256": "80499d964ec486625b51bdda90357a6634a9f45cd5b1b3dea6bf591dcb94d0c6",
+      "baseBytes": 95846,
+      "baseSha256": "80499d964ec486625b51bdda90357a6634a9f45cd5b1b3dea6bf591dcb94d0c6",
+      "operations": []
+    },
+    "gpu-rpc-worker.js": {
+      "bytes": 41452,
+      "sha256": "27e7ef48a679f2926e57f804d6e8b7e7c3c63d358dd322620134f4ce198227e5",
+      "baseBytes": 41452,
+      "baseSha256": "27e7ef48a679f2926e57f804d6e8b7e7c3c63d358dd322620134f4ce198227e5",
+      "operations": []
+    },
+    "index.html": {
+      "bytes": 42853,
+      "sha256": "9cc93b0747d4ba0d7de40251231282ba21d5f127c385b438e3080c814be2792f",
+      "baseBytes": 42853,
+      "baseSha256": "35f0bbec41213231bd85ee6afb539cb9b643dc23006c01c2877bb3ed35156d5a",
+      "operations": [
+        {
+          "operation": "update-loader-integrity-record",
+          "target": "javavm.js",
+          "count": 1
+        }
+      ]
+    },
+    "jar-massage.js": {
+      "bytes": 42551,
+      "sha256": "7a487f8e5e7fa259a8fab421fd88be7cc5c5584fb8ece7fbff2b4632ff204d19",
+      "baseBytes": 42551,
+      "baseSha256": "7a487f8e5e7fa259a8fab421fd88be7cc5c5584fb8ece7fbff2b4632ff204d19",
+      "operations": []
+    },
+    "javavm.data": {
+      "bytes": 43197241,
+      "sha256": "d96c679599916ee7b74c2c49bd4d8445d4f8a99bf3c9dee1043b1b665c4a9e33",
+      "baseBytes": 43197241,
+      "baseSha256": "d96c679599916ee7b74c2c49bd4d8445d4f8a99bf3c9dee1043b1b665c4a9e33",
+      "operations": []
+    },
+    "javavm.js": {
+      "bytes": 2395921,
+      "sha256": "790e4b7ebb2543ccb4c1e60ca3ebbc41d51d540b0bd7a376448d9f342dda6ffd",
+      "baseBytes": 2396278,
+      "baseSha256": "3902eedc8da07c6232bba31e661baf39a8b4860bcec05a1b4963c7e3beef9e8c",
+      "operations": [
+        {
+          "operation": "neutralize-build-prefix",
+          "replacement": "/build/runtime/",
+          "count": 7,
+          "sameLength": false,
+          "originalPrefixBytes": 66,
+          "replacementPrefixBytes": 15
+        }
+      ]
+    },
+    "javavm.wasm": {
+      "bytes": 1581145,
+      "sha256": "5d3e2c3397da02ebd53f41ac8ce8aa275c9e85ec0fe3f206af465397c2702622",
+      "baseBytes": 1581145,
+      "baseSha256": "5d3e2c3397da02ebd53f41ac8ce8aa275c9e85ec0fe3f206af465397c2702622",
+      "operations": []
+    },
+    "launch-display.js": {
+      "bytes": 8836,
+      "sha256": "73d117fac31434511fe03d76bd51397c244dbab41d9a7081add698b725b5cbd9",
+      "baseBytes": 8836,
+      "baseSha256": "73d117fac31434511fe03d76bd51397c244dbab41d9a7081add698b725b5cbd9",
+      "operations": []
+    },
+    "libextnet.so": {
+      "bytes": 4502,
+      "sha256": "5c4fc2f17280d7999fa880ee63cad5d842beaed6ec65af15381894a726a4e2d6",
+      "baseBytes": 4502,
+      "baseSha256": "5c4fc2f17280d7999fa880ee63cad5d842beaed6ec65af15381894a726a4e2d6",
+      "operations": []
+    },
+    "libfallbackLinker.so": {
+      "bytes": 22078,
+      "sha256": "a2f1935c9b6a2d684de0bd2f41f2703dd9ba6696818afac5f9a60e11e13996c8",
+      "baseBytes": 22078,
+      "baseSha256": "a2f1935c9b6a2d684de0bd2f41f2703dd9ba6696818afac5f9a60e11e13996c8",
+      "operations": []
+    },
+    "libinstrument.so": {
+      "bytes": 32219,
+      "sha256": "dce476d960ab999a259c370d81d9b7f93b4688c0d9a7ef1bcfec08670efd209e",
+      "baseBytes": 32219,
+      "baseSha256": "dce476d960ab999a259c370d81d9b7f93b4688c0d9a7ef1bcfec08670efd209e",
+      "operations": []
+    },
+    "libj2gss.so": {
+      "bytes": 35707,
+      "sha256": "f95a8d0f807981335767d0b260c8bf4393b705ea7ea11504acfeec7f390bc353",
+      "baseBytes": 35707,
+      "baseSha256": "f95a8d0f807981335767d0b260c8bf4393b705ea7ea11504acfeec7f390bc353",
+      "operations": []
+    },
+    "libj2pcsc.so": {
+      "bytes": 8900,
+      "sha256": "fe535ec8df2e76c01cbb83551407dac98c9e79324baff7dc210299b9e987967d",
+      "baseBytes": 8900,
+      "baseSha256": "fe535ec8df2e76c01cbb83551407dac98c9e79324baff7dc210299b9e987967d",
+      "operations": []
+    },
+    "libj2pkcs11.so": {
+      "bytes": 65640,
+      "sha256": "dc6bf39ad162c024fb413f1cb7ce55ba3e334d28821f30019cacc7ba360f8124",
+      "baseBytes": 65640,
+      "baseSha256": "dc6bf39ad162c024fb413f1cb7ce55ba3e334d28821f30019cacc7ba360f8124",
+      "operations": []
+    },
+    "libjaas.so": {
+      "bytes": 2051,
+      "sha256": "365825b3f9fdca159f7386cca0ff5dad90ccb4bc1d32538b3bd9574d763d28ca",
+      "baseBytes": 2051,
+      "baseSha256": "365825b3f9fdca159f7386cca0ff5dad90ccb4bc1d32538b3bd9574d763d28ca",
+      "operations": []
+    },
+    "libjava.so": {
+      "bytes": 88878,
+      "sha256": "49ffb5999ff91695d92607622bf5a6055db04cebd1adae3748153cfa1ae1a3e9",
+      "baseBytes": 88878,
+      "baseSha256": "49ffb5999ff91695d92607622bf5a6055db04cebd1adae3748153cfa1ae1a3e9",
+      "operations": []
+    },
+    "libjimage.so": {
+      "bytes": 12047,
+      "sha256": "91184fbb1af057c1ad78497903b94350a650d6c35fa3dbdf0e86548f2dc3ac48",
+      "baseBytes": 12047,
+      "baseSha256": "91184fbb1af057c1ad78497903b94350a650d6c35fa3dbdf0e86548f2dc3ac48",
+      "operations": []
+    },
+    "libjli.so": {
+      "bytes": 73493,
+      "sha256": "52a2cff616edc55ed0154faaf36d010b005ceeda22f0f1520e94bb38dd853167",
+      "baseBytes": 73493,
+      "baseSha256": "52a2cff616edc55ed0154faaf36d010b005ceeda22f0f1520e94bb38dd853167",
+      "operations": []
+    },
+    "libjsig.so": {
+      "bytes": 3439,
+      "sha256": "01c267aee86fc0b65e9136a9d35c3fd5c5edb8d8cb8e3116fcd8989db24d963e",
+      "baseBytes": 3439,
+      "baseSha256": "01c267aee86fc0b65e9136a9d35c3fd5c5edb8d8cb8e3116fcd8989db24d963e",
+      "operations": []
+    },
+    "libjvm.so": {
+      "bytes": 4940726,
+      "sha256": "b9f56ceb5735e0c2724b10a59074b4c9d4749aeeec46e8531acfb14f06adbcbb",
+      "baseBytes": 4940726,
+      "baseSha256": "b9f56ceb5735e0c2724b10a59074b4c9d4749aeeec46e8531acfb14f06adbcbb",
+      "operations": []
+    },
+    "libmanagement.so": {
+      "bytes": 9101,
+      "sha256": "7aafccc8ed33be199b4627155826042ab4fc5dfe361dca435d5cff7474004322",
+      "baseBytes": 9101,
+      "baseSha256": "7aafccc8ed33be199b4627155826042ab4fc5dfe361dca435d5cff7474004322",
+      "operations": []
+    },
+    "libmcwebjs.so": {
+      "bytes": 103381,
+      "sha256": "2a900bc0f2c2b8a5b0f90d0cb0963ed7cd0b5f7965f771507a5827fbca881139",
+      "baseBytes": 103381,
+      "baseSha256": "2a900bc0f2c2b8a5b0f90d0cb0963ed7cd0b5f7965f771507a5827fbca881139",
+      "operations": []
+    },
+    "libnet.so": {
+      "bytes": 36718,
+      "sha256": "3f97ccf26732265c4650633d3dc155bdec330d90f4000bc60116a6a2d427b83f",
+      "baseBytes": 36718,
+      "baseSha256": "3f97ccf26732265c4650633d3dc155bdec330d90f4000bc60116a6a2d427b83f",
+      "operations": []
+    },
+    "libnio.so": {
+      "bytes": 45447,
+      "sha256": "99a6c67713e8880cdc5ec742eb1b6f1b17f3f9657af66a18323a40d346c2b0dc",
+      "baseBytes": 45447,
+      "baseSha256": "99a6c67713e8880cdc5ec742eb1b6f1b17f3f9657af66a18323a40d346c2b0dc",
+      "operations": []
+    },
+    "libprefs.so": {
+      "bytes": 1559,
+      "sha256": "b5ab69b2c2dab6f848d1d0bf72d6b2ab24a46ad3dec8ad0d8bad43f8a8952378",
+      "baseBytes": 1559,
+      "baseSha256": "b5ab69b2c2dab6f848d1d0bf72d6b2ab24a46ad3dec8ad0d8bad43f8a8952378",
+      "operations": []
+    },
+    "librmi.so": {
+      "bytes": 645,
+      "sha256": "ac198cae8d17c49f3c2393c8f24714c7dfb7a23829281c3f58298e65030048e6",
+      "baseBytes": 645,
+      "baseSha256": "ac198cae8d17c49f3c2393c8f24714c7dfb7a23829281c3f58298e65030048e6",
+      "operations": []
+    },
+    "libsyslookup.so": {
+      "bytes": 527,
+      "sha256": "04a54095aa9c0630825eee2cb0b5d8557bf16a2489167928c4e3aa6eb1a7bd94",
+      "baseBytes": 527,
+      "baseSha256": "04a54095aa9c0630825eee2cb0b5d8557bf16a2489167928c4e3aa6eb1a7bd94",
+      "operations": []
+    },
+    "libverify.so": {
+      "bytes": 63835,
+      "sha256": "80b68bf3e1557e3cf7a3329655a65b97aa80161d409af1e239c8804a6cd10cc7",
+      "baseBytes": 63835,
+      "baseSha256": "80b68bf3e1557e3cf7a3329655a65b97aa80161d409af1e239c8804a6cd10cc7",
+      "operations": []
+    },
+    "libzip.so": {
+      "bytes": 77794,
+      "sha256": "8895bb2fe3b9b73c5713995feb845607745d66cc33918604f475e6ad49b66f42",
+      "baseBytes": 77794,
+      "baseSha256": "8895bb2fe3b9b73c5713995feb845607745d66cc33918604f475e6ad49b66f42",
+      "operations": []
+    },
+    "mc-net.js": {
+      "bytes": 16942,
+      "sha256": "5ccb52b80d9717c3e3527a6d553495df92589d5d572c48bc8f5f941be270c517",
+      "baseBytes": 16942,
+      "baseSha256": "5ccb52b80d9717c3e3527a6d553495df92589d5d572c48bc8f5f941be270c517",
+      "operations": []
+    },
+    "mc-wisp-socket.js": {
+      "bytes": 2723,
+      "sha256": "0fb9a20aa48efc9be9c7b471c26cc07ca5f78851ff93cd38cda0c6834c71ec4a",
+      "baseBytes": 2723,
+      "baseSha256": "0fb9a20aa48efc9be9c7b471c26cc07ca5f78851ff93cd38cda0c6834c71ec4a",
+      "operations": []
+    },
+    "mc-wisp-worker.js": {
+      "bytes": 11983,
+      "sha256": "6f9f006b3b68905af78149e974c1aebe3711d433b9fe0ad69d0c5f329511c901",
+      "baseBytes": 11983,
+      "baseSha256": "6f9f006b3b68905af78149e974c1aebe3711d433b9fe0ad69d0c5f329511c901",
+      "operations": []
+    },
+    "memory-profile-worker.js": {
+      "bytes": 18794,
+      "sha256": "b1b9d3b9c7c25c9364873f8708c49757d096269c947d7f52ab1a0f1c269a7ba5",
+      "baseBytes": 18794,
+      "baseSha256": "b1b9d3b9c7c25c9364873f8708c49757d096269c947d7f52ab1a0f1c269a7ba5",
+      "operations": []
+    },
+    "memory-profile.js": {
+      "bytes": 38813,
+      "sha256": "8b78225c280ce9a4dd1e494e8d810522f892829b0f38f9df8c0b5bcd61759614",
+      "baseBytes": 38813,
+      "baseSha256": "8b78225c280ce9a4dd1e494e8d810522f892829b0f38f9df8c0b5bcd61759614",
+      "operations": []
+    },
+    "mobile-runtime.js": {
+      "bytes": 24490,
+      "sha256": "bef91364de2c5a9d1b9c4262e60b4c88a3a029497dff79c0fb0dce08dd0196a4",
+      "baseBytes": 24490,
+      "baseSha256": "bef91364de2c5a9d1b9c4262e60b4c88a3a029497dff79c0fb0dce08dd0196a4",
+      "operations": []
+    },
+    "mojang-upstream.js": {
+      "bytes": 21503,
+      "sha256": "0bf59433eb3ef046d127f8e2703a4ff24d720a649a71710e9c80df6dbe3d94d9",
+      "baseBytes": 21503,
+      "baseSha256": "0bf59433eb3ef046d127f8e2703a4ff24d720a649a71710e9c80df6dbe3d94d9",
+      "operations": []
+    },
+    "nagamin.wasm": {
+      "bytes": 886821,
+      "sha256": "1eca7cfd5e103f309c049eeb53783ff83c6301b4364fbcfa6132991ccd9783ca",
+      "baseBytes": 886821,
+      "baseSha256": "bb5dc03ae2e805899d9723ded70c5002ca7c71f141c02bfe0c832d93fcea757d",
+      "operations": [
+        {
+          "operation": "neutralize-build-prefix",
+          "replacement": "/build/public-source_____________________________________/runtime/",
+          "count": 60,
+          "sameLength": true,
+          "originalPrefixBytes": 66,
+          "replacementPrefixBytes": 66
+        }
+      ]
+    },
+    "pack-http.js": {
+      "bytes": 9028,
+      "sha256": "37945dc6719d43db2ace105cce8b2ad9b80666f73bc4a6f041fb8e74babbd891",
+      "baseBytes": 9028,
+      "baseSha256": "37945dc6719d43db2ace105cce8b2ad9b80666f73bc4a6f041fb8e74babbd891",
+      "operations": []
+    },
+    "payload/jar/azure-json-1.4.0.jar": {
+      "bytes": 325945,
+      "sha256": "c50bc998cd1a6c689f8644b51c206217bf2da09d5b949e777490a60290cc3a0d",
+      "baseBytes": 325945,
+      "baseSha256": "c50bc998cd1a6c689f8644b51c206217bf2da09d5b949e777490a60290cc3a0d",
+      "operations": []
+    },
+    "payload/jar/commons-codec-1.22.0.jar": {
+      "bytes": 420480,
+      "sha256": "d164fe79f262c32d9b18a0b5b2d317d1c27653d5e98fd2b998c24bf901c72ce4",
+      "baseBytes": 420480,
+      "baseSha256": "d164fe79f262c32d9b18a0b5b2d317d1c27653d5e98fd2b998c24bf901c72ce4",
+      "operations": []
+    },
+    "payload/jar/commons-compress-1.28.0.jar": {
+      "bytes": 1117221,
+      "sha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca",
+      "baseBytes": 1117221,
+      "baseSha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca",
+      "operations": []
+    },
+    "payload/jar/commons-io-2.20.0.jar": {
+      "bytes": 563971,
+      "sha256": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72",
+      "baseBytes": 563971,
+      "baseSha256": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72",
+      "operations": []
+    },
+    "payload/jar/commons-lang3-3.20.0.jar": {
+      "bytes": 713862,
+      "sha256": "69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4",
+      "baseBytes": 713862,
+      "baseSha256": "69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4",
+      "operations": []
+    },
+    "payload/jar/failureaccess-1.0.3.jar": {
+      "bytes": 10763,
+      "sha256": "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb",
+      "baseBytes": 10763,
+      "baseSha256": "cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb",
+      "operations": []
+    },
+    "payload/jar/fastutil-8.5.18.jar": {
+      "bytes": 23965563,
+      "sha256": "9094ae67d01d0ad246f886f11ad557fc2e79c72cbf3feed83e1512a8ae90a74a",
+      "baseBytes": 23965563,
+      "baseSha256": "9094ae67d01d0ad246f886f11ad557fc2e79c72cbf3feed83e1512a8ae90a74a",
+      "operations": []
+    },
+    "payload/jar/gson-2.14.0.jar": {
+      "bytes": 313604,
+      "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f",
+      "baseBytes": 313604,
+      "baseSha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f",
+      "operations": []
+    },
+    "payload/jar/guava-33.6.0-jre.jar": {
+      "bytes": 3064793,
+      "sha256": "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3",
+      "baseBytes": 3064793,
+      "baseSha256": "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3",
+      "operations": []
+    },
+    "payload/jar/icu4j-78.3.jar": {
+      "bytes": 15156073,
+      "sha256": "e962c1758d9659ea1e1fbab99c58683f654d304e1126ace19aaabfe39e0edb25",
+      "baseBytes": 15156073,
+      "baseSha256": "e962c1758d9659ea1e1fbab99c58683f654d304e1126ace19aaabfe39e0edb25",
+      "operations": []
+    },
+    "payload/jar/jna-5.17.0.jar": {
+      "bytes": 2002589,
+      "sha256": "b3a9408e7c51e08ef0e3bfcc08f443f6ec0f6191ba8cd7c18d53d2b22e5bdbc0",
+      "baseBytes": 2002589,
+      "baseSha256": "b3a9408e7c51e08ef0e3bfcc08f443f6ec0f6191ba8cd7c18d53d2b22e5bdbc0",
+      "operations": []
+    },
+    "payload/jar/jna-platform-5.17.0.jar": {
+      "bytes": 1378617,
+      "sha256": "b7e3d46c87bad2eb409b0e704916bcd81206168e357312dfddd0e253679cd9e0",
+      "baseBytes": 1378617,
+      "baseSha256": "b7e3d46c87bad2eb409b0e704916bcd81206168e357312dfddd0e253679cd9e0",
+      "operations": []
+    },
+    "payload/jar/joml-1.10.9.jar": {
+      "bytes": 814581,
+      "sha256": "feca4db853371704338621c120acc5cc32300d8af635fa42414b6213301e216b",
+      "baseBytes": 814581,
+      "baseSha256": "feca4db853371704338621c120acc5cc32300d8af635fa42414b6213301e216b",
+      "operations": []
+    },
+    "payload/jar/jopt-simple-5.0.4.jar": {
+      "bytes": 78146,
+      "sha256": "df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28",
+      "baseBytes": 78146,
+      "baseSha256": "df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28",
+      "operations": []
+    },
+    "payload/jar/jorbis-0.0.17.jar": {
+      "bytes": 99701,
+      "sha256": "e067f29a3701426b67ed973036949c6e58ca5bb53eef7240b2e71e286d252a9e",
+      "baseBytes": 99701,
+      "baseSha256": "e067f29a3701426b67ed973036949c6e58ca5bb53eef7240b2e71e286d252a9e",
+      "operations": []
+    },
+    "payload/jar/jspecify-1.0.0.jar": {
+      "bytes": 3819,
+      "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab",
+      "baseBytes": 3819,
+      "baseSha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab",
+      "operations": []
+    },
+    "payload/jar/log4j-api-2.26.0.jar": {
+      "bytes": 351126,
+      "sha256": "820de7bbaf430eaf2e3e5ccb92f23e2085797c5ac4d4f7fc6c8b660fbefa1dbc",
+      "baseBytes": 351126,
+      "baseSha256": "820de7bbaf430eaf2e3e5ccb92f23e2085797c5ac4d4f7fc6c8b660fbefa1dbc",
+      "operations": []
+    },
+    "payload/jar/log4j-core-2.26.0.jar": {
+      "bytes": 2015101,
+      "sha256": "406bb3132c47a5d322e5c571feb0787ca84496469f346eb51f1ef2ee45499902",
+      "baseBytes": 2015101,
+      "baseSha256": "406bb3132c47a5d322e5c571feb0787ca84496469f346eb51f1ef2ee45499902",
+      "operations": []
+    },
+    "payload/jar/log4j-slf4j2-impl-2.26.0.jar": {
+      "bytes": 30211,
+      "sha256": "cfc1bddbd39e684b698ae968291d8a3b3a55ee0ec2ef3d3ea5c2336a9e151598",
+      "baseBytes": 30211,
+      "baseSha256": "cfc1bddbd39e684b698ae968291d8a3b3a55ee0ec2ef3d3ea5c2336a9e151598",
+      "operations": []
+    },
+    "payload/jar/lwjgl-3.4.3.jar": {
+      "bytes": 1255440,
+      "sha256": "46eeca5471833c3cf5da3c1da015b41e3bb3eb16dd3da03f366886da10096751",
+      "baseBytes": 1255440,
+      "baseSha256": "46eeca5471833c3cf5da3c1da015b41e3bb3eb16dd3da03f366886da10096751",
+      "operations": []
+    },
+    "payload/jar/lwjgl-freetype-3.4.3.jar": {
+      "bytes": 468438,
+      "sha256": "b331b9d2a29c1b330c3887d33c14dab9d7eed3f763bb8f5ca559eec02d73f075",
+      "baseBytes": 468438,
+      "baseSha256": "b331b9d2a29c1b330c3887d33c14dab9d7eed3f763bb8f5ca559eec02d73f075",
+      "operations": []
+    },
+    "payload/jar/lwjgl-jemalloc-3.4.3.jar": {
+      "bytes": 48061,
+      "sha256": "f34062b6489454f7e2c3bf5979e37667e62c7c85cd00f73760f441557cb1978a",
+      "baseBytes": 48061,
+      "baseSha256": "f34062b6489454f7e2c3bf5979e37667e62c7c85cd00f73760f441557cb1978a",
+      "operations": []
+    },
+    "payload/jar/lwjgl-openal-3.4.3.jar": {
+      "bytes": 154573,
+      "sha256": "4a0049c8554d6890718fee76507572f2f9f8f3f6144d25d7d2ea76bccc2d9605",
+      "baseBytes": 154573,
+      "baseSha256": "4a0049c8554d6890718fee76507572f2f9f8f3f6144d25d7d2ea76bccc2d9605",
+      "operations": []
+    },
+    "payload/jar/lwjgl-opengl-3.4.3.jar": {
+      "bytes": 953649,
+      "sha256": "a92cf30f25b6fb6066f3508511f83c5c4fe2a0cff14fc2e7373bc1f6c726374f",
+      "baseBytes": 953649,
+      "baseSha256": "a92cf30f25b6fb6066f3508511f83c5c4fe2a0cff14fc2e7373bc1f6c726374f",
+      "operations": []
+    },
+    "payload/jar/lwjgl-sdl-3.4.3.jar": {
+      "bytes": 989769,
+      "sha256": "dcb33abcbd946553176bb668be80d7adc60cb9d919ab5c71fb01fc51cacc4c8f",
+      "baseBytes": 989769,
+      "baseSha256": "dcb33abcbd946553176bb668be80d7adc60cb9d919ab5c71fb01fc51cacc4c8f",
+      "operations": []
+    },
+    "payload/jar/lwjgl-shaderc-3.4.3.jar": {
+      "bytes": 153441,
+      "sha256": "82c7b5270d2c78458f5720c639459710c8f086ca050eea9ab0c44256fee7a626",
+      "baseBytes": 153441,
+      "baseSha256": "82c7b5270d2c78458f5720c639459710c8f086ca050eea9ab0c44256fee7a626",
+      "operations": []
+    },
+    "payload/jar/lwjgl-spvc-3.4.3.jar": {
+      "bytes": 150189,
+      "sha256": "d737eba8512caa2f53db7a8dbea4c08d9c3d94493bb0a244e6d64af95541f742",
+      "baseBytes": 150189,
+      "baseSha256": "d737eba8512caa2f53db7a8dbea4c08d9c3d94493bb0a244e6d64af95541f742",
+      "operations": []
+    },
+    "payload/jar/lwjgl-stb-3.4.3.jar": {
+      "bytes": 143041,
+      "sha256": "544753f5e49c53580949b9f1fc341f0e434991303c93d5a428fbaafaacc2cd69",
+      "baseBytes": 143041,
+      "baseSha256": "544753f5e49c53580949b9f1fc341f0e434991303c93d5a428fbaafaacc2cd69",
+      "operations": []
+    },
+    "payload/jar/lwjgl-vma-3.4.3.jar": {
+      "bytes": 110265,
+      "sha256": "254162ef94bd213663a417368902ea916d51e0e0fa3054d07ea0ce9a8b7ac9e6",
+      "baseBytes": 110265,
+      "baseSha256": "254162ef94bd213663a417368902ea916d51e0e0fa3054d07ea0ce9a8b7ac9e6",
+      "operations": []
+    },
+    "payload/jar/lwjgl-vulkan-3.4.3.jar": {
+      "bytes": 8866042,
+      "sha256": "acdb40767775ed1223dc3b2a8c9d3ce740c9e3c4af074444ce2dfe2ea9ba62e0",
+      "baseBytes": 8866042,
+      "baseSha256": "acdb40767775ed1223dc3b2a8c9d3ce740c9e3c4af074444ce2dfe2ea9ba62e0",
+      "operations": []
+    },
+    "payload/jar/lz4-java-1.10.1.jar": {
+      "bytes": 910232,
+      "sha256": "a58a84c4271e50df4c96ed916ccb7e48a869f8ed9cdcda1ad5d3d4c33b0214a3",
+      "baseBytes": 910232,
+      "baseSha256": "a58a84c4271e50df4c96ed916ccb7e48a869f8ed9cdcda1ad5d3d4c33b0214a3",
+      "operations": []
+    },
+    "payload/jar/mcweb-native-policy-5635a4ea13d32a36880875e631b78863d2d25a460ac319f795a76e250bc44792.jar": {
+      "bytes": 2786,
+      "sha256": "5635a4ea13d32a36880875e631b78863d2d25a460ac319f795a76e250bc44792",
+      "baseBytes": 2786,
+      "baseSha256": "5635a4ea13d32a36880875e631b78863d2d25a460ac319f795a76e250bc44792",
+      "operations": []
+    },
+    "payload/jar/mcweb-port.jar": {
+      "bytes": 385401,
+      "sha256": "89d42ab0a9d6723bbdb2f1a25e7dbe184e52de8b14b170ab4fba56fa2743cbbc",
+      "baseBytes": 385401,
+      "baseSha256": "89d42ab0a9d6723bbdb2f1a25e7dbe184e52de8b14b170ab4fba56fa2743cbbc",
+      "operations": []
+    },
+    "payload/jar/msal4j-1.24.1.jar": {
+      "bytes": 396486,
+      "sha256": "12e62f79d1a71d176a41c168c0587f8167f0add99b78f006f39595bd7242aebe",
+      "baseBytes": 396486,
+      "baseSha256": "12e62f79d1a71d176a41c168c0587f8167f0add99b78f006f39595bd7242aebe",
+      "operations": []
+    },
+    "payload/jar/netty-buffer-4.2.16.Final.jar": {
+      "bytes": 378032,
+      "sha256": "cc36ae9fbd0b03fe755eb4eb4424ca53b59cfd297d7fd47d49e5b1059beded6c",
+      "baseBytes": 378032,
+      "baseSha256": "cc36ae9fbd0b03fe755eb4eb4424ca53b59cfd297d7fd47d49e5b1059beded6c",
+      "operations": []
+    },
+    "payload/jar/netty-codec-base-4.2.16.Final.jar": {
+      "bytes": 155355,
+      "sha256": "feb410225938d9970de6b624a0c031d079804fa5cc5e1ec6e9298f16db5998a7",
+      "baseBytes": 155355,
+      "baseSha256": "feb410225938d9970de6b624a0c031d079804fa5cc5e1ec6e9298f16db5998a7",
+      "operations": []
+    },
+    "payload/jar/netty-codec-compression-4.2.16.Final.jar": {
+      "bytes": 183349,
+      "sha256": "13c8565414dd2115281303ef4ad1f7cc69bd7771d8d12c7d2fb31307dff26d11",
+      "baseBytes": 183349,
+      "baseSha256": "13c8565414dd2115281303ef4ad1f7cc69bd7771d8d12c7d2fb31307dff26d11",
+      "operations": []
+    },
+    "payload/jar/netty-codec-http-4.2.16.Final.jar": {
+      "bytes": 678387,
+      "sha256": "0d16f981de8d0d304a2ab1a81f0a674892089fbaa8a583100aebb4a5b00456ec",
+      "baseBytes": 678387,
+      "baseSha256": "0d16f981de8d0d304a2ab1a81f0a674892089fbaa8a583100aebb4a5b00456ec",
+      "operations": []
+    },
+    "payload/jar/netty-common-4.2.16.Final.jar": {
+      "bytes": 819965,
+      "sha256": "9825ee68a0dc4cd2b53e2f532502401b2211bad9b77e8b04882d9e64487283ff",
+      "baseBytes": 819965,
+      "baseSha256": "9825ee68a0dc4cd2b53e2f532502401b2211bad9b77e8b04882d9e64487283ff",
+      "operations": []
+    },
+    "payload/jar/netty-handler-4.2.16.Final.jar": {
+      "bytes": 587814,
+      "sha256": "a259ca496da05ac1981f95cd856211f894a328056a6129e9cd70dbbd5df401f7",
+      "baseBytes": 587814,
+      "baseSha256": "a259ca496da05ac1981f95cd856211f894a328056a6129e9cd70dbbd5df401f7",
+      "operations": []
+    },
+    "payload/jar/netty-resolver-4.2.16.Final.jar": {
+      "bytes": 32975,
+      "sha256": "c9eca6a99036485cf1d186b4a6a595b0a54c53808319ee03924270eae04c32bb",
+      "baseBytes": 32975,
+      "baseSha256": "c9eca6a99036485cf1d186b4a6a595b0a54c53808319ee03924270eae04c32bb",
+      "operations": []
+    },
+    "payload/jar/netty-transport-4.2.16.Final.jar": {
+      "bytes": 549855,
+      "sha256": "cfa3f654caff906653385f4b7ddaa539d795b78f5711a622482b17d2b73484c0",
+      "baseBytes": 549855,
+      "baseSha256": "cfa3f654caff906653385f4b7ddaa539d795b78f5711a622482b17d2b73484c0",
+      "operations": []
+    },
+    "payload/jar/netty-transport-classes-epoll-4.2.16.Final.jar": {
+      "bytes": 159935,
+      "sha256": "9f2b53210db9c8d24e787ed43f3896aaf30d686ed270c7afbb29ab6330c6aa23",
+      "baseBytes": 159935,
+      "baseSha256": "9f2b53210db9c8d24e787ed43f3896aaf30d686ed270c7afbb29ab6330c6aa23",
+      "operations": []
+    },
+    "payload/jar/netty-transport-classes-kqueue-4.2.16.Final.jar": {
+      "bytes": 116819,
+      "sha256": "6599b495f69420cb240ab0a1aa60a19a2df3bc72791729170e0993727637a689",
+      "baseBytes": 116819,
+      "baseSha256": "6599b495f69420cb240ab0a1aa60a19a2df3bc72791729170e0993727637a689",
+      "operations": []
+    },
+    "payload/jar/netty-transport-native-unix-common-4.2.16.Final.jar": {
+      "bytes": 46877,
+      "sha256": "41ca8fe192083d17917be7ddcecded4da4fc1db1d1656d03d0bcb14e2f431155",
+      "baseBytes": 46877,
+      "baseSha256": "41ca8fe192083d17917be7ddcecded4da4fc1db1d1656d03d0bcb14e2f431155",
+      "operations": []
+    },
+    "payload/jar/oshi-core-6.9.0.jar": {
+      "bytes": 1022125,
+      "sha256": "b29ba9bce041e6ea822203d5b5a692660c87551241510ebc76eedffe684844c7",
+      "baseBytes": 1022125,
+      "baseSha256": "b29ba9bce041e6ea822203d5b5a692660c87551241510ebc76eedffe684844c7",
+      "operations": []
+    },
+    "payload/jar/slf4j-api-2.0.17.jar": {
+      "bytes": 69908,
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832",
+      "baseBytes": 69908,
+      "baseSha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832",
+      "operations": []
+    },
+    "payload/manifest.json": {
+      "bytes": 61758,
+      "sha256": "838beed0d25a3e8659eb833bb0f6a19cc1ce19e04dd7920420e5ae0fa4530e0e",
+      "baseBytes": 61758,
+      "baseSha256": "838beed0d25a3e8659eb833bb0f6a19cc1ce19e04dd7920420e5ae0fa4530e0e",
+      "operations": []
+    },
+    "player-textures.mjs": {
+      "bytes": 4394,
+      "sha256": "2ce34af1c4c263fcedb2ebffb09573f2e82cb0b2dadf87de6c129dfcea5cbc05",
+      "baseBytes": 4394,
+      "baseSha256": "2ce34af1c4c263fcedb2ebffb09573f2e82cb0b2dadf87de6c129dfcea5cbc05",
+      "operations": []
+    },
+    "profile-property-verifier.mjs": {
+      "bytes": 3526,
+      "sha256": "ca36d33d509b498734f06b5bfb86c2b30b3ca028d3ca657714e2d1a7b48331d2",
+      "baseBytes": 3526,
+      "baseSha256": "ca36d33d509b498734f06b5bfb86c2b30b3ca028d3ca657714e2d1a7b48331d2",
+      "operations": []
+    },
+    "render-command-stream.js": {
+      "bytes": 5668,
+      "sha256": "261e0929ab20092efb98a8484e1a0bf0b197e97bef2cc4bb64c8c79c3a05ce07",
+      "baseBytes": 5668,
+      "baseSha256": "261e0929ab20092efb98a8484e1a0bf0b197e97bef2cc4bb64c8c79c3a05ce07",
+      "operations": []
+    },
+    "runtime-manifest.json": {
+      "bytes": 340,
+      "sha256": "12b1a8327f9a2c48c836e7534c920e4df5baf1f53f09d7eb127165f522b0948a",
+      "baseBytes": 340,
+      "baseSha256": "12b1a8327f9a2c48c836e7534c920e4df5baf1f53f09d7eb127165f522b0948a",
+      "operations": []
+    },
+    "shader-glue.js": {
+      "bytes": 24946,
+      "sha256": "4c52138bd46af0c7155f0c8e81e0f8500cd805a987e6ac0f551e3b48e565f9e8",
+      "baseBytes": 24946,
+      "baseSha256": "4c52138bd46af0c7155f0c8e81e0f8500cd805a987e6ac0f551e3b48e565f9e8",
+      "operations": []
+    },
+    "vm-identity.mjs": {
+      "bytes": 2297,
+      "sha256": "73cb80ebba0591a289dee65e8722cbb80a3bae35bbdfe7a27637dbc9d9273494",
+      "baseBytes": 2297,
+      "baseSha256": "73cb80ebba0591a289dee65e8722cbb80a3bae35bbdfe7a27637dbc9d9273494",
+      "operations": []
+    },
+    "wasmjvm-manifest.json": {
+      "bytes": 906,
+      "sha256": "6f3941d83e21366b7b8e5d1b6b35e9929a2b05d93de980a2d01935a1fe24ab08",
+      "baseBytes": 906,
+      "baseSha256": "b798b343940cad57800071db3ca8b257f6f11b10a082073d85ae3ba6305ce645",
+      "operations": [
+        {
+          "operation": "update-loader-sha256",
+          "target": "javavm.js",
+          "count": 1
+        }
+      ]
+    },
+    "webgpu-host.js": {
+      "bytes": 328217,
+      "sha256": "6d94bef6bceffd9b8516471fe6f2a59f1ba7990f9df07582243f4aad8dc2a444",
+      "baseBytes": 328217,
+      "baseSha256": "6d94bef6bceffd9b8516471fe6f2a59f1ba7990f9df07582243f4aad8dc2a444",
+      "operations": []
+    },
+    "webgpu-texture-lifetime.js": {
+      "bytes": 7382,
+      "sha256": "e06530d0c25537f6f7a953fe6d4f9b5c6da81818231926cbcf19fb25c3dd1b74",
+      "baseBytes": 7382,
+      "baseSha256": "e06530d0c25537f6f7a953fe6d4f9b5c6da81818231926cbcf19fb25c3dd1b74",
+      "operations": []
+    },
+    "worker-env.js": {
+      "bytes": 9156,
+      "sha256": "79888b58b28330cba834397365ae30903e9495820e1d28c95917c8ada5cf2e3c",
+      "baseBytes": 9156,
+      "baseSha256": "79888b58b28330cba834397365ae30903e9495820e1d28c95917c8ada5cf2e3c",
+      "operations": []
+    }
+  },
+  "validation": {
+    "basePublicationAudit": {
+      "violations": 0,
+      "servedJars": 47,
+      "upstreamJars": 6,
+      "preloadFiles": 7970,
+      "shaders": {
+        "shaderFiles": 89,
+        "lines": 633,
+        "runs": 16,
+        "members": 18,
+        "scanned": 34
+      }
+    },
+    "derivedPublicationAudit": {
+      "violations": 0,
+      "servedJars": 47,
+      "upstreamJars": 6,
+      "preloadFiles": 7970,
+      "shaders": {
+        "shaderFiles": 89,
+        "lines": 633,
+        "runs": 16,
+        "members": 18,
+        "scanned": 31
+      }
+    },
+    "zipPrivacyScan": {
+      "archives": 47,
+      "entries": 35985,
+      "uncompressedBytes": 170274122,
+      "unchangedVendorNativeHomeReferences": [
+        {
+          "archive": "jna-5.17.0.jar",
+          "entry": "com/sun/jna/aix-ppc/libjnidispatch.a",
+          "occurrences": 6
+        },
+        {
+          "archive": "jna-5.17.0.jar",
+          "entry": "com/sun/jna/aix-ppc64/libjnidispatch.a",
+          "occurrences": 6
+        },
+        {
+          "archive": "jna-5.17.0.jar",
+          "entry": "com/sun/jna/linux-loongarch64/libjnidispatch.so",
+          "occurrences": 1
+        },
+        {
+          "archive": "lz4-java-1.10.1.jar",
+          "entry": "net/jpountz/util/darwin/aarch64/liblz4-java.dylib",
+          "occurrences": 1
+        },
+        {
+          "archive": "lz4-java-1.10.1.jar",
+          "entry": "net/jpountz/util/darwin/x86_64/liblz4-java.dylib",
+          "occurrences": 1
+        }
+      ],
+      "unchangedVendorMicrosoftEndpointReferences": [
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/AadInstanceDiscoveryProvider.class",
+          "occurrences": 1
+        },
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/AbstractApplicationBase$Builder.class",
+          "occurrences": 1
+        },
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/AbstractClientApplicationBase$Builder.class",
+          "occurrences": 1
+        },
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/AuthorizationRequestUrlParameters.class",
+          "occurrences": 1
+        },
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/AzureCloudEndpoint.class",
+          "occurrences": 1
+        },
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/IApplicationBase.class",
+          "occurrences": 1
+        },
+        {
+          "archive": "msal4j-1.24.1.jar",
+          "entry": "com/microsoft/aad/msal4j/KnownMetadataProvider.class",
+          "occurrences": 1
+        }
+      ]
+    },
+    "nagaTranslationsMatchBase": 2,
+    "mobilePreparation": {
+      "loaderChecksum": true,
+      "compiledLibraries": 9,
+      "factoryEvaluated": true
+    },
+    "loaderSyntax": true,
+    "wasmModulesCompiled": [
+      "javavm.wasm",
+      "nagamin.wasm"
+    ]
+  }
+}

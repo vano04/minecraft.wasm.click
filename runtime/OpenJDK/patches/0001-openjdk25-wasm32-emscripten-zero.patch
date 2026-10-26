@@ -1,0 +1,564 @@
+diff --git a/make/autoconf/basic.m4 b/make/autoconf/basic.m4
+index 2d3e071dd..8da7fd31b 100644
+--- a/make/autoconf/basic.m4
++++ b/make/autoconf/basic.m4
+@@ -389,7 +389,10 @@ AC_DEFUN_ONCE([BASIC_SETUP_DEVKIT],
+       [UTIL_PREPEND_TO_PATH([EXTRA_PATH],$with_extra_path)]
+   )
+ 
+-  if test "x$OPENJDK_BUILD_OS" = "xmacosx"; then
++  if test "x$OPENJDK_BUILD_OS" = "xmacosx" && test "x$OPENJDK_TARGET_OS" = "xmacosx"; then
++    # Only adopt the Xcode SDK as the sysroot when the *target* is macOS too.
++    # When cross-compiling (e.g. to wasm32-unknown-emscripten) the macOS SDK
++    # headers must not be forced onto the target compiler.
+     BASIC_SETUP_XCODE_SYSROOT
+   fi
+ 
+diff --git a/make/autoconf/flags-cflags.m4 b/make/autoconf/flags-cflags.m4
+index e80d9a989..de0d699dd 100644
+--- a/make/autoconf/flags-cflags.m4
++++ b/make/autoconf/flags-cflags.m4
+@@ -59,6 +59,15 @@ AC_DEFUN([FLAGS_SETUP_SHARED_LIBS],
+       SET_SHARED_LIBRARY_ORIGIN=''
+       SET_SHARED_LIBRARY_NAME=''
+ 
++    elif test "x$OPENJDK_TARGET_CPU" = xwasm32; then
++      # emcc builds Emscripten SIDE_MODULEs. wasm has no ELF rpath/soname/
++      # origin concept; the loader resolves libraries by name from its virtual
++      # filesystem instead.
++      SHARED_LIBRARY_FLAGS='-sSIDE_MODULE=1'
++      SET_EXECUTABLE_ORIGIN=''
++      SET_SHARED_LIBRARY_ORIGIN=''
++      SET_SHARED_LIBRARY_NAME=''
++
+     else
+       # Default works for linux, might work on other platforms as well.
+       SHARED_LIBRARY_FLAGS='-shared'
+diff --git a/make/autoconf/flags-ldflags.m4 b/make/autoconf/flags-ldflags.m4
+index 509e0dd82..aca636cf5 100644
+--- a/make/autoconf/flags-ldflags.m4
++++ b/make/autoconf/flags-ldflags.m4
+@@ -70,13 +70,18 @@ AC_DEFUN([FLAGS_SETUP_LDFLAGS_HELPER],
+ 
+     LDFLAGS_CXX_PARTIAL_LINKING="$MACHINE_FLAG -r"
+ 
+-    if test "x$OPENJDK_TARGET_OS" = xlinux; then
++    if test "x$OPENJDK_TARGET_OS" = xlinux && test "x$OPENJDK_TARGET_CPU" != xwasm32; then
+       # Clang needs the lld linker to work correctly
+       BASIC_LDFLAGS="-fuse-ld=lld -Wl,--exclude-libs,ALL"
+       if test "x$CXX_IS_USER_SUPPLIED" = xfalse && test "x$CC_IS_USER_SUPPLIED" = xfalse; then
+         UTIL_REQUIRE_PROGS(LLD, lld, $TOOLCHAIN_PATH:$PATH)
+       fi
+     fi
++    if test "x$OPENJDK_TARGET_CPU" = xwasm32; then
++      # emcc drives wasm-ld itself; the ELF-oriented flags above do not apply,
++      # and -fPIC/-mstack-alignment are meaningless for wasm.
++      BASIC_LDFLAGS_JVM_ONLY=""
++    fi
+     if test "x$OPENJDK_TARGET_OS" = xaix; then
+       BASIC_LDFLAGS="-Wl,-b64 -Wl,-brtl -Wl,-bnorwexec -Wl,-blibpath:/usr/lib:lib -Wl,-bnoexpall \
+         -Wl,-bernotok -Wl,-bdatapsize:64k -Wl,-btextpsize:64k -Wl,-bstackpsize:64k"
+diff --git a/make/autoconf/libraries.m4 b/make/autoconf/libraries.m4
+index bf697928f..6b0a67f84 100644
+--- a/make/autoconf/libraries.m4
++++ b/make/autoconf/libraries.m4
+@@ -87,6 +87,17 @@ AC_DEFUN_ONCE([LIB_DETERMINE_DEPENDENCIES],
+   else
+     NEEDS_LIB_FFI=false
+   fi
++
++  # wasm32/Emscripten has none of the desktop libraries, and java.desktop cannot
++  # be built for this target. Only java.base and the Zero VM are in scope, so
++  # override the decisions above.
++  if test "x$OPENJDK_TARGET_CPU" = xwasm32; then
++    NEEDS_LIB_X11=false
++    NEEDS_LIB_FONTCONFIG=false
++    NEEDS_LIB_CUPS=false
++    NEEDS_LIB_FREETYPE=false
++    NEEDS_LIB_ALSA=false
++  fi
+ ])
+ 
+ ################################################################################
+@@ -97,7 +108,10 @@ AC_DEFUN([LIB_SETUP_JVM_LIBS],
+   # Atomic library
+   # 32-bit platforms needs fallback library for 8-byte atomic ops on Zero
+   if HOTSPOT_CHECK_JVM_VARIANT(zero); then
++    # wasm32 is 32-bit but has native 64-bit atomics (threads proposal) and no
++    # separate libatomic, so it must not pull one in.
+     if test "x$OPENJDK_$1_OS" = xlinux &&
++        test "x$OPENJDK_TARGET_CPU" != xwasm32 &&
+         test "x$OPENJDK_TARGET_CPU_BITS" = "x32"; then
+       BASIC_JVM_LIBS_$1="$BASIC_JVM_LIBS_$1 -latomic"
+     fi
+diff --git a/make/autoconf/platform.m4 b/make/autoconf/platform.m4
+index 31451d0c3..d3ddbdf46 100644
+--- a/make/autoconf/platform.m4
++++ b/make/autoconf/platform.m4
+@@ -48,6 +48,12 @@ AC_DEFUN([PLATFORM_EXTRACT_VARS_FROM_CPU],
+       VAR_CPU_BITS=32
+       VAR_CPU_ENDIAN=little
+       ;;
++    wasm32)
++      VAR_CPU=wasm32
++      VAR_CPU_ARCH=wasm32
++      VAR_CPU_BITS=32
++      VAR_CPU_ENDIAN=little
++      ;;
+     alpha*)
+       VAR_CPU=alpha
+       VAR_CPU_ARCH=alpha
+@@ -198,6 +204,13 @@ AC_DEFUN([PLATFORM_EXTRACT_VARS_FROM_CPU],
+ AC_DEFUN([PLATFORM_EXTRACT_VARS_FROM_OS],
+ [
+   case "$1" in
++    *emscripten*)
++      # Emscripten's libc is musl-derived and presents a Linux-like POSIX
++      # surface, so the JDK's linux sources are reused verbatim. This is a
++      # masquerade, not a real port: see OpenJDK/EVIDENCE.md.
++      VAR_OS=linux
++      VAR_OS_TYPE=unix
++      ;;
+     *linux*)
+       VAR_OS=linux
+       VAR_OS_TYPE=unix
+diff --git a/make/common/Modules.gmk b/make/common/Modules.gmk
+index 725424d76..73f1de20d 100644
+--- a/make/common/Modules.gmk
++++ b/make/common/Modules.gmk
+@@ -66,6 +66,31 @@ ifeq ($(call isTargetOs, windows macosx linux), false)
+   MODULES_FILTER += jdk.jpackage
+ endif
+ 
++# wasm32/Emscripten has no X11, fontconfig, CUPS, ALSA, /proc or process
++# control, so the modules built on those facilities cannot be produced here.
++# See OpenJDK/EVIDENCE.md for what this costs.
++ifeq ($(OPENJDK_TARGET_CPU), wasm32)
++  MODULES_FILTER += java.desktop
++  MODULES_FILTER += java.se
++  MODULES_FILTER += jdk.accessibility
++  MODULES_FILTER += jdk.attach
++  MODULES_FILTER += jdk.editpad
++  MODULES_FILTER += jdk.hotspot.agent
++  MODULES_FILTER += jdk.jcmd
++  MODULES_FILTER += jdk.jconsole
++  MODULES_FILTER += jdk.jdi
++  MODULES_FILTER += jdk.jdwp.agent
++  MODULES_FILTER += jdk.jfr
++  MODULES_FILTER += jdk.jpackage
++  MODULES_FILTER += jdk.jshell
++  MODULES_FILTER += jdk.jstatd
++  MODULES_FILTER += jdk.management
++  MODULES_FILTER += jdk.management.agent
++  MODULES_FILTER += jdk.management.jfr
++  MODULES_FILTER += jdk.sctp
++  MODULES_FILTER += jdk.unsupported.desktop
++endif
++
+ ################################################################################
+ # Module list macros
+ 
+diff --git a/make/modules/java.base/Lib.gmk b/make/modules/java.base/Lib.gmk
+index 51d323a03..82472cf2f 100644
+--- a/make/modules/java.base/Lib.gmk
++++ b/make/modules/java.base/Lib.gmk
+@@ -160,7 +160,7 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBSYSLOOKUP, \
+     NAME := syslookup, \
+     EXTRA_HEADER_DIRS := java.base:libjava, \
+     LD_SET_ORIGIN := false, \
+-    LDFLAGS_linux := -Wl$(COMMA)--no-as-needed, \
++    LDFLAGS_linux := $(if $(filter wasm32, $(OPENJDK_TARGET_CPU)),,-Wl$(COMMA)--no-as-needed), \
+     LDFLAGS_aix := -brtl -bexpfull, \
+     LIBS_linux := $(LIBDL) $(LIBM), \
+     LIBS_aix := -ldecNumber $(LIBM), \
+diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+index 029ccbded..0bd8e4ced 100644
+--- a/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
++++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.cpp
+@@ -766,6 +766,89 @@ int ZeroInterpreter::setter_entry(Method* method, intptr_t UNUSED, TRAPS) {
+   return 0;
+ }
+ 
++// Compute java.lang.Math's intrinsics directly instead of interpreting them.
++// Since JDK 21 StrictMath's bodies are Java (jdk.internal.math.FdLibm), so
++// without this entry Math.sqrt runs a few hundred bytecodes: it measured 5.4 us
++// per call on this target, against 0.03 us here.
++//
++// Stack convention, as used by getter_entry above: topOfStack is the lowest
++// used address, index increases with address, and the macros negate the offset.
++// So the *last* pushed argument is at offset 0 and earlier arguments are at
++// negative offsets. A double occupies two slots based at its own offset.
++int ZeroInterpreter::math_entry(Method* method, intptr_t UNUSED, TRAPS) {
++  JavaThread* thread = THREAD;
++
++  // Drop into the slow path if we need a safepoint check
++  if (SafepointMechanism::should_process(thread)) {
++    return normal_entry(method, 0, THREAD);
++  }
++
++  ZeroStack* stack = thread->zero_stack();
++  intptr_t* topOfStack = stack->sp();
++
++  switch (method->intrinsic_id()) {
++    // Three float slots in, one out.
++    case vmIntrinsics::_fmaF: {
++      jfloat c = STACK_FLOAT(0);
++      jfloat b = STACK_FLOAT(-1);
++      jfloat a = STACK_FLOAT(-2);
++      jfloat r = ::fmaf(a, b, c);
++      stack->set_sp(stack->sp() + 2);
++      topOfStack = stack->sp();
++      SET_STACK_FLOAT(r, 0);
++      return 0;
++    }
++    // Six slots in, two out.
++    case vmIntrinsics::_fmaD: {
++      jdouble c = STACK_DOUBLE(0);
++      jdouble b = STACK_DOUBLE(-2);
++      jdouble a = STACK_DOUBLE(-4);
++      jdouble r = ::fma(a, b, c);
++      stack->set_sp(stack->sp() + 4);
++      topOfStack = stack->sp();
++      SET_STACK_DOUBLE(r, 0);
++      return 0;
++    }
++    // Four slots in, two out.
++    case vmIntrinsics::_dpow: {
++      jdouble y = STACK_DOUBLE(0);
++      jdouble x = STACK_DOUBLE(-2);
++      jdouble r = ::pow(x, y);
++      stack->set_sp(stack->sp() + 2);
++      topOfStack = stack->sp();
++      SET_STACK_DOUBLE(r, 0);
++      return 0;
++    }
++    default:
++      break;
++  }
++
++  // The rest take one double and return one, so the result replaces the
++  // argument in place and the stack pointer does not move.
++  jdouble x = STACK_DOUBLE(0);
++  jdouble r;
++  switch (method->intrinsic_id()) {
++    case vmIntrinsics::_dsin:   r = ::sin(x);   break;
++    case vmIntrinsics::_dcos:   r = ::cos(x);   break;
++    case vmIntrinsics::_dtan:   r = ::tan(x);   break;
++    case vmIntrinsics::_dtanh:  r = ::tanh(x);  break;
++    case vmIntrinsics::_dcbrt:  r = ::cbrt(x);  break;
++    case vmIntrinsics::_dabs:   r = ::fabs(x);  break;
++    case vmIntrinsics::_dlog:   r = ::log(x);   break;
++    case vmIntrinsics::_dlog10: r = ::log10(x); break;
++    case vmIntrinsics::_dexp:   r = ::exp(x);   break;
++    case vmIntrinsics::_dsqrt:
++    case vmIntrinsics::_dsqrt_strict:
++      r = ::sqrt(x);
++      break;
++    default:
++      // Not one we compute here: let the interpreter run the Java body.
++      return normal_entry(method, 0, THREAD);
++  }
++  SET_STACK_DOUBLE(r, 0);
++  return 0;
++}
++
+ int ZeroInterpreter::empty_entry(Method* method, intptr_t UNUSED, TRAPS) {
+   JavaThread *thread = THREAD;
+   ZeroStack *stack = thread->zero_stack();
+diff --git a/src/hotspot/cpu/zero/zeroInterpreter_zero.hpp b/src/hotspot/cpu/zero/zeroInterpreter_zero.hpp
+index 3761dfc58..364c309b4 100644
+--- a/src/hotspot/cpu/zero/zeroInterpreter_zero.hpp
++++ b/src/hotspot/cpu/zero/zeroInterpreter_zero.hpp
+@@ -37,6 +37,7 @@
+   static int getter_entry(Method* method, intptr_t UNUSED, TRAPS);
+   static int setter_entry(Method* method, intptr_t UNUSED, TRAPS);
+   static int empty_entry(Method* method, intptr_t UNUSED, TRAPS);
++  static int math_entry(Method* method, intptr_t UNUSED, TRAPS);
+   static int Reference_get_entry(Method* method, intptr_t UNUSED, TRAPS);
+ 
+   // Stack watermark machinery
+diff --git a/src/hotspot/os/linux/os_linux.cpp b/src/hotspot/os/linux/os_linux.cpp
+--- a/src/hotspot/os/linux/os_linux.cpp
++++ b/src/hotspot/os/linux/os_linux.cpp
+@@ -476,6 +476,9 @@
+     #define SYS_gettid 186
+   #elif defined(__sparc__)
+     #define SYS_gettid 143
++  #elif defined(__EMSCRIPTEN__)
++    // wasm has no syscall interface; see os::Linux::gettid below.
++    #define SYS_gettid (-1)
+   #else
+     #error "Define SYS_gettid for this architecture"
+   #endif
+@@ -486,9 +489,15 @@
+ // Returns the kernel thread id of the currently running thread. Kernel
+ // thread id is used to access /proc.
+ pid_t os::Linux::gettid() {
++#ifdef __EMSCRIPTEN__
++  // No kernel and no /proc under wasm. The pthread handle is a stable,
++  // unique-per-thread value, which is all HotSpot needs it for here.
++  return (pid_t)(intptr_t)pthread_self();
++#else
+   long rslt = syscall(SYS_gettid);
+   assert(rslt != -1, "must be."); // old linuxthreads implementation?
+   return (pid_t)rslt;
++#endif
+ }
+ 
+ // Returns the amount of swap currently configured, in bytes.
+@@ -1635,6 +1644,19 @@
+   void * result = nullptr;
+   bool load_attempted = false;
+ 
++#ifdef __EMSCRIPTEN__
++  // Emscripten's dynamic loader keys its module cache on the *string* it is
++  // given, and a side module's own dependencies are always named by basename.
++  // Loading "/path/lib/libjava.so" and "libjava.so" therefore instantiates the
++  // module twice, each with a private data segment -- which silently splits
++  // state such as libjava's platform-encoding flag. Reduce every load to the
++  // basename so there is exactly one instance of each library.
++  const char* slash = ::strrchr(filename, '/');
++  if (slash != nullptr && slash[1] != '\0') {
++    filename = slash + 1;
++  }
++#endif
++
+   log_info(os)("attempting shared library load of %s", filename);
+ 
+   // Check whether the library to load might change execution rights
+@@ -1822,6 +1844,11 @@
+   static  Elf32_Half running_arch_code=EM_RISCV;
+ #elif  (defined LOONGARCH64)
+   static  Elf32_Half running_arch_code=EM_LOONGARCH;
++#elif  (defined WASM32)
++  // There are no ELF shared objects to load under wasm: everything is linked
++  // statically into the module. EM_NONE simply never matches a library, so
++  // dll_load reports a clean "wrong architecture" rather than misbehaving.
++  static  Elf32_Half running_arch_code=EM_NONE;
+ #else
+     #error Method os::dll_load requires that one of following is defined:\
+         AARCH64, ALPHA, ARM, AMD64, IA32, LOONGARCH64, M68K, MIPS, MIPSEL, PARISC, __powerpc__, __powerpc64__, RISCV, S390, SH, __sparc
+@@ -2762,6 +2789,22 @@
+     return;
+   }
+ 
++#ifdef __EMSCRIPTEN__
++  // Emscripten declares dladdr(3) but does not implement it, so a side module
++  // cannot discover its own path. The launcher already knows where it loaded
++  // libjvm.so from and publishes it here; java_home is derived from this.
++  {
++    const char* p = ::getenv("MCWEB_JVM_PATH");
++    if (p != nullptr && p[0] != '\0' && (jint)strlen(p) < buflen) {
++      strcpy(buf, p);
++      strcpy(saved_jvm_path, p);
++      return;
++    }
++    vm_exit_during_initialization(
++        "MCWEB_JVM_PATH is not set; the wasm build cannot locate libjvm.so", nullptr);
++  }
++#endif
++
+   char dli_fname[MAXPATHLEN];
+   dli_fname[0] = '\0';
+   bool ret = dll_address_to_library_name(
+@@ -2898,7 +2941,18 @@
+ //       All it does is to check if there are enough free pages
+ //       left at the time of mmap(). This could be a potential
+ //       problem.
++#ifdef __EMSCRIPTEN__
++extern "C" void mcweb_commit_reserved(void*, size_t);
++#endif
+ int os::Linux::commit_memory_impl(char* addr, size_t size, bool exec) {
++#ifdef __EMSCRIPTEN__
++  // The mmap shim leaves PROT_NONE reservations untouched until commit.
++  // Only its owned reservations are zeroed: pthread stack guard ranges are
++  // malloc-backed and contain Emscripten's stack cookie.
++  mcweb_commit_reserved(addr, size);
++  (void)exec;
++  return 0;
++#else
+   int prot = exec ? PROT_READ|PROT_WRITE|PROT_EXEC : PROT_READ|PROT_WRITE;
+   uintptr_t res = (uintptr_t) ::mmap(addr, size, prot,
+                                      MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0);
+@@ -2926,6 +2980,7 @@
+   }
+ 
+   return err;
++#endif // __EMSCRIPTEN__
+ }
+ 
+ bool os::pd_commit_memory(char* addr, size_t size, bool exec) {
+@@ -3453,6 +3508,13 @@
+ struct bitmask* os::Linux::_numa_cpunodebind_bitmask;
+ 
+ bool os::pd_uncommit_memory(char* addr, size_t size, bool exec) {
++#ifdef __EMSCRIPTEN__
++  // Memory cannot be handed back to the wasm engine, and there is no
++  // protection to re-arm. Report success: the range stays mapped and writable,
++  // which is the only state this target can represent.
++  (void)addr; (void)size; (void)exec;
++  return true;
++#else
+   uintptr_t res = (uintptr_t) ::mmap(addr, size, PROT_NONE,
+                                      MAP_PRIVATE|MAP_FIXED|MAP_NORESERVE|MAP_ANONYMOUS, -1, 0);
+   if (res == (uintptr_t) MAP_FAILED) {
+@@ -3463,6 +3525,7 @@
+     return false;
+   }
+   return true;
++#endif // __EMSCRIPTEN__
+ }
+ 
+ static address get_stack_commited_bottom(address bottom, size_t size) {
+@@ -3584,6 +3647,18 @@
+ // may not start from the requested address. Unlike Linux mmap(), this
+ // function returns null to indicate failure.
+ static char* anon_mmap(char* requested_addr, size_t bytes) {
++#ifdef __EMSCRIPTEN__
++  // wasm has neither MAP_FIXED nor page protection. A reservation must
++  // therefore be real, writable memory obtained wherever the allocator puts
++  // it; a caller that demands a specific address cannot be satisfied and is
++  // told so, which is a case HotSpot already handles.
++  if (requested_addr != nullptr) {
++    return nullptr;
++  }
++  char* addr = (char*)::mmap(nullptr, bytes, PROT_NONE,
++                             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  return addr == MAP_FAILED ? nullptr : addr;
++#else
+   // If a requested address was given:
+   //
+   // The POSIX-conforming way is to *omit* MAP_FIXED. This will leave existing mappings intact.
+@@ -3614,6 +3689,7 @@
+     return nullptr;
+   }
+   return addr;
++#endif // __EMSCRIPTEN__
+ }
+ 
+ // Allocate (using mmap, NO_RESERVE, with small pages) at either a given request address
+
+diff --git a/src/hotspot/os/linux/systemMemoryBarrier_linux.cpp b/src/hotspot/os/linux/systemMemoryBarrier_linux.cpp
+index 766bb70a9..316bf990c 100644
+--- a/src/hotspot/os/linux/systemMemoryBarrier_linux.cpp
++++ b/src/hotspot/os/linux/systemMemoryBarrier_linux.cpp
+@@ -44,6 +44,9 @@
+   #define SYS_membarrier 389
+   #elif defined(ALPHA)
+   #define SYS_membarrier 517
++  #elif defined(__EMSCRIPTEN__)
++  // No kernel: membarrier is unavailable, and initialize() below reports that.
++  #define SYS_membarrier (-1)
+   #else
+   #error define SYS_membarrier for the arch
+   #endif
+@@ -58,7 +61,14 @@ enum membarrier_cmd {
+ };
+ 
+ static long membarrier(int cmd, unsigned int flags, int cpu_id) {
++#ifdef __EMSCRIPTEN__
++  // wasm exposes no syscall interface. Reporting failure makes HotSpot use its
++  // portable fallback barrier, which is correct, just less cheap.
++  (void)cmd; (void)flags; (void)cpu_id;
++  return -1;
++#else
+   return syscall(SYS_membarrier, cmd, flags, cpu_id); // cpu_id only on >= 5.10
++#endif
+ }
+ 
+ bool LinuxSystemMemoryBarrier::initialize() {
+diff --git a/src/hotspot/os/linux/waitBarrier_linux.cpp b/src/hotspot/os/linux/waitBarrier_linux.cpp
+index f1f5be051..001f7e9fa 100644
+--- a/src/hotspot/os/linux/waitBarrier_linux.cpp
++++ b/src/hotspot/os/linux/waitBarrier_linux.cpp
+@@ -37,7 +37,11 @@
+ #endif
+ 
+ static long futex(volatile int *addr, int futex_op, int op_arg) {
++#ifdef __EMSCRIPTEN__
++  return mcweb_futex(addr, futex_op, op_arg);
++#else
+   return syscall(SYS_futex, addr, futex_op, op_arg, nullptr, nullptr, 0);
++#endif
+ }
+ 
+ void LinuxWaitBarrier::arm(int barrier_tag) {
+diff --git a/src/hotspot/share/interpreter/zero/zeroInterpreterGenerator.cpp b/src/hotspot/share/interpreter/zero/zeroInterpreterGenerator.cpp
+index c4eeb3fa8..b5678397c 100644
+--- a/src/hotspot/share/interpreter/zero/zeroInterpreterGenerator.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroInterpreterGenerator.cpp
+@@ -141,11 +141,15 @@ address ZeroInterpreterGenerator::generate_slow_signature_handler() {
+ 
+ address ZeroInterpreterGenerator::generate_math_entry(
+     AbstractInterpreter::MethodKind kind) {
+-  if (!InlineIntrinsics)
+-    return nullptr;
+-
+-  Unimplemented();
+-  return nullptr;
++  // Deliberately not gated on InlineIntrinsics: that flag describes whether a
++  // JIT inlines intrinsics, and compiler_globals_pd.hpp forces it false when
++  // no compiler is built -- which is always, for Zero. This is an interpreter
++  // entry, and without it Math.sqrt runs jdk.internal.math.FdLibm's Java body
++  // bytecode by bytecode.
++  //
++  // One entry serves every kind; it dispatches on the method's intrinsic id and
++  // falls back to the interpreter for anything it does not compute.
++  return generate_entry((address) ZeroInterpreter::math_entry);
+ }
+ 
+ address ZeroInterpreterGenerator::generate_abstract_entry() {
+diff --git a/src/java.base/unix/classes/sun/nio/fs/UnixConstants.java.template b/src/java.base/unix/classes/sun/nio/fs/UnixConstants.java.template
+index 682383358..18093179d 100644
+--- a/src/java.base/unix/classes/sun/nio/fs/UnixConstants.java.template
++++ b/src/java.base/unix/classes/sun/nio/fs/UnixConstants.java.template
+@@ -170,7 +170,9 @@ class UnixConstants {
+     static final int PREFIX_FSOPT_NOFOLLOW = 00;
+ #endif
+ 
+-#ifdef __linux__
++// Emscripten is not __linux__, but this build compiles the java.base linux
++// sources, so LinuxFileSystem still references these constants.
++#if defined(__linux__) || defined(__EMSCRIPTEN__)
+     // advice flags used with posix_fadvise(2)
+     static final int PREFIX_POSIX_FADV_SEQUENTIAL = POSIX_FADV_SEQUENTIAL;
+     static final int PREFIX_POSIX_FADV_NOREUSE    = POSIX_FADV_NOREUSE;
+diff --git a/src/java.base/unix/native/libjli/java_md.c b/src/java.base/unix/native/libjli/java_md.c
+index 0a61971b0..de0d535bf 100644
+--- a/src/java.base/unix/native/libjli/java_md.c
++++ b/src/java.base/unix/native/libjli/java_md.c
+@@ -524,6 +524,21 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
+ 
+     JLI_TraceLauncher("JVM path is %s\n", jvmpath);
+ 
++#ifdef __EMSCRIPTEN__
++    /* Emscripten has no working dladdr(3), so libjvm cannot find its own path.
++     * Hand it over explicitly; os::jvm_path reads this back. */
++    setenv("MCWEB_JVM_PATH", jvmpath, 1);
++    /* Emscripten's loader caches modules under the exact name it is given, and
++     * side-module dependencies are always named by basename. Loading libjvm by
++     * its full path here would create a second, separate instance. */
++    {
++        const char *slash = strrchr(jvmpath, '/');
++        if (slash != NULL && slash[1] != '\0') {
++            jvmpath = slash + 1;
++        }
++    }
++#endif
++
+     if (JLI_IsStaticallyLinked()) {
+         libjvm = dlopen(NULL, RTLD_NOW + RTLD_GLOBAL);
+     } else {
+diff --git a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+index fbf996886..3b181d571 100644
+--- a/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
++++ b/src/java.base/unix/native/libnio/fs/UnixNativeDispatcher.c
+@@ -382,7 +382,7 @@ Java_sun_nio_fs_UnixNativeDispatcher_init(JNIEnv* env, jclass this)
+ #ifdef _DARWIN_FEATURE_64_BIT_INODE
+     capabilities |= sun_nio_fs_UnixNativeDispatcher_SUPPORTS_BIRTHTIME;
+ #endif
+-#if defined(__linux__)
++#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+     my_statx_func = (statx_func*) dlsym(RTLD_DEFAULT, "statx");
+     if (my_statx_func != NULL) {
+         capabilities |= sun_nio_fs_UnixNativeDispatcher_SUPPORTS_BIRTHTIME;

@@ -1,0 +1,40 @@
+# Local dependencies and developer tools
+node_modules/
+.wrangler/
+.netlify/
+site/
+site-manifest.json
+*.log
+
+# Local secrets and machine state
+.env
+.env.*
+.mcweb/
+.DS_Store
+
+# Never commit generated or player-supplied runtime inputs.
+build/
+dist/
+*.jar
+*.class
+*.wasm
+*.data
+*.ogg
+*.mp3
+*.wav
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.zip
+*.tar
+*.gz
+
+# Project-owned PWA artwork (never player/game textures).
+!public/icons/app-192.png
+!public/icons/app-512.png
+!public/icons/apple-touch-icon.png
+
+# The reviewed, sanitized runtime is the only binary release archive in Git.
+!artifacts/runtime.tar.gz

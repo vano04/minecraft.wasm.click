@@ -1,0 +1,47 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -205,7 +205,7 @@
+           "Write each generated wasm module to this directory, for wasm-dis")\
+                                                                             \
+   product(ccstr, ZeroWasmJITOnly, nullptr, EXPERIMENTAL,                    \
+-          "Only compile methods whose class or name contains this string")  \
++          "Only compile methods matching one of these comma-separated substrings")  \
+                                                                             \
+   product(uintx, ZeroWasmJITMaxInlineTargets, 48, EXPERIMENTAL,              \
+           "Branch targets allowed inside an inlined callee. 0 restricts "   \
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+--- a/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmCompiler.cpp
+@@ -9380,6 +9380,22 @@
+   if (ZeroWasmJITPrintCompileTime) note_compile_time(nullptr, os::javaTimeNanos() - t0);
+ }
+ 
++static bool matches_jit_filter(const char* name, const char* filter) {
++  if (filter == nullptr || *filter == '\0') return true;
++  const char* term = filter;
++  while (true) {
++    const char* end = ::strchr(term, ',');
++    size_t length = end != nullptr ? (size_t)(end - term) : ::strlen(term);
++    if (length > 0) {
++      for (const char* at = name; *at != '\0'; at++) {
++        if (::strncmp(at, term, length) == 0) return true;
++      }
++    }
++    if (end == nullptr) return false;
++    term = end + 1;
++  }
++}
++
+ static bool compile_into_timed(Method* method, CacheEntry* e) {
+   // -XX:ZeroWasmJITOnly=Foo isolates a suspect method from everything the
+   // JDK compiles during boot, which is the only practical way to get a
+@@ -9411,7 +9427,7 @@
+   }
+   if (ZeroWasmJITOnly != nullptr) {
+     ResourceMark rm;
+-    if (::strstr(method->name_and_sig_as_C_string(), ZeroWasmJITOnly) == nullptr) {
++    if (!matches_jit_filter(method->name_and_sig_as_C_string(), ZeroWasmJITOnly)) {
+       e->index = -1;
+       return false;
+     }

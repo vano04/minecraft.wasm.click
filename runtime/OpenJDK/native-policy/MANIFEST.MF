@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Main-Class: dev.mcweb.wasm.Boot
+Implementation-Title: MC-Web OpenJDK Browser Native Policy
+Implementation-Version: 1
+

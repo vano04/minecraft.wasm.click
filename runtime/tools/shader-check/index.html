@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Shader device check</title>
+<!--
+  Shader stage S3, device half (docs/SHADERS-PLAN.md): every translated
+  pipeline in build/shader-wgsl/wgsl.json (written by
+  tools/shader-translate-check.mjs --out build/shader-wgsl) is compiled and
+  built on the real WebGPU device. Local only: it is served from the repo root
+  by tools/shader-device-check.mjs and never packaged (tools/, not web/).
+-->
+<pre id="out">running…</pre>
+<script type="module">
+const VERTEX = {
+  R32_FLOAT: "float32", RG32_FLOAT: "float32x2", RGB32_FLOAT: "float32x3", RGBA32_FLOAT: "float32x4",
+  RGBA8_UNORM: "unorm8x4", RGBA8_SNORM: "snorm8x4", RG16_SINT: "sint16x2", RG16_UINT: "uint16x2",
+  RGBA8_UINT: "uint8x4", RG8_UNORM: "unorm8x2",
+};
+const TOPOLOGY = { QUADS: "triangle-list", TRIANGLES: "triangle-list", TRIANGLE_FAN: "triangle-list",
+  TRIANGLE_STRIP: "triangle-strip", LINES: "line-list", POINTS: "point-list" };
+
+const results = { adapter: "", pipelines: 0, ok: 0, failures: [] };
+try {
+  const adapter = await navigator.gpu.requestAdapter();
+  results.adapter = `${adapter.info.vendor} ${adapter.info.architecture}`;
+  const device = await adapter.requestDevice({ requiredLimits: { maxBindGroups: adapter.limits.maxBindGroups } });
+  const list = await (await fetch("/build/shader-wgsl/wgsl.json", { cache: "no-store" })).json();
+  results.pipelines = list.length;
+  for (const p of list) {
+    const problems = [];
+    device.pushErrorScope("validation");
+    const vs = device.createShaderModule({ code: p.vs, label: p.location + " vs" });
+    const fs = device.createShaderModule({ code: p.fs, label: p.location + " fs" });
+    for (const [stage, m] of [["vs", vs], ["fs", fs]]) {
+      for (const msg of (await m.getCompilationInfo()).messages) {
+        if (msg.type === "error") problems.push(`${stage}: ${msg.message.split("\n")[0]}`);
+      }
+    }
+    const fmt = (p.vertexFormats || [])[0];
+    const buffers = fmt ? [{ arrayStride: fmt.stride, attributes: fmt.elements
+      .map((e, i) => ({ shaderLocation: i, offset: e.offset, format: VERTEX[e.format] }))
+      // Attributes the shader does not read are allowed; every one it reads must be here.
+      .filter((a) => a.format || !problems.push(`no vertex format mapping for ${fmt.elements[a.shaderLocation].format}`)) }] : [];
+    try {
+      await device.createRenderPipelineAsync({
+        label: p.location, layout: "auto",
+        vertex: { module: vs, entryPoint: "main", buffers },
+        fragment: { module: fs, entryPoint: "main", targets: [{ format: "rgba8unorm" }] },
+        primitive: { topology: TOPOLOGY[p.topology] || "triangle-list" },
+      });
+    } catch (e) {
+      problems.push("pipeline: " + String(e.message || e).split("\n")[0]);
+    }
+    const err = await device.popErrorScope();
+    if (err) problems.push("validation: " + err.message.split("\n")[0]);
+    if (problems.length) results.failures.push({ location: p.location, problems });
+    else results.ok++;
+  }
+} catch (e) {
+  results.error = String(e.stack || e);
+}
+document.getElementById("out").textContent = JSON.stringify(results, null, 1);
+window.__shaderCheck = results;
+</script>

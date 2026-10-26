@@ -1,0 +1,99 @@
+diff --git a/src/wasm/ffi.c b/src/wasm/ffi.c
+index b631b1b..fe84107 100644
+--- a/src/wasm/ffi.c
++++ b/src/wasm/ffi.c
+@@ -55,6 +55,32 @@ EM_JS_DEPS(libffi, "$getWasmTableEntry,$setWasmTableEntry,$getEmptyTableSlot,$co
+ #define DEREF_F64(addr, offset) HEAPF64[(addr >> 3) + offset]
+ #define DEREF_U64(addr, offset) HEAPU64[(addr >> 3) + offset]
+ 
++// The buffers reached through avalue[] and rvalue belong to the *caller* and
++// carry only C's alignment for the target: on wasm32 a 64-bit value there may
++// sit at a 4-byte boundary. HEAPU64/HEAPF64 index by (addr >> 3), which
++// silently rounds such an address down and reads or writes four bytes early,
++// so 64-bit caller data must be moved one 32-bit word at a time.
++//
++// The reinterpreting scratch is created once and bound to a local `ua` at the
++// top of each function that needs it -- doing the lookup per value made a
++// double-argument call several microseconds slower than an integer one.
++#define UA_SCRATCH_INIT                                                        \
++  const ua = (globalThis.__ffi_ua ||= (() => {                                 \
++    const b = new ArrayBuffer(8);                                              \
++    return { u32: new Uint32Array(b), u64: new BigUint64Array(b),              \
++             f64: new Float64Array(b) };                                       \
++  })());
++#define DEREF_U64_UA(addr)                                                     \
++  (ua.u32[0] = DEREF_U32(addr, 0), ua.u32[1] = DEREF_U32(addr, 1), ua.u64[0])
++#define DEREF_F64_UA(addr)                                                     \
++  (ua.u32[0] = DEREF_U32(addr, 0), ua.u32[1] = DEREF_U32(addr, 1), ua.f64[0])
++#define SET_U64_UA(addr, val)                                                  \
++  (ua.u64[0] = (val), DEREF_U32(addr, 0) = ua.u32[0],                          \
++   DEREF_U32(addr, 1) = ua.u32[1])
++#define SET_F64_UA(addr, val)                                                  \
++  (ua.f64[0] = (val), DEREF_U32(addr, 0) = ua.u32[0],                          \
++   DEREF_U32(addr, 1) = ua.u32[1])
++
+ #define CHECK_FIELD_OFFSET(struct, field, offset)                                  \
+   _Static_assert(                                                                  \
+     offsetof(struct, field) == offset,                                             \
+@@ -124,8 +150,8 @@ CHECK_FIELD_OFFSET(ffi_type, elements, 8);
+ // the BigUint64Array store wraps the signed variant modulo 2^64, which is
+ // sign extension.
+ #define STORE_ARG_WIDENED_UNSIGNED(rvalue, x) \
+-  (DEREF_U64(rvalue, 0) = BigInt(x) & BigInt(4294967295))
+-#define STORE_ARG_WIDENED_SIGNED(rvalue, x) (DEREF_U64(rvalue, 0) = BigInt(x))
++  SET_U64_UA(rvalue, BigInt(x) & BigInt(4294967295))
++#define STORE_ARG_WIDENED_SIGNED(rvalue, x) SET_U64_UA(rvalue, BigInt(x))
+ 
+ CHECK_FIELD_OFFSET(ffi_cif, abi, 0);
+ CHECK_FIELD_OFFSET(ffi_cif, nargs, 4);
+@@ -253,6 +279,7 @@ EM_JS_MACROS(
+ void,
+ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
+ {
++  UA_SCRATCH_INIT
+   cif = DEC_PTR(cif);
+   fn = DEC_PTR(fn);
+   rvalue = DEC_PTR(rvalue);
+@@ -325,7 +352,7 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
+       args.push(DEREF_F32(arg_ptr, 0));
+       break;
+     case FFI_TYPE_DOUBLE:
+-      args.push(DEREF_F64(arg_ptr, 0));
++      args.push(DEREF_F64_UA(arg_ptr));
+       break;
+     case FFI_TYPE_UINT8:
+       args.push(DEREF_U8(arg_ptr, 0));
+@@ -341,12 +368,12 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
+       break;
+     case FFI_TYPE_UINT64:
+     case FFI_TYPE_SINT64:
+-      args.push(DEREF_U64(arg_ptr, 0));
++      args.push(DEREF_U64_UA(arg_ptr));
+       break;
+     case FFI_TYPE_LONGDOUBLE:
+       // long double is passed as a pair of BigInts.
+-      args.push(DEREF_U64(arg_ptr, 0));
+-      args.push(DEREF_U64(arg_ptr, 1));
++      args.push(DEREF_U64_UA(arg_ptr));
++      args.push(DEREF_U64_UA(arg_ptr + 8));
+       break;
+     case FFI_TYPE_STRUCT:
+       // Nontrivial structs are passed by pointer.
+@@ -491,7 +518,7 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
+     DEREF_F32(rvalue, 0) = result;
+     break;
+   case FFI_TYPE_DOUBLE:
+-    DEREF_F64(rvalue, 0) = result;
++    SET_F64_UA(rvalue, result);
+     break;
+   case FFI_TYPE_UINT8:
+     if (rtype_widen)
+@@ -519,7 +546,7 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
+     break;
+   case FFI_TYPE_UINT64:
+   case FFI_TYPE_SINT64:
+-    DEREF_U64(rvalue, 0) = result;
++    SET_U64_UA(rvalue, result);
+     break;
+   case FFI_TYPE_POINTER:
+     DEREF_PTR(rvalue, 0) = result;

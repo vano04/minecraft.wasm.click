@@ -1,0 +1,197 @@
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 9a197be..c4253d2 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -794,7 +794,8 @@ run:
+     if (linked_group == ZeroWasmBaseline::Returned
+         || linked_group == ZeroWasmBaseline::DeoptResume
+         || linked_group == ZeroWasmBaseline::ExceptionResume
+-        || linked_group == ZeroWasmBaseline::InvokeResume) {
++        || linked_group == ZeroWasmBaseline::InvokeResume
++        || linked_group == ZeroWasmBaseline::OpcodeResume) {
+       goto run;
+     }
+   }
+@@ -1237,7 +1238,16 @@ run:
+       OPC_INT_BINARY(and, And, 0);
+       OPC_INT_BINARY(or,  Or,  0);
+       OPC_INT_BINARY(xor, Xor, 0);
+-      OPC_INT_BINARY(div, Div, 1);
++      CASE(_idiv):
++          if (ZeroWasmLinkedGroupVerbose && BCI() == 2) {
++            tty->print_cr("[zbg] INTERPRETER_IDIV_REEXEC safeDiv bci=2");
++          }
++          if (STACK_INT(-1) == 0) {
++              VM_JAVA_ERROR(vmSymbols::java_lang_ArithmeticException(),
++                            "/ by zero");
++          }
++          SET_STACK_INT(VMintDiv(STACK_INT(-2), STACK_INT(-1)), -2);
++          UPDATE_PC_AND_TOS_AND_CONTINUE(1, -1);
+       OPC_INT_BINARY(rem, Rem, 1);
+ 
+ 
+@@ -3032,6 +3042,11 @@ run:
+   // An exception exists in the thread state see whether this activation can handle it
+   handle_exception: {
+ 
++    if (ZeroWasmLinkedGroupVerbose && METHOD->name()->equals("safeDiv")
++        && BCI() == 2) {
++      tty->print_cr("[zbg] INTERPRETER_HANDLER safeDiv throw-bci=2");
++    }
++
+     HandleMarkCleaner __hmc(THREAD);
+     Handle except_oop(THREAD, THREAD->pending_exception());
+     // Prevent any subsequent HandleMarkCleaner in the VM
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index a9947b5..8e13cf7 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -247,6 +247,7 @@ struct LinkedOopLayout {
+ static const int LINKED_RETURN = 0;
+ static const int LINKED_DEOPT = 1;
+ static const int LINKED_EXCEPTION = 2;
++static const int LINKED_REEXECUTE = 3;
+ 
+ static jlong linked_status(int status, int bci) {
+   return ((jlong)(uint16_t)status << 48) | ((jlong)(uint16_t)bci << 32);
+@@ -306,14 +307,25 @@ static void emit_linked_safe_div(WasmBuf& body, int resume_bci) {
+   body.u8(0x20); body.uleb(1);
+   body.u8(0x45);                       // y == 0
+   body.u8(0x04); body.u8(0x7e);         // if (result i64)
+-  linked_i64_const(body, linked_status(LINKED_EXCEPTION, resume_bci));
++  linked_i64_const(body, linked_status(LINKED_REEXECUTE, resume_bci));
+   body.u8(0x05);
+   body.u8(0x20); body.uleb(0);
++  body.u8(0x41); body.sleb(-2147483647 - 1);
++  body.u8(0x46);
+   body.u8(0x20); body.uleb(1);
+-  body.u8(0x6d);                       // i32.div_s; MIN_VALUE/-1 is defined
++  body.u8(0x41); body.sleb(-1);
++  body.u8(0x46);
++  body.u8(0x71);                       // i32.and
++  body.u8(0x04); body.u8(0x7e);
++  linked_i64_const(body, linked_status(LINKED_REEXECUTE, resume_bci));
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x6d);                       // safe after the two guards
+   linked_extend_i32(body);
+   body.u8(0x0b);
+   body.u8(0x0b);
++  body.u8(0x0b);
+ }
+ 
+ // The object lane is deliberately a raw linear-memory operation. It has no
+@@ -1201,21 +1213,31 @@ static int first_opcode(Method* method, unsigned char opcode) {
+   return -1;
+ }
+ 
+-static bool linked_safe_div_shape(Method* method, int* fault_bci) {
++static bool linked_safe_div_shape(Method* method, int* fault_bci,
++                                  int* handler_bci) {
+   static const unsigned char expected[] = {
+       0x1a, 0x1b, 0x6c, 0xac, 0x4d, 0x02, 0xac};
+   if (!code_is(method, expected, sizeof(expected))
+       || !method->has_exception_handler()) return false;
+   ExceptionTable et(method);
+-  if (et.length() != 1 || et.start_pc(0) != 0 || et.end_pc(0) != 4
+-      || et.handler_pc(0) != 4 || et.catch_type_index(0) == 0) return false;
+   *fault_bci = first_opcode(method, 0x6c);
+-  return *fault_bci == 2;
++  if (*fault_bci < 0 || et.length() != 1) return false;
++  int catch_index = et.catch_type_index(0);
++  if (catch_index == 0) return false;
++  Symbol* catch_name = method->constants()->klass_name_at(catch_index);
++  if (catch_name == nullptr
++      || !catch_name->equals("java/lang/ArithmeticException")) return false;
++  if (!(et.start_pc(0) <= *fault_bci && *fault_bci < et.end_pc(0))) {
++    return false;
++  }
++  *handler_bci = et.handler_pc(0);
++  return *handler_bci > *fault_bci && *handler_bci < method->code_size();
+ }
+ 
+ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* virtual_bci,
+                                              int* safe_div_bci,
++                                             int* safe_div_handler_bci,
+                                              int* return_bci,
+                                              int* alloc_bci,
+                                              int* init_bci,
+@@ -1262,7 +1284,7 @@ static LinkedMethodKind verify_linked_method(Method* method,
+     return *virtual_bci == 2 ? LinkedVirtualMethod : LinkedNoMethod;
+   }
+   if (static_int(method, "safeDiv", "(II)I")
+-      && linked_safe_div_shape(method, safe_div_bci)) {
++      && linked_safe_div_shape(method, safe_div_bci, safe_div_handler_bci)) {
+     *return_bci = first_opcode(method, 0xac);
+     return LinkedSafeDivMethod;
+   }
+@@ -1460,12 +1482,15 @@ static ZeroWasmBaseline::Result run_linked_group(
+       || istate->thread()->has_pending_exception()) return ZeroWasmBaseline::NotRun;
+   int virtual_bci = -1;
+   int safe_div_bci = -1;
++  int safe_div_handler_bci = -1;
+   int alloc_bci = -1;
+   int init_bci = -1;
+   int dispatch_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+-                                                &safe_div_bci, &return_bci,
++                                                &safe_div_bci,
++                                                &safe_div_handler_bci,
++                                                &return_bci,
+                                                 &alloc_bci, &init_bci,
+                                                 &dispatch_bci);
+   LinkedOopLayout oop_layout;
+@@ -1576,6 +1601,10 @@ static ZeroWasmBaseline::Result run_linked_group(
+     case LinkedSafeDivMethod: {
+       jint x = (jint)locals[0];
+       jint y = (jint)locals[-1];
++      if (ZeroWasmLinkedGroupVerbose && _linked_calls <= 8) {
++        tty->print_cr("[zbg] MODULE_ENTRY safeDiv x=%d y=%d idiv-bci=%d",
++                      x, y, safe_div_bci);
++      }
+       result = decode_linked_status(linked_table_call2(
+           _linked_table_slots[LinkedSafeDiv], x, y));
+       if (ZeroWasmLinkedGroupVerbose && _linked_calls <= 8) {
+@@ -1593,7 +1622,7 @@ static ZeroWasmBaseline::Result run_linked_group(
+         _linked_returned++;
+         return ZeroWasmBaseline::Returned;
+       }
+-      if (y == 0 && result.status == LINKED_EXCEPTION && result.bci == safe_div_bci) {
++      if (result.status == LINKED_REEXECUTE && result.bci == safe_div_bci) {
+         // No exception is pending here. Re-execute idiv exactly once and let
+         // BytecodeInterpreter::handle_exception find the real catch handler.
+         if (!linked_validate_pre_push(istate, *tos, 2)) {
+@@ -1606,11 +1635,12 @@ static ZeroWasmBaseline::Result run_linked_group(
+         }
+         _linked_exception++;
+         if (ZeroWasmLinkedGroupVerbose) {
+-          tty->print_cr("[zbg] STATE_SPILL safeDiv status=EXCEPTION resume-bci=%d depth=2 sp-offset=%ld pending=0",
+-                        safe_div_bci,
++          tty->print_cr("[zbg] OPCODE_REEXECUTE safeDiv resume-bci=%d "
++                        "handler-bci=%d depth=2 sp-offset=%ld pending=0",
++                        safe_div_bci, safe_div_handler_bci,
+                         (long)(istate->stack_base() - istate->stack()));
+         }
+-        return ZeroWasmBaseline::ExceptionResume;
++        return ZeroWasmBaseline::OpcodeResume;
+       }
+       return ZeroWasmBaseline::NotRun;
+     }
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+index 9d4b2fd..a143401 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.hpp
+@@ -25,7 +25,8 @@ class ZeroWasmBaseline : AllStatic {
+     Returned = 1,
+     DeoptResume = 2,
+     ExceptionResume = 3,
+-    InvokeResume = 4
++    InvokeResume = 4,
++    OpcodeResume = 5
+   };
+ 
+   // The adapter is called while a real Zero interpreter frame is live.  It
+

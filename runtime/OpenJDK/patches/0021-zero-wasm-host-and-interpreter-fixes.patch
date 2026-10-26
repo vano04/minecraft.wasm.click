@@ -1,0 +1,228 @@
+diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
+index 448ebce..48166f6 100644
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -84,6 +84,11 @@
+ #include <time.h>
+ #include <unistd.h>
+ #include <utmpx.h>
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++#include <emscripten/html5.h>   // emscripten_date_now
++#include <math.h>
++#endif
+ 
+ #ifdef __APPLE__
+   #include <crt_externs.h>
+@@ -1457,7 +1462,18 @@ void os::Posix::to_RTC_abstime(timespec* abstime, int64_t millis) {
+ 
+ // Common (partly) shared time functions
+ 
++#ifdef __EMSCRIPTEN__
++// Emscripten's clock_gettime is a JavaScript call that reads
++// emscripten_get_now (CLOCK_MONOTONIC) or emscripten_date_now (REALTIME),
++// rounds to nanoseconds and stores an i64 through memory. Reading the same
++// clocks directly gives the same values at about half the cost (127 against
++// 61 ns under node), and System.nanoTime is called all over a game's frame.
++#endif
++
+ jlong os::javaTimeMillis() {
++#ifdef __EMSCRIPTEN__
++  return (jlong)emscripten_date_now();
++#endif
+   struct timespec ts;
+   int status = clock_gettime(CLOCK_REALTIME, &ts);
+   assert(status == 0, "clock_gettime error: %s", os::strerror(errno));
+@@ -1480,6 +1496,11 @@ void os::javaTimeSystemUTC(jlong &seconds, jlong &nanos) {
+ #if !defined(__APPLE__) && !defined(AIX)
+ 
+ jlong os::javaTimeNanos() {
++#ifdef __EMSCRIPTEN__
++  // clock_gettime(CLOCK_MONOTONIC)'s own arithmetic: milliseconds to
++  // nanoseconds, rounded.
++  return (jlong)llround(emscripten_get_now() * 1000.0 * 1000.0);
++#endif
+   struct timespec tp;
+   int status = clock_gettime(CLOCK_MONOTONIC, &tp);
+   assert(status == 0, "clock_gettime error: %s", os::strerror(errno));
+diff --git a/src/hotspot/os_cpu/linux_zero/atomic_linux_zero.hpp b/src/hotspot/os_cpu/linux_zero/atomic_linux_zero.hpp
+index 6409942..b53cb58 100644
+--- a/src/hotspot/os_cpu/linux_zero/atomic_linux_zero.hpp
++++ b/src/hotspot/os_cpu/linux_zero/atomic_linux_zero.hpp
+@@ -149,4 +149,33 @@ inline void Atomic::PlatformStore<8>::operator()(T volatile* dest,
+   __atomic_store(dest, &store_value, __ATOMIC_RELAXED);
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// wasm32 falls into orderAccess_linux_zero.hpp's "strongest barriers" branch,
++// so a generic acquire load or release store is a plain access plus a full
++// atomic.fence -- which V8 lowers to mfence on x64 and dmb ish on ARM. Every
++// Method::from_interpreted_entry(), cpCache is_resolved() check and safepoint
++// poll paid that. wasm has sequentially consistent atomic loads and stores,
++// so use them, exactly as the aarch64 port does with ldar/stlr.
++template<size_t byte_size>
++struct Atomic::PlatformOrderedLoad<byte_size, X_ACQUIRE>
++{
++  template <typename T>
++  T operator()(const volatile T* p) const { T data; __atomic_load(const_cast<T*>(p), &data, __ATOMIC_ACQUIRE); return data; }
++};
++
++template<size_t byte_size>
++struct Atomic::PlatformOrderedStore<byte_size, RELEASE_X>
++{
++  template <typename T>
++  void operator()(volatile T* p, T v) const { __atomic_store(const_cast<T*>(p), &v, __ATOMIC_RELEASE); }
++};
++
++template<size_t byte_size>
++struct Atomic::PlatformOrderedStore<byte_size, RELEASE_X_FENCE>
++{
++  template <typename T>
++  void operator()(volatile T* p, T v) const { release_store(p, v); OrderAccess::fence(); }
++};
++#endif // __EMSCRIPTEN__
++
+ #endif // OS_CPU_LINUX_ZERO_ATOMIC_LINUX_ZERO_HPP
+diff --git a/src/hotspot/share/classfile/classLoaderData.cpp b/src/hotspot/share/classfile/classLoaderData.cpp
+index 825072c..aaeb5c5 100644
+--- a/src/hotspot/share/classfile/classLoaderData.cpp
++++ b/src/hotspot/share/classfile/classLoaderData.cpp
+@@ -143,6 +143,7 @@ ClassLoaderData::ClassLoaderData(Handle h_class_loader, bool has_class_mirror_ho
+   _keep_alive_ref_count((has_class_mirror_holder || h_class_loader.is_null()) ? 1 : 0),
+   _claim(0),
+   _handles(),
++  _dependency_keys(nullptr), _dependency_key_count(0), _dependency_key_capacity(0),
+   _klasses(nullptr), _packages(nullptr), _modules(nullptr), _unnamed_module(nullptr), _dictionary(nullptr),
+   _jmethod_ids(nullptr),
+   _deallocate_list(nullptr),
+@@ -496,7 +497,13 @@ void ClassLoaderData::record_dependency(const Klass* k) {
+   }
+ 
+   // It's a dependency we won't find through GC, add it.
+-  if (!_handles.contains(to)) {
++  const void* key = to_cld->has_class_mirror_holder() ? (const void*)k : (const void*)to_cld;
++  bool added;
++  {
++    MutexLocker ml(metaspace_lock(), Mutex::_no_safepoint_check_flag);
++    added = add_dependency_key(key);
++  }
++  if (added) {
+     NOT_PRODUCT(Atomic::inc(&_dependency_count));
+     LogTarget(Trace, class, loader, data) lt;
+     if (lt.is_enabled()) {
+@@ -715,6 +722,8 @@ ClassLoaderData::~ClassLoaderData() {
+   // Release the WeakHandle
+   _holder.release(Universe::vm_weak());
+ 
++  FREE_C_HEAP_ARRAY(const void*, _dependency_keys);
++
+   // Release C heap allocated hashtable for all the packages.
+   if (_packages != nullptr) {
+     // Destroy the table itself
+@@ -822,6 +831,34 @@ ClassLoaderMetaspace* ClassLoaderData::metaspace_non_null() {
+   return metaspace;
+ }
+ 
++bool ClassLoaderData::add_dependency_key(const void* key) {
++  assert_lock_strong(metaspace_lock());
++  if (2 * (_dependency_key_count + 1) > _dependency_key_capacity) {
++    int capacity = _dependency_key_capacity == 0 ? 64 : 2 * _dependency_key_capacity;
++    const void** keys = NEW_C_HEAP_ARRAY(const void*, capacity, mtClass);
++    memset(keys, 0, sizeof(const void*) * capacity);
++    for (int i = 0; i < _dependency_key_capacity; i++) {
++      const void* k = _dependency_keys[i];
++      if (k == nullptr) continue;
++      unsigned j = (unsigned)(((uintptr_t)k >> 3) * 2654435761u) & (unsigned)(capacity - 1);
++      while (keys[j] != nullptr) j = (j + 1) & (unsigned)(capacity - 1);
++      keys[j] = k;
++    }
++    FREE_C_HEAP_ARRAY(const void*, _dependency_keys);
++    _dependency_keys = keys;
++    _dependency_key_capacity = capacity;
++  }
++  unsigned mask = (unsigned)(_dependency_key_capacity - 1);
++  for (unsigned j = (unsigned)(((uintptr_t)key >> 3) * 2654435761u) & mask; ; j = (j + 1) & mask) {
++    if (_dependency_keys[j] == key) return false;
++    if (_dependency_keys[j] == nullptr) {
++      _dependency_keys[j] = key;
++      _dependency_key_count++;
++      return true;
++    }
++  }
++}
++
+ OopHandle ClassLoaderData::add_handle(Handle h) {
+   MutexLocker ml(metaspace_lock(),  Mutex::_no_safepoint_check_flag);
+   record_modified_oops();
+diff --git a/src/hotspot/share/classfile/classLoaderData.hpp b/src/hotspot/share/classfile/classLoaderData.hpp
+index 19dbb0b..5159634 100644
+--- a/src/hotspot/share/classfile/classLoaderData.hpp
++++ b/src/hotspot/share/classfile/classLoaderData.hpp
+@@ -135,6 +135,16 @@ class ClassLoaderData : public CHeapObj<mtClass> {
+   ChunkedHandleList _handles; // Handles to constant pool arrays, Modules, etc, which
+                               // have the same life cycle of the corresponding ClassLoader.
+ 
++  // What record_dependency has already put in _handles, as a hash set keyed by
++  // the dependency's ClassLoaderData, or by its Klass for a hidden class with
++  // a mirror holder (both outlive the handle that keeps them alive). Replaces
++  // a scan of every handle per call, which made linking a program's lambdas
++  // quadratic in their number. Guarded by the metaspace lock.
++  const void** _dependency_keys;
++  int _dependency_key_count;
++  int _dependency_key_capacity;
++  bool add_dependency_key(const void* key);  // false if it was already there
++
+   NOT_PRODUCT(volatile int _dependency_count;)  // number of class loader dependencies
+ 
+   Klass* volatile _klasses;              // The classes defined by the class loader.
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 24b2e85..d7f71db 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -1384,6 +1384,18 @@ run:
+           }
+           SET_STACK_INT(VMintDiv(STACK_INT(-2), STACK_INT(-1)), -2);
+           UPDATE_PC_AND_TOS_AND_CONTINUE(1, -1);
++      // The hand-written _idiv above replaced OPC_INT_BINARY(div, ...), which
++      // also generated _ldiv. Without this, long division reaches DEFAULT and
++      // aborts the VM with "Unimplemented opcode 109 = ldiv".
++      CASE(_ldiv): {
++          jlong l1 = STACK_LONG(-1);
++          if (VMlongEqz(l1)) {
++            VM_JAVA_ERROR(vmSymbols::java_lang_ArithmeticException(),
++                          "/ by long zero");
++          }
++          SET_STACK_LONG(VMlongDiv(STACK_LONG(-3), STACK_LONG(-1)), -3);
++          UPDATE_PC_AND_TOS_AND_CONTINUE(1, -2);
++      }
+       OPC_INT_BINARY(rem, Rem, 1);
+ 
+ 
+@@ -3351,6 +3363,12 @@ run:
+     // final fields with publishing the reference to the object that
+     // holds the field. Without the barrier the value of final fields
+     // can be observed to change.
++#ifdef __EMSCRIPTEN__
++    // On wasm this is a full atomic.fence (mfence / dmb ish) on every return.
++    // Only a constructor can have written final fields, which is also the
++    // only place HotSpot's own compilers emit this barrier.
++    if (METHOD->is_object_initializer())
++#endif
+     OrderAccess::storestore();
+ 
+     DECACHE_STATE();
+diff --git a/src/java.base/unix/native/libjli/java_md.c b/src/java.base/unix/native/libjli/java_md.c
+index de0d535..d672d6b 100644
+--- a/src/java.base/unix/native/libjli/java_md.c
++++ b/src/java.base/unix/native/libjli/java_md.c
+@@ -591,7 +591,9 @@ const char*
+ SetExecname(char **argv)
+ {
+     char* exec_path = NULL;
+-#if defined(__linux__)
++#if defined(__linux__) && !defined(__EMSCRIPTEN__)
++    /* Under Emscripten on a Linux host, NODERAWFS exposes the host's
++     * /proc/self/exe, which names node rather than this launcher. */
+     {
+         const char* self = "/proc/self/exe";
+         char buf[PATH_MAX+1];

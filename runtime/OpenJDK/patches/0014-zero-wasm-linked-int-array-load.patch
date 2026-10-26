@@ -1,0 +1,665 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index b5f7d47..61afa97 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -155,6 +155,12 @@ define_pd_global(bool, CompactStrings, true);
+   product(bool, UseZeroWasmLinkedGroup, false, EXPERIMENTAL,                 \
+           "Run the opt-in OSS fixture linked group through Zero state")      \
+                                                                             \
++  product(bool, UseZeroWasmLinkedIntArray, false, EXPERIMENTAL,              \
++          "Run the opt-in OSS fixture linked int[] load through Zero state") \
++                                                                            \
++  product(intx, ZeroWasmLinkedArrayMemoryLimitForTest, 0, EXPERIMENTAL,     \
++          "Test-only Wasm int[] memory limit in pages; zero uses active memory") \
++                                                                            \
+   product(bool, ZeroWasmLinkedGroupVerbose, false, EXPERIMENTAL,             \
+           "Report linked-group ABI and real Zero resume state")             \
+                                                                             \
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 5b34582..0e6fe48 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -32,6 +32,8 @@
+ #include "interpreter/zero/bytecodeInterpreter.inline.hpp"
+ #include "interpreter/interpreter.hpp"
+ #include "interpreter/zero/zeroWasmBaseline.hpp"
++
++extern uint64_t zbb_linked_array_resume_sequence();
+ #include "interpreter/interpreterRuntime.hpp"
+ #include "interpreter/zero/zeroWasmCompiler.hpp"
+ #include "jvm_io.h"
+@@ -787,7 +789,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+ run:
+ 
+ #ifdef __EMSCRIPTEN__
+-  if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedBenchmark)
++  if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray || UseZeroWasmLinkedBenchmark)
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -1634,6 +1636,15 @@ void BytecodeInterpreter::run(interpreterState istate) {
+       }
+ 
+       CASE(_iaload):
++          if (ZeroWasmLinkedGroupVerbose
++              && METHOD->method_holder()->name()->equals("ZeroBaselineFixture")
++              && METHOD->name()->equals("intArrayLoad")
++              && METHOD->signature()->equals("([II)I")) {
++            tty->print_cr("[zbg] INTERPRETER_IALOAD seq=%llu bci=%d",
++                          (unsigned long long)
++                              zbb_linked_array_resume_sequence(),
++                          BCI());
++          }
+           ARRAY_LOADTO32(T_INT, jint,   "%d",   STACK_INT, 0);
+       CASE(_faload):
+           ARRAY_LOADTO32(T_FLOAT, jfloat, "%f",   STACK_FLOAT, 0);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 197b4dd..6f0ecba 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -21,10 +21,13 @@
+ #include "gc/shared/cardTable.hpp"
+ #include "gc/shared/cardTableBarrierSet.hpp"
+ #include "oops/constantPool.inline.hpp"
++#include "oops/arrayOop.hpp"
+ #include "oops/instanceKlass.inline.hpp"
+ #include "oops/method.inline.hpp"
+ #include "oops/oop.inline.hpp"
++#include "oops/typeArrayKlass.hpp"
+ #include "oops/resolvedMethodEntry.hpp"
++#include "memory/universe.hpp"
+ #include "runtime/fieldDescriptor.inline.hpp"
+ #include "runtime/globals.hpp"
+ #include "runtime/os.hpp"
+@@ -266,6 +269,11 @@ struct LinkedOopLayout {
+   int dirty_card;
+ };
+ 
++struct LinkedIntArrayLayout {
++  int length_offset;
++  int base_offset;
++};
++
+ static const int LINKED_RETURN = 0;
+ static const int LINKED_DEOPT = 1;
+ static const int LINKED_EXCEPTION = 2;
+@@ -462,6 +470,91 @@ static void emit_linked_throw_caller(WasmBuf& body, int resume_bci) {
+   body.u8(0x0b);
+ }
+ 
++static void emit_linked_array_status(WasmBuf& body, int bci) {
++  linked_i64_const(body, linked_status(LINKED_REEXECUTE, bci));
++}
++
++// A call-free, safepoint-free int[] load. Every linear-memory load is
++// dominated by a null, length-address, bounds, and end-address check. The
++// latter uses memory.size and i64 arithmetic so a 32-bit address wrap cannot
++// turn a rejected access into a Wasm trap or an out-of-range read.
++static void emit_linked_active_memory_bytes(WasmBuf& body) {
++  body.u8(0x3f); body.u8(0x00); body.u8(0xad);
++  body.u8(0x42); body.sleb64(65536); body.u8(0x7e);
++}
++
++static void emit_linked_effective_memory_bytes(WasmBuf& body) {
++  body.u8(0x20); body.uleb(2); body.u8(0x45);
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_active_memory_bytes(body);
++  body.u8(0x05);
++  emit_linked_active_memory_bytes(body);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(65536); body.u8(0x7e);
++  body.u8(0x54); // active bytes < override bytes
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_active_memory_bytes(body);
++  body.u8(0x05);
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  body.u8(0x42); body.sleb64(65536); body.u8(0x7e);
++  body.u8(0x0b);
++  body.u8(0x0b);
++}
++
++static void emit_linked_int_array_load(WasmBuf& body,
++                                       const LinkedIntArrayLayout& layout,
++                                       int iaload_bci) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // null
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, iaload_bci);
++  body.u8(0x05);
++
++  // Check array + length_offset + sizeof(jint) <= memory.size * 65536.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.length_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body);
++  body.u8(0x58); // i64.le_u
++  body.u8(0x04); body.u8(0x7e);
++
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x4b); // length > unsigned index; negative indexes fail
++  body.u8(0x04); body.u8(0x7e);
++
++  // Check array + base_offset + index*4 + 4 <= memory end.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7e);
++  body.u8(0x7c); // array address + index * sizeof(jint)
++  body.u8(0x42); body.sleb64(layout.base_offset + 4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body);
++  body.u8(0x58);
++  body.u8(0x04); body.u8(0x7e);
++
++  // Recompute the checked start address and perform the only load.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0xa7); // i32.wrap_i64 after the end check
++  body.u8(0x28); body.uleb(2); body.uleb(0);
++  body.u8(0xad); // zero-extend low jint; adapter restores signed result
++  body.u8(0x05);
++  emit_linked_array_status(body, iaload_bci);
++  body.u8(0x0b);
++  body.u8(0x05);
++  emit_linked_array_status(body, iaload_bci);
++  body.u8(0x0b);
++  body.u8(0x05);
++  emit_linked_array_status(body, iaload_bci);
++  body.u8(0x0b);
++  body.u8(0x0b); // close the outer null guard
++  body.u8(0x0b); // function end
++}
++
+ // Benchmark-only bodies. They are emitted only in the opt-in benchmark
+ // module, so the production ten-export module remains byte-for-byte stable.
+ // Each wrapper performs its complete N-iteration loop in Wasm; the host makes
+@@ -670,7 +763,9 @@ static void emit_linked_export(WasmBuf& body, const char* name, int index) {
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+                                int dispatch_bci, int throw_invoke_bci,
+-                               bool benchmark_mode = false) {
++                               bool benchmark_mode = false,
++                               const LinkedIntArrayLayout* array_layout = nullptr,
++                               int array_bci = -1) {
+   static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
+                                          0x01, 0x00, 0x00, 0x00};
+   module.raw(magic, sizeof(magic));
+@@ -706,7 +801,7 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+ 
+   WasmBuf functions;
+   int function_count = oop_layout == nullptr ? 4
+-      : (benchmark_mode ? 28 : 10);
++      : (benchmark_mode ? 28 : (array_layout == nullptr ? 10 : 11));
+   int emitted_function_count = 0;
+   functions.uleb((unsigned)function_count);
+   linked_counted_function_type(functions, 0, &emitted_function_count);
+@@ -720,6 +815,11 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     linked_counted_function_type(functions, 3, &emitted_function_count);
+     linked_counted_function_type(functions, 4, &emitted_function_count);
+     linked_counted_function_type(functions, 4, &emitted_function_count);
++    if (!benchmark_mode && array_layout != nullptr) {
++      // The array production entry takes array, index, and the test-only
++      // memory-limit override (zero selects the active imported memory).
++      linked_counted_function_type(functions, 3, &emitted_function_count);
++    }
+     if (benchmark_mode) {
+       linked_counted_function_type(functions, 5, &emitted_function_count);
+       linked_counted_function_type(functions, 5, &emitted_function_count);
+@@ -746,7 +846,7 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+ 
+   WasmBuf exports;
+   int export_count = oop_layout == nullptr ? 4
+-      : (benchmark_mode ? 20 : 10);
++      : (benchmark_mode ? 20 : (array_layout == nullptr ? 10 : 11));
+   int emitted_export_count = 0;
+   exports.uleb((unsigned)export_count);
+   emit_linked_export(exports, "leaf", LinkedLeaf); emitted_export_count++;
+@@ -760,6 +860,9 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     emit_linked_export(exports, "dispatch", LinkedDispatch); emitted_export_count++;
+     emit_linked_export(exports, "throwLeaf", LinkedThrowLeaf); emitted_export_count++;
+     emit_linked_export(exports, "throwCaller", LinkedThrowCaller); emitted_export_count++;
++    if (!benchmark_mode && array_layout != nullptr) {
++      emit_linked_export(exports, "intArrayLoad", 10); emitted_export_count++;
++    }
+     if (benchmark_mode) {
+       emit_linked_export(exports, "benchPrimCandidate", LinkedBenchPrimCandidate); emitted_export_count++;
+       emit_linked_export(exports, "benchPrimReference", LinkedBenchPrimReference); emitted_export_count++;
+@@ -821,6 +924,12 @@ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bc
+     emit_linked_throw_caller(body, throw_invoke_bci);
+     code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
+     emitted_code_bodies++;
++    if (!benchmark_mode && array_layout != nullptr) {
++      body = WasmBuf();
++      emit_linked_int_array_load(body, *array_layout, array_bci);
++      code.uleb((unsigned)body.length()); code.raw(body.data(), body.length());
++      emitted_code_bodies++;
++    }
+     if (benchmark_mode) {
+       body = WasmBuf();
+       emit_bench_prim(body, LinkedCaller);
+@@ -1324,6 +1433,19 @@ static bool linked_oop_layout_for_fixture(Method* seed,
+   return linked_oop_layout_for_class(box_klass, layout);
+ }
+ 
++static bool linked_int_array_layout_for_fixture(LinkedIntArrayLayout* layout) {
++  if (layout == nullptr || !UseSerialGC || UseCompressedOops
++      || UseCompressedClassPointers || UseCompactObjectHeaders
++      || sizeof(void*) != 4 || sizeof(oop) != 4
++      || Universe::intArrayKlass() == nullptr) {
++    return false;
++  }
++  layout->length_offset = arrayOopDesc::length_offset_in_bytes();
++  layout->base_offset = arrayOopDesc::base_offset_in_bytes(T_INT);
++  return layout->length_offset >= 0 && layout->base_offset > layout->length_offset
++      && layout->base_offset < INT_MAX - 4;
++}
++
+ static CardTable::CardValue* linked_card_for(const LinkedOopLayout& layout,
+                                              oop box) {
+   uintptr_t field_address = (uintptr_t)box + (uintptr_t)layout.child_offset;
+@@ -1377,7 +1499,10 @@ EM_JS(int, zbb_install, (const unsigned char* bytes, int length, const char* key
+   }
+   try {
+     const binary = HEAPU8.slice(bytes, bytes + length);
+-    if (!WebAssembly.validate(binary)) return -1;
++    if (!WebAssembly.validate(binary)) {
++      if (typeof console !== "undefined") console.error("[zbg] install reject=validate");
++      return -1;
++    }
+     const module = new WebAssembly.Module(binary);
+     const instance = new WebAssembly.Instance(module, {});
+     // Installation is the only JS operation.  addFunction places the actual
+@@ -1436,10 +1561,16 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+         if (typeof err === "function") err("[zbg] dump failed: " + dumpError);
+       }
+     }
+-    if (!WebAssembly.validate(binary)) return -1;
++    if (!WebAssembly.validate(binary)) {
++      if (typeof console !== "undefined") console.error("[zbg] install reject=validate");
++      return -1;
++    }
+     const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
+       env: { memory: wasmMemory }
+     });
++    if (slot_count === 11 && typeof err === "function") {
++      err("[zbg] ARRAY_MEMORY bytes=" + wasmMemory.buffer.byteLength);
++    }
+     const slots = [
+       addFunction(instance.exports.leaf, "ji"),
+       addFunction(instance.exports.caller, "ji"),
+@@ -1464,6 +1595,22 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+       slots.push(addFunction(instance.exports.throwLeaf, "ji"));
+       slots.push(addFunction(instance.exports.throwCaller, "ji"));
+     }
++    if (slot_count === 11) {
++      slots.push(addFunction(instance.exports.storeChild, "jii"));
++      slots.push(addFunction(instance.exports.storeChildCaller, "jii"));
++      slots.push(addFunction(instance.exports.goodValue, "ji"));
++      slots.push(addFunction(instance.exports.dispatch, "jiii"));
++      slots.push(addFunction(instance.exports.throwLeaf, "ji"));
++      slots.push(addFunction(instance.exports.throwCaller, "ji"));
++      slots.push(addFunction(instance.exports.intArrayLoad, "jiii"));
++    }
++    if (slots.length !== slot_count || slots.some((slot) => slot < 0)) {
++      if (typeof console !== "undefined") {
++        console.error("[zbg] install reject=table-slots count=" + slots.length
++                      + " expected=" + slot_count);
++      }
++      return -1;
++    }
+     const id = globalThis.__mcwebZeroLinkedGroupCache.__nextId || 1;
+     globalThis.__mcwebZeroLinkedGroupCache.__nextId = id + 1;
+     globalThis.__mcwebZeroLinkedGroupCache[metadata] = { id, instance, slots };
+@@ -1475,6 +1622,7 @@ EM_JS(int, zbb_linked_install, (const unsigned char* bytes, int length,
+     }
+     return id;
+   } catch (error) {
++    if (typeof console !== "undefined") console.error("[zbg] install reject=exception " + error);
+     if (!globalThis.__mcwebZeroLinkedGroupCache.__error) {
+       globalThis.__mcwebZeroLinkedGroupCache.__error = String(error);
+       if (typeof err === "function") err("[zbg] install failed: " + error);
+@@ -1555,7 +1703,7 @@ static THREAD_LOCAL uint64_t _deopt = 0;
+ static THREAD_LOCAL uint64_t _exception_resume = 0;
+ 
+ static THREAD_LOCAL int _linked_module_id = -1;
+-static THREAD_LOCAL int _linked_table_slots[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
++static THREAD_LOCAL int _linked_table_slots[11] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+ static THREAD_LOCAL uint64_t _linked_calls = 0;
+ static THREAD_LOCAL uint64_t _linked_returned = 0;
+ static THREAD_LOCAL uint64_t _linked_deopt = 0;
+@@ -1565,6 +1713,8 @@ static THREAD_LOCAL uint64_t _linked_store_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_alloc_bails = 0;
+ static THREAD_LOCAL uint64_t _linked_alloc_interpreter_entries = 0;
+ static THREAD_LOCAL uint64_t _linked_throw_leaf_interpreter_entries = 0;
++static THREAD_LOCAL uint64_t _linked_array_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_array_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ static THREAD_LOCAL int _benchmark_module_id = -1;
+@@ -1746,6 +1896,7 @@ enum LinkedMethodKind {
+   LinkedFailCallerMethod,
+   LinkedDispatchMethod,
+   LinkedThrowCallerMethod,
++  LinkedIntArrayLoadMethod,
+   LinkedBenchPrimCandidateMethod,
+   LinkedBenchPrimReferenceMethod,
+   LinkedBenchDispatchCandidateMethod,
+@@ -1843,6 +1994,25 @@ static bool linked_throw_caller_shape(Method* method, int* invoke_bci,
+   return *handler_bci > *invoke_bci && *handler_bci < method->code_size();
+ }
+ 
++static bool linked_int_array_load_shape(Method* method, int* iaload_bci,
++                                        int* return_bci) {
++  if (method == nullptr || method->code_size() != 4
++      || iaload_bci == nullptr || return_bci == nullptr) {
++    return false;
++  }
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if ((code[0] != (unsigned char)Bytecodes::_aload_0
++          && code[0] != (unsigned char)Bytecodes::_fast_aload_0)
++      || code[1] != (unsigned char)Bytecodes::_iload_1
++      || code[2] != (unsigned char)Bytecodes::_iaload
++      || code[3] != (unsigned char)Bytecodes::_ireturn) {
++    return false;
++  }
++  *iaload_bci = first_opcode(method, (unsigned char)Bytecodes::_iaload);
++  *return_bci = first_opcode(method, (unsigned char)Bytecodes::_ireturn);
++  return *iaload_bci == 2 && *return_bci == 3;
++}
++
+ // Diagnostic-only E2 classifier trace.  This deliberately reports the raw
+ // rewritten method bytes and metadata predicates without changing acceptance.
+ static void linked_throw_classify_diagnostic(Method* method) {
+@@ -1969,7 +2139,8 @@ static LinkedMethodKind verify_linked_method(Method* method,
+                                              int* init_bci,
+                                              int* dispatch_bci,
+                                              int* throw_invoke_bci,
+-                                             int* throw_handler_bci) {
++                                             int* throw_handler_bci,
++                                             int* int_array_bci) {
+   if (!fixture_class(method) || method->is_native() || method->is_synchronized()) {
+     return LinkedNoMethod;
+   }
+@@ -2077,6 +2248,12 @@ static LinkedMethodKind verify_linked_method(Method* method,
+       return LinkedThrowCallerMethod;
+     }
+   }
++  if (UseZeroWasmLinkedIntArray
++      && static_int(method, "intArrayLoad", "([II)I")
++      && method->size_of_parameters() == 2
++      && linked_int_array_load_shape(method, int_array_bci, return_bci)) {
++    return LinkedIntArrayLoadMethod;
++  }
+   if (static_int(method, "storeChild",
+                  "(LZeroBaselineFixture$Box;LZeroBaselineFixture$Box;)I")
+       && linked_store_child_code_is(method)) {
+@@ -2216,7 +2393,9 @@ static bool linked_prepare_state(interpreterState istate, intptr_t** tos,
+ 
+ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci,
+                                  int dispatch_bci, int throw_invoke_bci,
+-                                 const LinkedOopLayout* oop_layout) {
++                                 const LinkedOopLayout* oop_layout,
++                                 const LinkedIntArrayLayout* array_layout,
++                                 int array_bci) {
+   if (ZeroWasmBaselineJarHash == nullptr
+       || ZeroWasmBaselineClassHash == nullptr
+       || ZeroWasmBaselineDependencyHashes == nullptr) return false;
+@@ -2249,11 +2428,16 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+       "dispatch(LZeroBaselineFixture$Base;I)I;"
+       "throwLeaf(I)I|throwCaller(I)I;virtual-bci=%d;safe-div-bci=%d;"
+       "dispatch-bci=%d;throw-invoke-bci=%d;jar=%s;classHash=%s;dependencies=%s;"
+-      "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;"
++      "features=wasm32-i32-i64-linear-memory-status;oop-mode=%s;array-mode=%s;"
++      "array-memory-limit-pages=%lld;"
++      "array-abi=intArrayLoad:([II)I->(i32,i32,i32)->i64;"
++      "array-exports=11;array-slot=10;array-memory-mode=active-min-override;"
+       "child-offset=%d;tag-offset=%d;card-base=%d;card-shift=%d;dirty-card=%d",
+       virtual_bci, safe_div_bci, dispatch_bci, throw_invoke_bci, ZeroWasmBaselineJarHash,
+       ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
+       oop_layout == nullptr ? "none" : "raw32-serial-card",
++      array_layout == nullptr ? "off" : "on",
++      (long long)ZeroWasmLinkedArrayMemoryLimitForTest,
+       oop_layout == nullptr ? 0 : oop_layout->child_offset,
+       oop_layout == nullptr ? 0 : oop_layout->tag_offset,
+       oop_layout == nullptr ? 0 : oop_layout->card_base,
+@@ -2262,14 +2446,23 @@ static bool install_linked_group(Method* seed, int virtual_bci, int safe_div_bci
+   if (written <= 0 || written >= (int)sizeof(key)) return false;
+   WasmBuf module;
+   int length = build_linked_module(module, virtual_bci, safe_div_bci, oop_layout,
+-                                   dispatch_bci, throw_invoke_bci);
++                                   dispatch_bci, throw_invoke_bci, false,
++                                   array_layout, array_bci);
+   if (length <= 0) return false;
+   _linked_module_id = zbb_linked_install(module.data(), length, key,
+                                            (int)(intptr_t)_linked_table_slots,
+-                                           oop_layout == nullptr ? 4 : 10,
++                                           array_layout != nullptr ? 11
++                                           : (oop_layout == nullptr ? 4 : 10),
+                                            ZeroWasmLinkedGroupVerbose ? 1 : 0);
+   if (_linked_module_id < 0) return false;
+   if (ZeroWasmLinkedGroupVerbose) {
++    if (array_layout != nullptr) {
++      tty->print_cr("[zbg] ARRAY_MODULE_KEY abi=intArrayLoad:([II)I->(i32,i32,i32)->i64 "
++                    "exports=11 slot=10 length-offset=%d base-offset=%d "
++                    "memory-mode=active-min-override limit-pages=%lld bytes=%d",
++                    array_layout->length_offset, array_layout->base_offset,
++                    (long long)ZeroWasmLinkedArrayMemoryLimitForTest, length);
++    }
+     tty->print_cr("[zbg] module direct-call caller->leaf wasm-call=1 status=i64 bytes=%d",
+                   length);
+   }
+@@ -2412,11 +2605,12 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+   int unused_dispatch_bci = -1;
+   int unused_throw_invoke_bci = -1;
+   int unused_throw_handler_bci = -1;
++  int unused_int_array_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(
+       method, &unused_virtual_bci, &unused_safe_div_bci,
+       &unused_safe_div_handler_bci, &return_bci, &unused_alloc_bci,
+       &unused_init_bci, &unused_dispatch_bci, &unused_throw_invoke_bci,
+-      &unused_throw_handler_bci);
++      &unused_throw_handler_bci, &unused_int_array_bci);
+   bool primitive = kind == LinkedBenchPrimCandidateMethod
+       || kind == LinkedBenchPrimReferenceMethod;
+   bool dispatch = kind == LinkedBenchDispatchCandidateMethod
+@@ -2592,7 +2786,7 @@ static ZeroWasmBaseline::Result run_linked_benchmark(
+ static ZeroWasmBaseline::Result run_linked_group(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+-  if (!UseZeroWasmLinkedGroup || istate == nullptr
++  if (!(UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray) || istate == nullptr
+       || istate->thread()->has_pending_exception()) return ZeroWasmBaseline::NotRun;
+   int virtual_bci = -1;
+   int safe_div_bci = -1;
+@@ -2602,6 +2796,7 @@ static ZeroWasmBaseline::Result run_linked_group(
+   int dispatch_bci = -1;
+   int throw_invoke_bci = -1;
+   int throw_handler_bci = -1;
++  int int_array_bci = -1;
+   int return_bci = -1;
+   LinkedMethodKind kind = verify_linked_method(method, &virtual_bci,
+                                                 &safe_div_bci,
+@@ -2610,17 +2805,46 @@ static ZeroWasmBaseline::Result run_linked_group(
+                                                 &alloc_bci, &init_bci,
+                                                 &dispatch_bci,
+                                                 &throw_invoke_bci,
+-                                                &throw_handler_bci);
++                                                &throw_handler_bci,
++                                                &int_array_bci);
++  if (!UseZeroWasmLinkedGroup && kind != LinkedIntArrayLoadMethod) {
++    return ZeroWasmBaseline::NotRun;
++  }
+   LinkedOopLayout oop_layout;
++  LinkedIntArrayLayout int_array_layout;
+   const LinkedOopLayout* install_oop_layout = nullptr;
++  const LinkedIntArrayLayout* install_array_layout = nullptr;
+   if (kind != LinkedNoMethod) {
+     // Always install the deterministic six-function superset.  In
+     // particular, caller/leaf cannot consume a four-function module before
+     // the later storeChild entry has a chance to resolve field metadata.
+     if (!linked_oop_layout_for_fixture(method, &oop_layout)) {
++      if (ZeroWasmLinkedGroupVerbose && kind == LinkedIntArrayLoadMethod) {
++        tty->print_cr("[zbg] ARRAY_REJECT stage=box-layout serial=%d compressed-oops=%d "
++                      "compressed-class=%d compact-headers=%d ptr=%d oop=%d",
++                      UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
++                      UseCompressedClassPointers ? 1 : 0,
++                      UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                      (int)sizeof(oop));
++      }
+       return ZeroWasmBaseline::NotRun;
+     }
+     install_oop_layout = &oop_layout;
++    if (kind == LinkedIntArrayLoadMethod) {
++      if (!linked_int_array_layout_for_fixture(&int_array_layout)) {
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] ARRAY_REJECT stage=array-layout serial=%d "
++                        "compressed-oops=%d compressed-class=%d compact-headers=%d "
++                        "ptr=%d oop=%d int-array-klass=%p",
++                        UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
++                        UseCompressedClassPointers ? 1 : 0,
++                        UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                        (int)sizeof(oop), (void*)Universe::intArrayKlass());
++        }
++        return ZeroWasmBaseline::NotRun;
++      }
++      install_array_layout = &int_array_layout;
++    }
+   }
+   if (ZeroWasmLinkedGroupVerbose && fixture_class(method)
+       && _linked_entry_diagnostics < 16) {
+@@ -2658,7 +2882,12 @@ static ZeroWasmBaseline::Result run_linked_group(
+   if (return_bci < 0) return ZeroWasmBaseline::NotRun;
+   if (_linked_module_id < 0
+       && !install_linked_group(method, virtual_bci, safe_div_bci, dispatch_bci,
+-                               throw_invoke_bci, install_oop_layout)) {
++                               throw_invoke_bci, install_oop_layout,
++                               install_array_layout, int_array_bci)) {
++    if (ZeroWasmLinkedGroupVerbose && kind == LinkedIntArrayLoadMethod) {
++      tty->print_cr("[zbg] ARRAY_REJECT stage=module-install array-bci=%d",
++                    int_array_bci);
++    }
+     return ZeroWasmBaseline::NotRun;
+   }
+   if ((kind == LinkedStoreChildMethod || kind == LinkedStoreChildCallerMethod)
+@@ -2669,6 +2898,98 @@ static ZeroWasmBaseline::Result run_linked_group(
+ 
+   LinkedStatus result;
+   switch (kind) {
++    case LinkedIntArrayLoadMethod: {
++      const uint64_t array_sequence = ++_linked_array_sequence;
++      _linked_array_resume_sequence = array_sequence;
++      oop array = cast_to_oop((void*)locals[0]);
++      jint index = (jint)locals[-1];
++      jlong memory_limit_pages = (jlong)ZeroWasmLinkedArrayMemoryLimitForTest;
++      if (memory_limit_pages < 0 || memory_limit_pages > INT_MAX) {
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] ARRAY_REJECT reason=invalid-memory-limit pages=%lld",
++                        (long long)memory_limit_pages);
++        }
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (array != nullptr && array->klass() != Universe::intArrayKlass()) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (_linked_table_slots[10] < 0 || !install_array_layout) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] ARRAY_ENTER seq=%llu method=intArrayLoad static=1 params=2 "
++                      "raw32=1 exact-klass=intArrayKlass length-offset=%d "
++                      "base-offset=%d limit-pages=%lld slot=%d",
++                      (unsigned long long)array_sequence,
++                      install_array_layout->length_offset,
++                      install_array_layout->base_offset,
++                      (long long)memory_limit_pages, _linked_table_slots[10]);
++        tty->print_cr("[zbg] ARRAY_ADAPTER oop=%p index=%d length=%d "
++                      "length-offset=%d base-offset=%d slot=%d",
++                      (void*)array, index,
++                      array == nullptr ? -1 : typeArrayOop(array)->length(),
++                      install_array_layout->length_offset,
++                      install_array_layout->base_offset, _linked_table_slots[10]);
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] ARRAY_TABLE_CALL seq=%llu slot=%d oop=%p index=%d limit-pages=%lld",
++                      (unsigned long long)array_sequence,
++                      _linked_table_slots[10], (void*)array, index,
++                      (long long)memory_limit_pages);
++      }
++      result = decode_linked_status(linked_table_call3(
++          _linked_table_slots[10], (jint)(intptr_t)array, index,
++          (jint)memory_limit_pages));
++      if (ZeroWasmLinkedGroupVerbose) {
++        tty->print_cr("[zbg] ARRAY_STATUS seq=%llu status=%d bci=%d value=%d "
++                      "expected-bci=%d limit-pages=%lld",
++                      (unsigned long long)array_sequence, result.status,
++                      result.bci, result.value, int_array_bci,
++                      (long long)memory_limit_pages);
++      }
++      if (result.status == LINKED_RETURN && result.bci == 0) {
++        if (!linked_validate_pre_push(istate, *tos, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        push_int(tos, result.value);
++        if (!linked_prepare_state(istate, tos, pc, code_base + return_bci, 1)) {
++          return ZeroWasmBaseline::NotRun;
++        }
++        if (ZeroWasmLinkedGroupVerbose) {
++          tty->print_cr("[zbg] ARRAY_EXIT seq=%llu status=RETURN bci=0",
++                        (unsigned long long)array_sequence);
++          tty->print_cr("[zbg] DIRECT_LOAD intArrayLoad runtime=1 seq=%llu result=%d",
++                        (unsigned long long)array_sequence,
++                        result.value);
++        }
++        _linked_returned++;
++        return ZeroWasmBaseline::Returned;
++      }
++      if (result.status != LINKED_REEXECUTE || result.bci != int_array_bci) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (!linked_validate_pre_push(istate, *tos, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      push_oop(tos, array);
++      push_int(tos, index);
++      if (!linked_prepare_state(istate, tos, pc, code_base + int_array_bci, 2)) {
++        return ZeroWasmBaseline::NotRun;
++      }
++      if (ZeroWasmLinkedGroupVerbose) {
++        const char* reason = array == nullptr ? "null"
++            : ((uint32_t)index >= (uint32_t)typeArrayOop(array)->length()
++               ? "bounds" : "memory");
++        tty->print_cr("[zbg] ARRAY_EXIT seq=%llu status=REEXECUTE bci=%d reason=%s",
++                      (unsigned long long)array_sequence, int_array_bci, reason);
++        tty->print_cr("[zbg] ARRAY_OPCODE_REEXECUTE seq=%llu reason=%s resume-bci=%d "
++                      "depth=2 pending=0", (unsigned long long)array_sequence,
++                      reason, int_array_bci);
++      }
++      _linked_deopt++;
++      return ZeroWasmBaseline::OpcodeResume;
++    }
+     case LinkedLeafMethod:
+       result = decode_linked_status(linked_table_call1(
+           _linked_table_slots[LinkedLeaf], (jint)locals[0]));
+@@ -3013,6 +3334,10 @@ static ZeroWasmBaseline::Result run_linked_group(
+ 
+ } // namespace
+ 
++uint64_t zbb_linked_array_resume_sequence() {
++  return _linked_array_resume_sequence;
++}
++
+ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -3021,7 +3346,7 @@ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+                                              tos, istate);
+     if (benchmark != NotRun) return benchmark;
+   }
+-  if (UseZeroWasmLinkedGroup) {
++  if (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray) {
+     return run_linked_group(method, locals, code_base, pc, tos, istate);
+   }
+   if (!UseZeroWasmBaseline || !fixture_class(method)) return NotRun;
+

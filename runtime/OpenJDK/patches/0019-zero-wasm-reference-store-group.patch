@@ -1,0 +1,2506 @@
+diff --git a/src/hotspot/cpu/zero/globals_zero.hpp b/src/hotspot/cpu/zero/globals_zero.hpp
+index 2d968ef..39bf6f5 100644
+--- a/src/hotspot/cpu/zero/globals_zero.hpp
++++ b/src/hotspot/cpu/zero/globals_zero.hpp
+@@ -180,6 +180,17 @@ define_pd_global(bool, CompactStrings, true);
+           "Test-only JS ref-array-store cache identity mutation incl card layout/poison") \
+   product(bool, ZeroWasmLinkedRefArrayStoreCardProbeForTest, false, EXPERIMENTAL, \
+           "Test-only dedicated old-array/young-child Serial card probe") \
++                                                                            \
++  product(bool, UseZeroWasmLinkedReferenceStoreGroup, false, EXPERIMENTAL,  \
++          "Run the opt-in OSS four-method Object[] store group")           \
++                                                                            \
++  product(intx, ZeroWasmLinkedReferenceStoreGroupMemoryLimitForTest, 0, EXPERIMENTAL, \
++          "Test-only grouped Object[] store memory limit in pages")        \
++  product(ccstr, ZeroWasmLinkedReferenceStoreGroupCacheMutationForTest, nullptr, EXPERIMENTAL, \
++          "Test-only grouped store cache mutation incl edges/card/poison") \
++                                                                            \
++  product(bool, UseZeroWasmReferenceStoreGroupPerf, false, EXPERIMENTAL,    \
++          "Run the measurement-only grouped Object[] store loop module")  \
+   \
+   product(bool, ZeroWasmLinkedGroupVerbose, false, EXPERIMENTAL,             \
+           "Report linked-group ABI and real Zero resume state")             \
+diff --git a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+index 8c7964c..13983d5 100644
+--- a/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
++++ b/src/hotspot/share/interpreter/zero/bytecodeInterpreter.cpp
+@@ -329,7 +329,8 @@ JRT_END
+ // is off or the loop is cold.
+ #ifdef __EMSCRIPTEN__
+ #define DO_BACKEDGE_CHECKS(skip, branch_pc)                                    \
+-  if (UseZeroWasmJIT && !zero_ref_array_collision && (skip) < 0                \
++  if (UseZeroWasmJIT && !zero_ref_array_collision                             \
++      && !zero_reference_store_group_collision && (skip) < 0                 \
+       && --ZeroWasmCompiler::_osr_countdown <= 0) {                            \
+     DECACHE_TOS();                                                             \
+     if (ZeroWasmCompiler::maybe_run_osr(METHOD, locals, &pc, &topOfStack, istate)) { \
+@@ -544,11 +545,27 @@ void BytecodeInterpreter::run(interpreterState istate) {
+       || ((UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore)
+           && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+               || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++              || UseZeroWasmLinkedReferenceStoreGroup
+               || UseZeroWasmBaseline || UseZeroWasmJIT));
++  const bool zero_reference_store_group_collision =
++      UseZeroWasmLinkedReferenceStoreGroup
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  const bool zero_reference_store_group_perf_collision =
++      UseZeroWasmReferenceStoreGroupPerf
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++          || UseZeroWasmLinkedReferenceStoreGroup
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
+   // Zero's browser runtime is single-threaded. Keep this process-local so a
+   // same-frame retry or a later fixture call cannot emit another collision
+   // marker; the gate requires exactly one bounded diagnostic per launch.
+   static bool zero_ref_array_collision_reported = false;
++  static bool zero_reference_store_group_collision_reported = false;
++  static bool zero_reference_store_group_perf_collision_reported = false;
+ #endif
+ 
+ #ifdef ASSERT
+@@ -814,7 +831,8 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // store, benchmark, method baseline, or trace-JIT lanes. Keep this guard
+   // before maybe_run so a collision cannot install a module and then loop at
+   // the same method entry. One bounded diagnostic is enough for the gate.
+-  if (zero_ref_array_collision && pc == METHOD->code_base()
++  if (zero_ref_array_collision && !UseZeroWasmLinkedReferenceStoreGroup
++      && pc == METHOD->code_base()
+       && ZeroWasmLinkedGroupVerbose && !zero_ref_array_collision_reported) {
+     tty->print_cr("[zbg] REF_ARRAY_REJECT reason=flag-collision "
+                   "group=%d int-load=%d int-store=%d benchmark=%d "
+@@ -828,9 +846,35 @@ void BytecodeInterpreter::run(interpreterState istate) {
+                   UseZeroWasmLinkedRefArrayStore ? 1 : 0);
+     zero_ref_array_collision_reported = true;
+   }
++  if (zero_reference_store_group_collision && pc == METHOD->code_base()
++      && ZeroWasmLinkedGroupVerbose
++      && !zero_reference_store_group_collision_reported) {
++    tty->print_cr("[zbg] REFERENCE_STORE_GROUP_REJECT reason=flag-collision "
++                  "group=%d int-load=%d int-store=%d benchmark=%d "
++                  "ref-load=%d ref-store=%d reference-store-group=%d "
++                  "baseline=%d jit=%d",
++                  UseZeroWasmLinkedGroup ? 1 : 0,
++                  UseZeroWasmLinkedIntArray ? 1 : 0,
++                  UseZeroWasmLinkedIntArrayStore ? 1 : 0,
++                  UseZeroWasmLinkedBenchmark ? 1 : 0,
++                  UseZeroWasmLinkedRefArrayLoad ? 1 : 0,
++                  UseZeroWasmLinkedRefArrayStore ? 1 : 0,
++                  UseZeroWasmLinkedReferenceStoreGroup ? 1 : 0,
++                  UseZeroWasmBaseline ? 1 : 0, UseZeroWasmJIT ? 1 : 0);
++    zero_reference_store_group_collision_reported = true;
++  }
++  if (zero_reference_store_group_perf_collision && pc == METHOD->code_base()
++      && ZeroWasmLinkedGroupVerbose
++      && !zero_reference_store_group_perf_collision_reported) {
++    tty->print_cr("[zbp3] PERF_REJECT reason=flag-collision "
++                  "measurement-only=1 production-cache=0");
++    zero_reference_store_group_perf_collision_reported = true;
++  }
+   if ((UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+       || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
+-      || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore)
++      || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++      || UseZeroWasmLinkedReferenceStoreGroup
++      || UseZeroWasmReferenceStoreGroupPerf)
+       // The two incompatible fixture-specific array ABIs fail closed as a
+       // pair. Do not call maybe_run and then retry at the same entry forever;
+       // the real interpreter must own the frame when either incompatible
+@@ -838,8 +882,11 @@ void BytecodeInterpreter::run(interpreterState istate) {
+       && !(UseZeroWasmLinkedIntArrayStore
+            && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+                || UseZeroWasmLinkedRefArrayLoad
+-               || UseZeroWasmLinkedRefArrayStore))
++               || UseZeroWasmLinkedRefArrayStore
++               || UseZeroWasmLinkedReferenceStoreGroup))
+       && !zero_ref_array_collision
++      && !zero_reference_store_group_collision
++      && !zero_reference_store_group_perf_collision
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result linked_group =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -858,6 +905,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // the existing return machinery, while guard/exception resumes re-enter
+   // this loop at the exact bytecode and stack state supplied by the adapter.
+   if (UseZeroWasmBaseline && !zero_ref_array_collision
++      && !zero_reference_store_group_collision
+       && pc == METHOD->code_base()) {
+     ZeroWasmBaseline::Result baseline =
+         ZeroWasmBaseline::maybe_run(METHOD, locals, METHOD->code_base(),
+@@ -885,6 +933,7 @@ void BytecodeInterpreter::run(interpreterState istate) {
+   // measured 13.6% on call-heavy code even when nothing compiled. Both
+   // remaining tests are loads the interpreter has already made.
+   if (UseZeroWasmJIT && !zero_ref_array_collision
++      && !zero_reference_store_group_collision
+       && pc == METHOD->code_base()
+       && (uintx)METHOD->code_size() >= ZeroWasmJITMinBytecodes) {
+     ZeroWasmCompiler::maybe_run(METHOD, locals, METHOD->code_base(), &pc, &topOfStack, istate);
+diff --git a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+index 7aec74d..12a61ec 100644
+--- a/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
++++ b/src/hotspot/share/interpreter/zero/zeroWasmBaseline.cpp
+@@ -20,6 +20,7 @@
+ #include "gc/shared/barrierSet.hpp"
+ #include "gc/shared/cardTable.hpp"
+ #include "gc/shared/cardTableBarrierSet.hpp"
++#include "gc/shared/collectedHeap.hpp"
+ #include "oops/constantPool.inline.hpp"
+ #include "oops/arrayOop.hpp"
+ #include "oops/instanceKlass.inline.hpp"
+@@ -33,6 +34,7 @@
+ #include "runtime/fieldDescriptor.inline.hpp"
+ #include "runtime/globals.hpp"
+ #include "runtime/os.hpp"
++#include "runtime/safepoint.hpp"
+ #include "runtime/safepointVerifiers.hpp"
+ #include "utilities/ostream.hpp"
+ 
+@@ -308,6 +310,9 @@ static THREAD_LOCAL int _linked_ref_array_slot = -1;
+ static THREAD_LOCAL int _linked_ref_array_store_module_id = -1;
+ static THREAD_LOCAL int _linked_ref_array_store_slot = -1;
+ static THREAD_LOCAL bool _linked_ref_array_store_collision_reported = false;
++static THREAD_LOCAL int _linked_reference_store_group_module_id = -1;
++static THREAD_LOCAL int _linked_reference_store_group_slot = -1;
++static THREAD_LOCAL int _reference_store_group_perf_module_id = -1;
+ static THREAD_LOCAL bool _linked_ref_array_store_card_probe_pending = false;
+ static THREAD_LOCAL jint _linked_ref_array_store_card_probe_index = -1;
+ // Only scalar binding facts cross the Java return/allocation gap. Do not keep
+@@ -318,6 +323,8 @@ static THREAD_LOCAL uintptr_t _linked_ref_array_store_card_probe_array_bits = 0;
+ static THREAD_LOCAL uintptr_t _linked_ref_array_store_card_probe_address_bits = 0;
+ static THREAD_LOCAL jint _linked_ref_array_store_card_probe_length = -1;
+ static THREAD_LOCAL jint _linked_ref_array_store_card_probe_span_kind = 0;
++static THREAD_LOCAL jint _reference_store_group_perf_start_index = -1;
++static THREAD_LOCAL jlong _reference_store_group_perf_last_elapsed_ns = 0;
+ 
+ // The dedicated card-probe helper is declared before its shape/runner block,
+ // while the publication helpers remain beside the other frame-state code.
+@@ -350,6 +357,21 @@ static void linked_type(WasmBuf& b, int params) {
+   b.u8(0x7e);                         // i64 packed result
+ }
+ 
++static void linked_i32_type(WasmBuf& b, int params) {
++  b.u8(0x60);
++  b.uleb((unsigned)params);
++  for (int i = 0; i < params; i++) b.u8(0x7f);
++  b.uleb(1);
++  b.u8(0x7f);
++}
++
++static void linked_void_type(WasmBuf& b, int params) {
++  b.u8(0x60);
++  b.uleb((unsigned)params);
++  for (int i = 0; i < params; i++) b.u8(0x7f);
++  b.uleb(0);
++}
++
+ static void linked_counted_type(WasmBuf& b, int params, int* count) {
+   linked_type(b, params);
+   (*count)++;
+@@ -892,6 +914,164 @@ static void emit_linked_ref_array_store(
+   body.u8(0x0b); // function end
+ }
+ 
++enum ReferenceStoreGroupFunction {
++  ReferenceStoreGroupEntry = 0,
++  ReferenceStoreGroupLeaf = 1,
++  ReferenceStoreGroupRelay = 2,
++  ReferenceStoreGroupCommit = 3
++};
++
++// M2-C3a keeps every fallible check in the exported entry before its first
++// private direct call. A miss returns REEXECUTE/BCI0 to the adapter, which
++// leaves the untouched Java entry frame to the interpreter. Only the fully
++// validated path reaches relay->leaf and then commit.
++static void emit_reference_store_group_entry(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout) {
++  body.u8(1);
++  body.uleb(2); body.u8(0x7f); // locals 6=element address, 7=card address
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // null array
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(kArrayStoreMemoryLimitLocal);
++  body.u8(0x45); body.u8(0x45); // memory-limit != 0
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  // Header end must be inside the effective imported-memory range.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.length_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(4); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x56); // i64.gt_u
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  // Unsigned index >= length rejects negative and upper-bound indexes.
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x4f);
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  // Element end uses widened arithmetic before any wasm32 wrap.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset + layout.element_size);
++  body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(5); body.u8(0x45); // VM subtype predicate
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  // Widened card address and end checks are both before the first call.
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(0xffffffffLL); body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c);
++  body.u8(0x42); body.sleb64(1); body.u8(0x7c);
++  emit_linked_effective_memory_bytes(body, kArrayStoreMemoryLimitLocal);
++  body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e);
++  emit_linked_array_status(body, 0);
++  body.u8(0x05);
++
++  // All guards now dominate every private call and both stores. Compute the
++  // proven wasm32 addresses, then execute exactly the three manifest edges.
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0xa7); body.u8(0x21); body.uleb(6);
++
++  body.u8(0x20); body.uleb(4); body.u8(0xad);
++  body.u8(0x20); body.uleb(0); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c); body.u8(0xa7); body.u8(0x21); body.uleb(7);
++
++  // Keep the packed Java success value below the three void-commit operands.
++  // The commit call consumes only its operands, exposing this value again;
++  // consequently every raw opcode after the call is an enclosing end/unwind.
++  body.u8(0x20); body.uleb(2); body.u8(0xad);
++  linked_i64_const(body, linked_status(LINKED_RETURN, 0));
++  body.u8(0x84);
++  body.u8(0x20); body.uleb(6);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupRelay); // entry -> relay
++  body.u8(0x20); body.uleb(7);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupCommit); // entry -> commit
++
++  body.u8(0x0b); // card end
++  body.u8(0x0b); // card overflow
++  body.u8(0x0b); // assignability
++  body.u8(0x0b); // element end
++  body.u8(0x0b); // bounds
++  body.u8(0x0b); // header
++  body.u8(0x0b); // memory override
++  body.u8(0x0b); // null
++  body.u8(0x0b); // function
++}
++
++static void emit_reference_store_group_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_relay(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupLeaf); // relay -> leaf
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_commit(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout) {
++  empty_locals(body);
++  // Void commit: exactly oop store, card store8, end. The exported entry owns
++  // the packed return and no post-commit fallible work exists anywhere.
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x36); body.uleb(2); body.uleb(0);
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x41); body.sleb(layout.dirty_card);
++  body.u8(0x3a); body.uleb(0); body.uleb(0);
++  body.u8(0x0b);
++}
++
+ // Benchmark-only bodies. They are emitted only in the opt-in benchmark
+ // module, so the production ten-export module remains byte-for-byte stable.
+ // Each wrapper performs its complete N-iteration loop in Wasm; the host makes
+@@ -1217,6 +1397,296 @@ static int build_linked_ref_array_store_module(
+   return module.length();
+ }
+ 
++// Four functions, one public entry, and three private direct-call members.
++// The imported memory does not add a function index; the exact indices are
++// therefore stable and are checked against the ordered edge manifest.
++static int build_reference_store_group_module(
++    WasmBuf& module, const LinkedRefArrayStoreLayout& layout) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++
++  WasmBuf types;
++  types.uleb(3);
++  linked_type(types, 6);      // type 0: exported entry -> i64
++  linked_i32_type(types, 1);  // type 1: leaf/relay -> i32
++  linked_void_type(types, 3); // type 2: commit(element,value,card) -> void
++  module.section(1, types);
++
++  WasmBuf imports;
++  imports.uleb(1);
++  imports.string("env"); imports.string("memory");
++  imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++  module.section(2, imports);
++
++  WasmBuf functions;
++  functions.uleb(4);
++  functions.uleb(0); // entry
++  functions.uleb(1); // leaf
++  functions.uleb(1); // relay
++  functions.uleb(2); // commit
++  module.section(3, functions);
++
++  WasmBuf exports;
++  exports.uleb(1);
++  emit_linked_export(exports, "groupedReferenceStore", ReferenceStoreGroupEntry);
++  module.section(7, exports);
++
++  WasmBuf code;
++  WasmBuf entry;
++  WasmBuf leaf;
++  WasmBuf relay;
++  WasmBuf commit;
++  emit_reference_store_group_entry(entry, layout);
++  emit_reference_store_group_leaf(leaf);
++  emit_reference_store_group_relay(relay);
++  emit_reference_store_group_commit(commit, layout);
++  code.uleb(4);
++  code.uleb((unsigned)entry.length()); code.raw(entry.data(), entry.length());
++  code.uleb((unsigned)leaf.length()); code.raw(leaf.data(), leaf.length());
++  code.uleb((unsigned)relay.length()); code.raw(relay.data(), relay.length());
++  code.uleb((unsigned)commit.length()); code.raw(commit.data(), commit.length());
++  module.section(10, code);
++  return module.length();
++}
++
++enum ReferenceStoreGroupPerfFunction {
++  ReferenceStoreGroupPerfInline = 0,
++  ReferenceStoreGroupPerfDirect = 1,
++  ReferenceStoreGroupPerfIndirect = 2,
++  ReferenceStoreGroupPerfDirectLeaf = 3,
++  ReferenceStoreGroupPerfDirectRelay = 4,
++  ReferenceStoreGroupPerfDirectCommit = 5,
++  ReferenceStoreGroupPerfIndirectLeaf = 6,
++  ReferenceStoreGroupPerfIndirectRelay = 7,
++  ReferenceStoreGroupPerfIndirectCommit = 8
++};
++
++enum ReferenceStoreGroupPerfLane {
++  ReferenceStoreGroupPerfInlineLane = 0,
++  ReferenceStoreGroupPerfDirectLane = 1,
++  ReferenceStoreGroupPerfIndirectLane = 2
++};
++
++// Measurement-only loop body. All three public wrappers share this exact
++// schedule and differ only in how identity+commit is expressed. The module is
++// never entered by the production group classifier/cache.
++static void emit_reference_store_group_perf_wrapper(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout,
++    ReferenceStoreGroupPerfLane lane) {
++  body.u8(2);
++  body.uleb(7); body.u8(0x7f); // 8=i,9=index,10=value,11=addr,12=card,13=pre,14=post
++  body.uleb(1); body.u8(0x7e); // 15=checksum
++
++  // Host-prevalidated invariants are repeated in each wrapper. Any mismatch
++  // returns checksum zero before a load, call, or side effect.
++  body.u8(0x20); body.uleb(0); body.u8(0x45); // n == 0
++  body.u8(0x20); body.uleb(1); body.u8(0x45); body.u8(0x72); // array == 0
++  body.u8(0x20); body.uleb(3); body.u8(0x45); body.u8(0x72); // span == 0
++  body.u8(0x20); body.uleb(4); body.u8(0x45); body.u8(0x72); // valueA == 0
++  body.u8(0x20); body.uleb(5); body.u8(0x45); body.u8(0x72); // valueB == 0
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x42); body.sleb64(0);
++  body.u8(0x05);
++
++  // spanCount must be a power of two.
++  body.u8(0x20); body.uleb(3);
++  body.u8(0x20); body.uleb(3); body.u8(0x41); body.sleb(1); body.u8(0x6b);
++  body.u8(0x71); body.u8(0x45); body.u8(0x45);
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x42); body.sleb64(0);
++  body.u8(0x05);
++
++  // start+span must not wrap and must fit the live Object[] length.
++  body.u8(0x20); body.uleb(2); body.u8(0x20); body.uleb(3); body.u8(0x6a);
++  body.u8(0x22); body.uleb(9); // temporary end in index local
++  body.u8(0x20); body.uleb(2); body.u8(0x49);
++  body.u8(0x20); body.uleb(9);
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x28); body.uleb(2); body.uleb((unsigned)layout.length_offset);
++  body.u8(0x4b); body.u8(0x72);
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x42); body.sleb64(0);
++  body.u8(0x05);
++
++  // The supplied page count must equal the imported memory size, and the
++  // highest element/card byte must fit before any loop work.
++  body.u8(0x3f); body.u8(0x00); body.u8(0x20); body.uleb(7); body.u8(0x47);
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x42); body.sleb64(0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(9); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x20); body.uleb(7); body.u8(0xad);
++  body.u8(0x42); body.sleb64(65536); body.u8(0x7e); body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x42); body.sleb64(0);
++  body.u8(0x05);
++
++  body.u8(0x20); body.uleb(6); body.u8(0xad);
++  body.u8(0x20); body.uleb(1); body.u8(0xad);
++  body.u8(0x20); body.uleb(9); body.u8(0xad);
++  body.u8(0x42); body.sleb64(layout.element_size); body.u8(0x7e); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.base_offset); body.u8(0x7c);
++  body.u8(0x42); body.sleb64(layout.card_shift); body.u8(0x88);
++  body.u8(0x7c); body.u8(0x42); body.sleb64(1); body.u8(0x7c);
++  body.u8(0x20); body.uleb(7); body.u8(0xad);
++  body.u8(0x42); body.sleb64(65536); body.u8(0x7e); body.u8(0x56);
++  body.u8(0x04); body.u8(0x7e);
++  body.u8(0x42); body.sleb64(0);
++  body.u8(0x05);
++
++  body.u8(0x41); body.sleb(0); body.u8(0x21); body.uleb(8);
++  body.u8(0x42); body.sleb64(0); body.u8(0x21); body.uleb(15);
++  body.u8(0x02); body.u8(0x40);
++  body.u8(0x03); body.u8(0x40);
++  body.u8(0x20); body.uleb(8); body.u8(0x20); body.uleb(0);
++  body.u8(0x4f); body.u8(0x0d); body.uleb(1);
++
++  body.u8(0x20); body.uleb(2);
++  body.u8(0x20); body.uleb(8);
++  body.u8(0x20); body.uleb(3); body.u8(0x41); body.sleb(1); body.u8(0x6b);
++  body.u8(0x71); body.u8(0x6a); body.u8(0x21); body.uleb(9);
++  body.u8(0x20); body.uleb(8); body.u8(0x41); body.sleb(1); body.u8(0x71);
++  body.u8(0x04); body.u8(0x7f); body.u8(0x20); body.uleb(5);
++  body.u8(0x05); body.u8(0x20); body.uleb(4); body.u8(0x0b);
++  body.u8(0x21); body.uleb(10);
++
++  body.u8(0x20); body.uleb(1);
++  body.u8(0x20); body.uleb(9); body.u8(0x41); body.sleb(layout.element_size);
++  body.u8(0x6c); body.u8(0x6a); body.u8(0x41); body.sleb(layout.base_offset);
++  body.u8(0x6a); body.u8(0x21); body.uleb(11);
++  body.u8(0x20); body.uleb(6); body.u8(0x20); body.uleb(11);
++  body.u8(0x41); body.sleb(layout.card_shift); body.u8(0x76); body.u8(0x6a);
++  body.u8(0x21); body.uleb(12);
++  body.u8(0x20); body.uleb(11); body.u8(0x28); body.uleb(2); body.uleb(0);
++  body.u8(0x21); body.uleb(13);
++
++  if (lane == ReferenceStoreGroupPerfInlineLane) {
++    body.u8(0x20); body.uleb(11); body.u8(0x20); body.uleb(10);
++    body.u8(0x36); body.uleb(2); body.uleb(0);
++    body.u8(0x20); body.uleb(12); body.u8(0x41); body.sleb(layout.dirty_card);
++    body.u8(0x3a); body.uleb(0); body.uleb(0);
++  } else if (lane == ReferenceStoreGroupPerfDirectLane) {
++    body.u8(0x20); body.uleb(11);
++    body.u8(0x20); body.uleb(10);
++    body.u8(0x10); body.uleb(ReferenceStoreGroupPerfDirectRelay);
++    body.u8(0x20); body.uleb(12);
++    body.u8(0x10); body.uleb(ReferenceStoreGroupPerfDirectCommit);
++  } else {
++    body.u8(0x20); body.uleb(11);
++    body.u8(0x20); body.uleb(10);
++    body.u8(0x41); body.sleb(1); body.u8(0x11); body.uleb(1); body.u8(0x00);
++    body.u8(0x20); body.uleb(12);
++    body.u8(0x41); body.sleb(2); body.u8(0x11); body.uleb(2); body.u8(0x00);
++  }
++
++  body.u8(0x20); body.uleb(11); body.u8(0x28); body.uleb(2); body.uleb(0);
++  body.u8(0x21); body.uleb(14);
++  for (unsigned local = 8; local <= 10; local++) {
++    body.u8(0x20); body.uleb(15); body.u8(0x20); body.uleb(local);
++    body.u8(0xad); body.u8(0x7c); body.u8(0x21); body.uleb(15);
++  }
++  for (unsigned local = 13; local <= 14; local++) {
++    body.u8(0x20); body.uleb(15); body.u8(0x20); body.uleb(local);
++    body.u8(0xad); body.u8(0x7c); body.u8(0x21); body.uleb(15);
++  }
++  body.u8(0x20); body.uleb(8); body.u8(0x41); body.sleb(1); body.u8(0x6a);
++  body.u8(0x21); body.uleb(8); body.u8(0x0c); body.uleb(0);
++  body.u8(0x0b); body.u8(0x0b);
++  body.u8(0x20); body.uleb(15);
++
++  // Close card, element, memory, range, power-of-two, and null guards.
++  for (int i = 0; i < 6; i++) body.u8(0x0b);
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_perf_leaf(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x0b);
++}
++
++static void emit_reference_store_group_perf_direct_relay(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0);
++  body.u8(0x10); body.uleb(ReferenceStoreGroupPerfDirectLeaf);
++  body.u8(0x0b);
++}
++
++static void emit_reference_store_group_perf_indirect_relay(WasmBuf& body) {
++  empty_locals(body);
++  body.u8(0x20); body.uleb(0); body.u8(0x41); body.sleb(0);
++  body.u8(0x11); body.uleb(1); body.u8(0x00); body.u8(0x0b);
++}
++
++static void emit_reference_store_group_perf_commit(
++    WasmBuf& body, const LinkedRefArrayStoreLayout& layout) {
++  emit_reference_store_group_commit(body, layout);
++}
++
++static int build_reference_store_group_perf_module(
++    WasmBuf& module, const LinkedRefArrayStoreLayout& layout) {
++  static const unsigned char magic[] = {0x00, 0x61, 0x73, 0x6d,
++                                         0x01, 0x00, 0x00, 0x00};
++  module.raw(magic, sizeof(magic));
++  WasmBuf types;
++  types.uleb(3);
++  linked_type(types, 8);
++  linked_i32_type(types, 1);
++  linked_void_type(types, 3);
++  module.section(1, types);
++  WasmBuf imports;
++  imports.uleb(1); imports.string("env"); imports.string("memory");
++  imports.u8(0x02); imports.u8(0x03); imports.uleb(0); imports.uleb(65536);
++  module.section(2, imports);
++  WasmBuf functions;
++  functions.uleb(9);
++  functions.uleb(0); functions.uleb(0); functions.uleb(0);
++  functions.uleb(1); functions.uleb(1); functions.uleb(2);
++  functions.uleb(1); functions.uleb(1); functions.uleb(2);
++  module.section(3, functions);
++  WasmBuf table;
++  table.uleb(1); table.u8(0x70); table.u8(0x00); table.uleb(3);
++  module.section(4, table);
++  WasmBuf exports;
++  exports.uleb(3);
++  emit_linked_export(exports, "inlineLoop", ReferenceStoreGroupPerfInline);
++  emit_linked_export(exports, "directLoop", ReferenceStoreGroupPerfDirect);
++  emit_linked_export(exports, "indirectLoop", ReferenceStoreGroupPerfIndirect);
++  module.section(7, exports);
++  WasmBuf elements;
++  elements.uleb(1); elements.u8(0x00);
++  elements.u8(0x41); elements.sleb(0); elements.u8(0x0b);
++  elements.uleb(3); elements.uleb(ReferenceStoreGroupPerfIndirectLeaf);
++  elements.uleb(ReferenceStoreGroupPerfIndirectRelay);
++  elements.uleb(ReferenceStoreGroupPerfIndirectCommit);
++  module.section(9, elements);
++  WasmBuf code;
++  WasmBuf bodies[9];
++  emit_reference_store_group_perf_wrapper(
++      bodies[0], layout, ReferenceStoreGroupPerfInlineLane);
++  emit_reference_store_group_perf_wrapper(
++      bodies[1], layout, ReferenceStoreGroupPerfDirectLane);
++  emit_reference_store_group_perf_wrapper(
++      bodies[2], layout, ReferenceStoreGroupPerfIndirectLane);
++  emit_reference_store_group_perf_leaf(bodies[3]);
++  emit_reference_store_group_perf_direct_relay(bodies[4]);
++  emit_reference_store_group_perf_commit(bodies[5], layout);
++  emit_reference_store_group_perf_leaf(bodies[6]);
++  emit_reference_store_group_perf_indirect_relay(bodies[7]);
++  emit_reference_store_group_perf_commit(bodies[8], layout);
++  code.uleb(9);
++  for (int i = 0; i < 9; i++) {
++    code.uleb((unsigned)bodies[i].length());
++    code.raw(bodies[i].data(), bodies[i].length());
++  }
++  module.section(10, code);
++  return module.length();
++}
++
+ static int build_linked_module(WasmBuf& module, int virtual_bci, int safe_div_bci,
+                                const LinkedOopLayout* oop_layout,
+                                int dispatch_bci, int throw_invoke_bci,
+@@ -1526,6 +1996,18 @@ static bool reference_array_store_fixture_class(Method* method) {
+           "ZeroReferenceArrayStoreFixture");
+ }
+ 
++static bool reference_store_group_fixture_class(Method* method) {
++  return method != nullptr
++      && method->method_holder()->name()->equals(
++          "ZeroReferenceStoreGroupFixture");
++}
++
++static bool reference_store_group_perf_fixture_class(Method* method) {
++  return method != nullptr
++      && method->method_holder()->name()->equals(
++          "ZeroReferenceStoreGroupPerfFixture");
++}
++
+ static bool static_int(Method* method, const char* name, const char* sig) {
+   return method->is_static() && method->result_type() == T_INT
+       && method->name()->equals(name) && method->signature()->equals(sig);
+@@ -3321,46 +3803,585 @@ EM_JS(int, zbb_ref_array_store_cache_mutation, (const unsigned char* bytes,
+   return freshId;
+ });
+ 
+-static bool install_linked_array_store(const LinkedIntArrayLayout& layout,
+-                                       int iastore_bci) {
+-  if (ZeroWasmBaselineJarHash == nullptr
+-      || ZeroWasmBaselineClassHash == nullptr
+-      || ZeroWasmBaselineDependencyHashes == nullptr
+-      || _linked_array_store_module_id >= 0) {
+-    return _linked_array_store_module_id >= 0;
+-  }
+-  char key[2048];
+-  int written = jio_snprintf(
+-      key, sizeof(key),
+-      "abi=zero-linked-int-array-store-v1;compiler=%s;class=ZeroBaselineFixture;"
+-      "method=intArrayStore([III)I;store-bci=%d;jar=%s;classHash=%s;"
+-      "dependencies=%s;features=wasm32-i32-i64-linear-memory-status;"
+-      "array-mode=int-store-only;exports=1;slot=separate;length-offset=%d;"
+-      "base-offset=%d;memory-mode=active-min-override;"
+-      "memory-limit-pages=%lld",
+-      kCompilerVersion, iastore_bci, ZeroWasmBaselineJarHash,
+-      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
+-      layout.length_offset, layout.base_offset,
+-      (long long)ZeroWasmLinkedArrayMemoryLimitForTest);
+-  if (written <= 0 || written >= (int)sizeof(key)) return false;
+-
+-  WasmBuf module;
+-  int length = build_linked_array_store_module(module, layout, iastore_bci);
+-  if (length <= 0) return false;
+-  _linked_array_store_module_id = zbb_array_store_install(
+-      module.data(), length, key, (int)(intptr_t)&_linked_array_store_slot,
+-      ZeroWasmLinkedGroupVerbose ? 1 : 0);
+-  if (_linked_array_store_module_id >= 0 && ZeroWasmLinkedGroupVerbose) {
+-    int cached_slot = -1;
+-    int cached_id = zbb_array_store_install(
+-        module.data(), length, key, (int)(intptr_t)&cached_slot, 0);
+-    if (cached_id != _linked_array_store_module_id
+-        || cached_slot != _linked_array_store_slot) {
+-      tty->print_cr("[zbg] ARRAY_STORE_CACHE_REJECT first-id=%d hit-id=%d "
+-                    "first-slot=%d hit-slot=%d",
+-                    _linked_array_store_module_id, cached_id,
+-                    _linked_array_store_slot, cached_slot);
+-      return false;
++EM_JS(int, zbb_reference_store_group_install,
++      (const unsigned char* bytes, int length, const char* key, int out_slot,
++       int dump_bytes, const char* card_layout, const char* group_edges), {
++  const install = (bytes, length, key, out_slot, dump_bytes, card_layout,
++                   group_edges) => {
++    globalThis.__mcwebZeroReferenceStoreGroupCache ||= Object.create(null);
++    HEAP32[out_slot >> 2] = -1;
++    const metadata = UTF8ToString(key);
++    const cardLayout = UTF8ToString(card_layout);
++    const groupEdges = UTF8ToString(group_edges);
++    const compiler = "zero-baseline-abi-v1";
++    const cache = globalThis.__mcwebZeroReferenceStoreGroupCache;
++    const importedMemory = wasmMemory;
++    const memoryBuffer = importedMemory && importedMemory.buffer;
++    const memoryPages = memoryBuffer && memoryBuffer.byteLength / 65536;
++    const sharedMemory = typeof SharedArrayBuffer !== "undefined"
++        && memoryBuffer instanceof SharedArrayBuffer;
++    if (!(importedMemory instanceof WebAssembly.Memory) || !sharedMemory
++        || !Number.isInteger(memoryPages) || memoryPages < 0
++        || memoryPages > 65536) {
++      if (typeof console !== "undefined") console.error(
++          "[zbg] reference-store-group install reject=memory-identity-shared-max");
++      return -1;
++    }
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    let digestA = 0x811c9dc5;
++    let digestB = 0x9e3779b9;
++    for (let i = 0; i < binary.length; i++) {
++      digestA = Math.imul(digestA ^ binary[i], 0x01000193) >>> 0;
++      digestB = Math.imul(digestB ^ ((binary[i] + i) & 0xff), 0x85ebca6b) >>> 0;
++    }
++    const digest = digestA.toString(16).padStart(8, "0")
++        + digestB.toString(16).padStart(8, "0");
++    const sameBytes = (left, right) => left instanceof Uint8Array
++        && left.length === right.length
++        && left.every((value, i) => value === right[i]);
++    const cached = cache[metadata];
++    let cachedExportMatches = false;
++    if (cached) {
++      try {
++        cachedExportMatches = typeof getWasmTableEntry === "function"
++            && getWasmTableEntry(cached.ownedSlot) === cached.export;
++      } catch (error) {
++        cachedExportMatches = false;
++      }
++    }
++    if (cached) {
++      if (cached.compiler !== compiler || cached.digest !== digest
++          || cached.bytes !== length || !sameBytes(cached.binary, binary)
++          || cached.metadata !== metadata || cached.memory !== importedMemory
++          || cached.memoryPages !== memoryPages
++          || cached.cardLayout !== cardLayout || cached.groupEdges !== groupEdges
++          || !cached.instance || cached.slot < 0
++          || !Number.isInteger(cached.ownedSlot)
++          || cached.slot !== cached.ownedSlot || !cachedExportMatches) {
++        const poisoning = cache.__pendingPoison === true;
++        const poisonCallable = cache.__poisonCallable;
++        const oldSlot = cached.slot;
++        const oldInstance = cached.instance;
++        const ownedSlot = cached.ownedSlot;
++        let oldCallable = false;
++        let callableProbe = false;
++        let poisonVisible = false;
++        let oldExportVisible = false;
++        try {
++          if (typeof getWasmTableEntry !== "function") {
++            throw new Error("missing table probe");
++          }
++          const visible = getWasmTableEntry(ownedSlot);
++          oldCallable = typeof visible === "function";
++          poisonVisible = poisoning && visible === poisonCallable;
++          oldExportVisible = visible === cached.export;
++          callableProbe = true;
++        } catch (error) {
++          oldCallable = false;
++        }
++        cached.instance = null;
++        cached.slot = -1;
++        cached.binary = null;
++        cached.memory = null;
++        delete cache[metadata];
++        cache.__lastInstance = null;
++        let removed = false;
++        try {
++          if (typeof removeFunction !== "function" || ownedSlot < 0) {
++            throw new Error("missing owned table cleanup");
++          }
++          removeFunction(ownedSlot);
++          removed = true;
++        } catch (error) {
++          if (typeof console !== "undefined") console.error(
++              "[zbg] reference-store-group install reject=cache-release " + error);
++        }
++        let oldCallableAfter = false;
++        try {
++          oldCallableAfter = typeof getWasmTableEntry(ownedSlot) === "function";
++        } catch (error) {
++          oldCallableAfter = false;
++        }
++        let poisonCallableAfter = false;
++        if (poisoning) {
++          try {
++            const after = getWasmTableEntry(ownedSlot);
++            poisonCallableAfter = typeof after === "function"
++                || after === poisonCallable;
++          } catch (error) {
++            poisonCallableAfter = false;
++          }
++        }
++        const poisonRemoved = !poisoning || removed;
++        const cacheIdentityProven = poisoning
++            ? !cachedExportMatches && poisonVisible && !oldExportVisible
++                && poisonRemoved && !poisonCallableAfter
++            : cachedExportMatches;
++        const cleanupProven = removed && callableProbe && oldCallable
++            && cacheIdentityProven && !oldCallableAfter;
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
++        cache.__lastInvalidation = {
++          oldSlot, ownedSlot, oldInstance, oldCallable, cachedExportMatches,
++          oldCallableAfter, removed, poisoning, poisonVisible,
++          oldExportVisible, poisonRemoved, poisonCallableAfter,
++          cleanupProven, metadataCleared: !cache[metadata],
++          lastInstanceCleared: cache.__lastInstance === null
++        };
++        if (!cleanupProven) {
++          if (typeof err === "function") err(
++              "[zbg] JS_CACHE_CLEANUP_UNSUPPORTED reference-store-group"
++              + " detached=1 removed=" + (removed ? "1" : "0")
++              + " poisoning=" + (poisoning ? "1" : "0")
++              + " old-callable-after=" + (oldCallableAfter ? "1" : "0"));
++          return -1;
++        }
++        if (typeof err === "function") err(
++            "[zbg] JS_CACHE_INVALIDATE reference-store-group slot=" + oldSlot
++            + " old-id=" + cached.id + " owned-slot=" + ownedSlot
++            + " removed=1 old-callable=" + (oldCallable ? "1" : "0")
++            + " export-match=" + (cachedExportMatches ? "1" : "0")
++            + " old-callable-after=0 poisoning=" + (poisoning ? "1" : "0")
++            + " poison-visible=" + (poisonVisible ? "1" : "0")
++            + " old-export-visible=" + (oldExportVisible ? "1" : "0")
++            + " poison-removed=" + (poisonRemoved ? "1" : "0")
++            + " poison-callable-after=" + (poisonCallableAfter ? "1" : "0")
++            + " instance-cleared=1 cache-cleared=1 last-instance-cleared=1");
++        return -1;
++      }
++      HEAP32[out_slot >> 2] = cached.slot;
++      if (typeof err === "function") err(
++          "[zbg] JS_CACHE_HIT reference-store-group id=" + cached.id
++          + " slot=" + cached.slot
++          + " instance-reused="
++          + (cached.instance === cache.__lastInstance ? "1" : "0")
++          + " memory-reused=1 compiler=" + cached.compiler
++          + " digest=" + cached.digest
++          + " bytes-exact=1 card-layout-exact=1 group-edges-exact=1"
++          + " export-match=1");
++      cache.__lastInstance = cached.instance;
++      return cached.id;
++    }
++    let installedSlot = -1;
++    try {
++      if (dump_bytes) {
++        const fs = typeof require === "function" ? require("fs") : null;
++        const dumpPath = typeof process !== "undefined" && process.env
++            ? process.env.MCWEB_ZERO_REFERENCE_STORE_GROUP_WASM_DUMP : "";
++        if (!fs || typeof Buffer === "undefined" || !dumpPath) {
++          throw new Error("missing unique reference-store-group dump path");
++        }
++        fs.writeFileSync(dumpPath, Buffer.from(binary), { flag: "wx" });
++      }
++      if (!WebAssembly.validate(binary)) throw new Error("validate");
++      const instance = new WebAssembly.Instance(new WebAssembly.Module(binary), {
++        env: { memory: importedMemory }
++      });
++      const exportedStore = instance.exports.groupedReferenceStore;
++      if (typeof exportedStore !== "function"
++          || Object.keys(instance.exports).length !== 1) {
++        throw new Error("exact export shape");
++      }
++      if (typeof addFunction !== "function" || typeof removeFunction !== "function") {
++        throw new Error("missing table primitives");
++      }
++      installedSlot = addFunction(exportedStore, "jiiiiii");
++      if (!Number.isInteger(installedSlot) || installedSlot < 0) {
++        throw new Error("invalid slot");
++      }
++      const id = cache.__nextId || 1;
++      cache.__nextId = id + 1;
++      cache[metadata] = {
++        id, metadata, bytes: length, binary, instance, slot: installedSlot,
++        compiler, digest, memory: importedMemory, memoryPages, cardLayout,
++        groupEdges
++      };
++      Object.defineProperty(cache[metadata], "export", {
++        value: exportedStore, writable: false, configurable: false,
++        enumerable: true
++      });
++      Object.defineProperty(cache[metadata], "ownedSlot", {
++        value: installedSlot, writable: false, configurable: false,
++        enumerable: true
++      });
++      cache.__lastInstance = instance;
++      HEAP32[out_slot >> 2] = installedSlot;
++      if (typeof err === "function") err(
++          "[zbg] JS_INSTALL reference-store-group funcs=4 exports=1 private=3"
++          + " table-slots=1 private-slots=0 id=" + id + " slot=" + installedSlot
++          + " bytes=" + length + " compiler=" + compiler
++          + " digest=" + digest + " memory=shared max-pages=65536"
++          + " card-layout=" + cardLayout + " group-edges=" + groupEdges);
++      return id;
++    } catch (error) {
++      if (installedSlot >= 0 && typeof removeFunction === "function") {
++        try { removeFunction(installedSlot); } catch (releaseError) {
++          if (typeof console !== "undefined") console.error(
++              "[zbg] reference-store-group install cleanup reject " + releaseError);
++        }
++      }
++      const failed = cache[metadata];
++      if (failed && failed.slot === installedSlot) delete cache[metadata];
++      cache.__lastInstance = null;
++      HEAP32[out_slot >> 2] = -1;
++      if (typeof console !== "undefined") console.error(
++          "[zbg] reference-store-group install reject=exception " + error);
++      return -1;
++    }
++  };
++  globalThis.__mcwebZeroReferenceStoreGroupInstall = install;
++  return install(bytes, length, key, out_slot, dump_bytes, card_layout,
++                 group_edges);
++});
++
++EM_JS(int, zbb_reference_store_group_cache_mutation,
++      (const unsigned char* bytes, int length, const char* key, int out_slot,
++       int dump_bytes, const char* card_layout, const char* group_edges,
++       const char* mutation_name), {
++  const mutation = UTF8ToString(mutation_name);
++  const metadata = UTF8ToString(key);
++  const cardLayout = UTF8ToString(card_layout);
++  const groupEdges = UTF8ToString(group_edges);
++  const cache = globalThis.__mcwebZeroReferenceStoreGroupCache;
++  const cached = cache && cache[metadata];
++  const install = globalThis.__mcwebZeroReferenceStoreGroupInstall;
++  HEAP32[out_slot >> 2] = -1;
++  if (!cached || typeof install !== "function") return -1;
++
++  const expectedBinary = HEAPU8.slice(bytes, bytes + length);
++  let digestA = 0x811c9dc5;
++  let digestB = 0x9e3779b9;
++  for (let i = 0; i < expectedBinary.length; i++) {
++    digestA = Math.imul(digestA ^ expectedBinary[i], 0x01000193) >>> 0;
++    digestB = Math.imul(digestB ^ ((expectedBinary[i] + i) & 0xff),
++                        0x85ebca6b) >>> 0;
++  }
++  const expectedDigest = digestA.toString(16).padStart(8, "0")
++      + digestB.toString(16).padStart(8, "0");
++  const expectedMemory = wasmMemory;
++  const expectedPages = expectedMemory && expectedMemory.buffer
++      ? expectedMemory.buffer.byteLength / 65536 : NaN;
++  const validationMode = mutation === "selftest-fresh-false"
++      || mutation === "selftest-fresh-throw" ? mutation : "normal";
++  cache.__lastInvalidation = null;
++  cache.__pendingPoison = false;
++  cache.__poisonCallable = null;
++  switch (mutation) {
++    case "compiler": cached.compiler = "mutated-compiler"; break;
++    case "digest": cached.digest = "deadbeefdeadbeef"; break;
++    case "bytes":
++      cached.binary = cached.binary.slice(); cached.binary[0] ^= 1; break;
++    case "memory":
++      try {
++        cached.memory = new WebAssembly.Memory({
++          initial: 0, maximum: 65536, shared: true
++        });
++      } catch (error) { return -1; }
++      break;
++    case "metadata": cached.metadata = metadata + "#mutated"; break;
++    case "slot": cached.slot = cached.ownedSlot + 1; break;
++    case "card-layout": cached.cardLayout = cardLayout + "#mutated"; break;
++    case "group-edges": cached.groupEdges = groupEdges + "#mutated"; break;
++    case "selftest-fresh-false":
++    case "selftest-fresh-throw":
++      cached.compiler = "mutated-compiler";
++      break;
++    case "poison": {
++      let originalRemoved = false;
++      let poisonSlot = -1;
++      try {
++        if (typeof addFunction !== "function"
++            || typeof getWasmTableEntry !== "function"
++            || typeof removeFunction !== "function") {
++          throw new Error("missing poison primitives");
++        }
++        const original = getWasmTableEntry(cached.ownedSlot);
++        if (typeof original !== "function") throw new Error("owned slot not callable");
++        removeFunction(cached.ownedSlot);
++        originalRemoved = true;
++        if (typeof getWasmTableEntry(cached.ownedSlot) === "function") {
++          throw new Error("original still callable");
++        }
++        const poisoned = (...args) => 0n;
++        poisonSlot = addFunction(poisoned, "jiiiiii");
++        const poisonCallable = getWasmTableEntry(poisonSlot);
++        if (poisonSlot !== cached.ownedSlot
++            || typeof poisonCallable !== "function"
++            || poisonCallable === original) {
++          throw new Error("owned slot not recycled");
++        }
++        cache.__poisonCallable = poisonCallable;
++        cache.__pendingPoison = true;
++      } catch (error) {
++        let poisonCleanup = poisonSlot < 0;
++        if (poisonSlot >= 0 && typeof removeFunction === "function") {
++          try {
++            removeFunction(poisonSlot);
++            poisonCleanup = typeof getWasmTableEntry(poisonSlot) !== "function";
++          } catch (cleanupError) { poisonCleanup = false; }
++        }
++        if (originalRemoved) {
++          cached.slot = -1;
++          cached.instance = null;
++          cached.binary = null;
++          cached.memory = null;
++          delete cache[metadata];
++          cache.__lastInstance = null;
++        }
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
++        cache.__lastInvalidation = {
++          setupFailed: true, originalRemoved, poisonSlot, poisonCleanup,
++          metadataCleared: !cache[metadata],
++          lastInstanceCleared: cache.__lastInstance === null
++        };
++        if (typeof console !== "undefined") console.error(
++            "[zbg] reference-store-group poison reject " + error
++            + " original-removed=" + (originalRemoved ? "1" : "0")
++            + " poison-cleanup=" + (poisonCleanup ? "1" : "0"));
++        return -1;
++      }
++      break;
++    }
++    default: return -1;
++  }
++
++  const oldId = cached.id;
++  const oldSlot = cached.slot;
++  const oldOwnedSlot = cached.ownedSlot;
++  const oldInstance = cached.instance;
++  const missId = install(bytes, length, key, out_slot, dump_bytes,
++                         card_layout, group_edges);
++  const invalidation = cache.__lastInvalidation;
++  const poisonProof = mutation === "poison"
++      ? invalidation && invalidation.poisoning
++          && !invalidation.cachedExportMatches
++          && invalidation.poisonVisible && !invalidation.oldExportVisible
++          && invalidation.poisonRemoved && !invalidation.poisonCallableAfter
++      : invalidation && invalidation.cachedExportMatches;
++  if (missId >= 0 || !invalidation || !invalidation.removed
++      || invalidation.oldSlot !== oldSlot
++      || invalidation.ownedSlot !== oldOwnedSlot
++      || invalidation.oldInstance !== oldInstance || !poisonProof
++      || invalidation.oldCallableAfter || !invalidation.cleanupProven
++      || !invalidation.metadataCleared || !invalidation.lastInstanceCleared) {
++    return -1;
++  }
++
++  const freshId = install(bytes, length, key, out_slot, dump_bytes,
++                          card_layout, group_edges);
++  const newSlot = HEAP32[out_slot >> 2];
++  let fresh = null;
++  let freshValid = false;
++  try {
++    fresh = cache[metadata];
++    if (validationMode === "selftest-fresh-throw") {
++      throw new Error("selftest-fresh-throw");
++    }
++    const callableMatches = fresh != null
++        && typeof getWasmTableEntry === "function"
++        && getWasmTableEntry(fresh.ownedSlot) === fresh.export;
++    const bytesExact = fresh?.binary instanceof Uint8Array
++        && fresh.binary.length === expectedBinary.length
++        && fresh.binary.every((value, i) => value === expectedBinary[i]);
++    freshValid = freshId >= 0 && !!fresh && fresh.id !== oldId
++        && fresh.instance !== oldInstance && fresh.slot === newSlot
++        && fresh.ownedSlot === newSlot && fresh.metadata === metadata
++        && fresh.compiler === "zero-baseline-abi-v1"
++        && fresh.digest === expectedDigest && fresh.bytes === expectedBinary.length
++        && fresh.memory === expectedMemory && fresh.memoryPages === expectedPages
++        && fresh.cardLayout === cardLayout && fresh.groupEdges === groupEdges
++        && callableMatches && bytesExact;
++    if (validationMode === "selftest-fresh-false") freshValid = false;
++  } catch (error) {
++    freshValid = false;
++  }
++  if (!freshValid) {
++    let ownedSlot = -1;
++    try {
++      ownedSlot = fresh && Number.isInteger(fresh.ownedSlot)
++          ? fresh.ownedSlot : -1;
++    } catch (error) { ownedSlot = -1; }
++    let callableBefore = false;
++    let removed = false;
++    let callableAfter = false;
++    let cleanupProven = fresh == null && freshId < 0 && newSlot < 0;
++    try {
++      if (ownedSlot >= 0 && typeof getWasmTableEntry === "function") {
++        callableBefore = typeof getWasmTableEntry(ownedSlot) === "function";
++      }
++      if (ownedSlot >= 0 && typeof removeFunction === "function") {
++        removeFunction(ownedSlot);
++        removed = true;
++        callableAfter = typeof getWasmTableEntry(ownedSlot) === "function";
++        cleanupProven = callableBefore && !callableAfter;
++      }
++    } catch (error) { cleanupProven = false; }
++    if (fresh) {
++      fresh.slot = -1;
++      fresh.instance = null;
++      fresh.binary = null;
++      fresh.memory = null;
++    }
++    delete cache[metadata];
++    cache.__lastInstance = null;
++    cache.__pendingPoison = false;
++    cache.__poisonCallable = null;
++    HEAP32[out_slot >> 2] = -1;
++    cache.__lastInvalidation = {
++      freshCleanup: true, freshId, ownedSlot, callableBefore, removed,
++      callableAfter, cleanupProven, metadataCleared: !cache[metadata],
++      lastInstanceCleared: true
++    };
++    if (typeof err === "function") err(
++        "[zbg] JS_CACHE_FRESH_REJECT reference-store-group fresh-id=" + freshId
++        + " validation=" + validationMode + " fresh-slot=" + ownedSlot
++        + " removed=" + (removed ? "1" : "0")
++        + " callable-before=" + (callableBefore ? "1" : "0")
++        + " callable-after=" + (callableAfter ? "1" : "0")
++        + " cleanup-proven=" + (cleanupProven ? "1" : "0")
++        + " metadata-cleared=1 last-instance-cleared=1");
++    return -1;
++  }
++  if (typeof err === "function") err(
++      "[zbg] JS_CACHE_MUTATION_PASS reference-store-group mutation=" + mutation
++      + " miss=-1 old-id=" + oldId + " new-id=" + freshId
++      + " old-slot=" + oldSlot + " new-slot=" + newSlot
++      + " old-owned-slot=" + oldOwnedSlot
++      + " slot-reused=" + (oldSlot === newSlot ? "1" : "0")
++      + " export-match=" + (invalidation.cachedExportMatches ? "1" : "0")
++      + " poisoning=" + (invalidation.poisoning ? "1" : "0")
++      + " poison-visible=" + (invalidation.poisonVisible ? "1" : "0")
++      + " old-export-visible=" + (invalidation.oldExportVisible ? "1" : "0")
++      + " poison-removed=" + (invalidation.poisonRemoved ? "1" : "0")
++      + " poison-callable-after="
++      + (invalidation.poisonCallableAfter ? "1" : "0")
++      + " old-callable-after=0 removed=1 instance-reused=0"
++      + " cache-cleared=1 last-instance-cleared=1 bytes-exact=1"
++      + " card-layout-exact=1 group-edges-exact=1");
++  return freshId;
++});
++
++// Complete a C++-observed verbose cache-hit identity mismatch without ever
++// guessing a table slot. If the JS install path already invalidated the
++// record, only prove the old expected slot is absent. Otherwise detach the
++// exact record and remove its immutable ownedSlot exactly once.
++EM_JS(int, zbb_reference_store_group_reject_cleanup,
++      (const char* key, int out_slot, int expected_id, int expected_slot), {
++  const metadata = UTF8ToString(key);
++  const cache = globalThis.__mcwebZeroReferenceStoreGroupCache;
++  const cached = cache && cache[metadata];
++  HEAP32[out_slot >> 2] = -1;
++  let ownedSlot = -1;
++  let recordPresent = !!cached;
++  let removed = false;
++  let callableBefore = false;
++  let callableAfter = false;
++  let expectedCallableAfter = false;
++  let expectedProbeComplete = false;
++  try {
++    if (typeof getWasmTableEntry !== "function") {
++      throw new Error("missing table probe");
++    }
++    const callableAt = (slot) => slot >= 0
++        && typeof getWasmTableEntry(slot) === "function";
++    if (cached) {
++      ownedSlot = Number.isInteger(cached.ownedSlot) ? cached.ownedSlot : -1;
++      if (ownedSlot < 0 || typeof removeFunction !== "function") {
++        throw new Error("missing immutable owned-slot cleanup");
++      }
++      callableBefore = callableAt(ownedSlot);
++      cached.slot = -1;
++      cached.instance = null;
++      cached.binary = null;
++      cached.memory = null;
++      delete cache[metadata];
++      cache.__lastInstance = null;
++      cache.__pendingPoison = false;
++      cache.__poisonCallable = null;
++      removeFunction(ownedSlot);
++      removed = true;
++      callableAfter = callableAt(ownedSlot);
++      if (expected_slot === ownedSlot) {
++        expectedCallableAfter = callableAfter;
++      } else {
++        expectedCallableAfter = callableAt(expected_slot);
++      }
++      expectedProbeComplete = true;
++    } else {
++      expectedCallableAfter = callableAt(expected_slot);
++      expectedProbeComplete = true;
++      if (cache) {
++        cache.__lastInstance = null;
++        cache.__pendingPoison = false;
++        cache.__poisonCallable = null;
++      }
++    }
++  } catch (error) {
++    if (typeof console !== "undefined") console.error(
++        "[zbg] reference-store-group reject cleanup failed " + error);
++    return 0;
++  }
++  const empty = !cache || !cache[metadata];
++  const ownedCleanupProven = !recordPresent
++      || (callableBefore && removed && !callableAfter);
++  const expectedCleanupProven = expectedProbeComplete
++      && !expectedCallableAfter;
++  const proven = empty && ownedCleanupProven && expectedCleanupProven;
++  if (typeof err === "function") err(
++      "[zbg] JS_CACHE_REJECT_CLEANUP reference-store-group expected-id="
++      + expected_id + " expected-slot=" + expected_slot
++      + " record-present=" + (recordPresent ? "1" : "0")
++      + " owned-slot=" + ownedSlot + " removed=" + (removed ? "1" : "0")
++      + " callable-before=" + (callableBefore ? "1" : "0")
++      + " callable-after=" + (callableAfter ? "1" : "0")
++      + " expected-probe=" + (expectedProbeComplete ? "1" : "0")
++      + " expected-callable-after=" + (expectedCallableAfter ? "1" : "0")
++      + " cache-empty=" + (empty ? "1" : "0")
++      + " cpp-slot=-1 proven=" + (proven ? "1" : "0"));
++  return proven ? 1 : 0;
++});
++
++static bool install_linked_array_store(const LinkedIntArrayLayout& layout,
++                                       int iastore_bci) {
++  if (ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr
++      || _linked_array_store_module_id >= 0) {
++    return _linked_array_store_module_id >= 0;
++  }
++  char key[2048];
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-int-array-store-v1;compiler=%s;class=ZeroBaselineFixture;"
++      "method=intArrayStore([III)I;store-bci=%d;jar=%s;classHash=%s;"
++      "dependencies=%s;features=wasm32-i32-i64-linear-memory-status;"
++      "array-mode=int-store-only;exports=1;slot=separate;length-offset=%d;"
++      "base-offset=%d;memory-mode=active-min-override;"
++      "memory-limit-pages=%lld",
++      kCompilerVersion, iastore_bci, ZeroWasmBaselineJarHash,
++      ZeroWasmBaselineClassHash, ZeroWasmBaselineDependencyHashes,
++      layout.length_offset, layout.base_offset,
++      (long long)ZeroWasmLinkedArrayMemoryLimitForTest);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++
++  WasmBuf module;
++  int length = build_linked_array_store_module(module, layout, iastore_bci);
++  if (length <= 0) return false;
++  _linked_array_store_module_id = zbb_array_store_install(
++      module.data(), length, key, (int)(intptr_t)&_linked_array_store_slot,
++      ZeroWasmLinkedGroupVerbose ? 1 : 0);
++  if (_linked_array_store_module_id >= 0 && ZeroWasmLinkedGroupVerbose) {
++    int cached_slot = -1;
++    int cached_id = zbb_array_store_install(
++        module.data(), length, key, (int)(intptr_t)&cached_slot, 0);
++    if (cached_id != _linked_array_store_module_id
++        || cached_slot != _linked_array_store_slot) {
++      tty->print_cr("[zbg] ARRAY_STORE_CACHE_REJECT first-id=%d hit-id=%d "
++                    "first-slot=%d hit-slot=%d",
++                    _linked_array_store_module_id, cached_id,
++                    _linked_array_store_slot, cached_slot);
++      return false;
+     }
+   }
+   if (ZeroWasmLinkedGroupVerbose) {
+@@ -3538,6 +4559,192 @@ static bool install_linked_ref_array_store(
+       && _linked_ref_array_store_slot >= 0;
+ }
+ 
++static bool install_reference_store_group(
++    const LinkedRefArrayStoreLayout& layout) {
++  if (ZeroWasmBaselineJarHash == nullptr
++      || ZeroWasmBaselineClassHash == nullptr
++      || ZeroWasmBaselineDependencyHashes == nullptr
++      || _linked_reference_store_group_module_id >= 0) {
++    return _linked_reference_store_group_module_id >= 0;
++  }
++  static const char* group_edges =
++      "members=entry:2a1b2cb8??b8??b0,leaf:2ab0,relay:leaf,"
++      "commit:2a1b2c532cb0;edges=entry>relay,relay>leaf,entry>commit";
++  char key[4096];
++  char card_layout[256];
++  int card_written = jio_snprintf(
++      card_layout, sizeof(card_layout),
++      "card-base=%u;card-shift=%d;clean-card=%d;dirty-card=%d",
++      (unsigned)(uint32_t)layout.card_base, layout.card_shift,
++      layout.clean_card, layout.dirty_card);
++  if (card_written <= 0 || card_written >= (int)sizeof(card_layout)) return false;
++  int written = jio_snprintf(
++      key, sizeof(key),
++      "abi=zero-linked-reference-store-group-v1;compiler=%s;"
++      "class=ZeroReferenceStoreGroupFixture;"
++      "entry=groupedReferenceStore([Ljava/lang/Object;ILjava/lang/Object;)"
++      "Ljava/lang/Object;;entry-body=2a1b2cb8??b8??b0;entry-bci=0;"
++      "relay-bci=3;commit-bci=6;return-bci=9;"
++      "leaf=leaf(Ljava/lang/Object;)Ljava/lang/Object;:2ab0;"
++      "relay=relay(Ljava/lang/Object;)Ljava/lang/Object;:aload0-invokestatic-leaf-areturn;"
++      "commit=commit([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;:"
++      "2a1b2c532cb0;jar=%s;classHash=%s;dependencies=%s;"
++      "features=wasm32-i32-i64-linear-memory-status;funcs=4;exports=1;"
++      "private-funcs=3;table-slots=1;private-slots=0;group-edges=%s;"
++      "collector=serial;compressed-oops=0;compressed-class-pointers=0;"
++      "compact-headers=0;pointer-bytes=%d;oop-bytes=%d;heap-oop-bytes=%d;"
++      "length-offset=%d;base-offset=%d;element-size=%d;card-layout=%s;"
++      "memory=shared;memory-max-pages=65536;memory-limit-pages=%lld",
++      kCompilerVersion, ZeroWasmBaselineJarHash, ZeroWasmBaselineClassHash,
++      ZeroWasmBaselineDependencyHashes, group_edges, (int)sizeof(void*),
++      (int)sizeof(oop), heapOopSize, layout.length_offset,
++      layout.base_offset, layout.element_size, card_layout,
++      (long long)ZeroWasmLinkedReferenceStoreGroupMemoryLimitForTest);
++  if (written <= 0 || written >= (int)sizeof(key)) return false;
++
++  WasmBuf module;
++  int length = build_reference_store_group_module(module, layout);
++  if (length <= 0) return false;
++  _linked_reference_store_group_module_id = zbb_reference_store_group_install(
++      module.data(), length, key,
++      (int)(intptr_t)&_linked_reference_store_group_slot,
++      ZeroWasmLinkedGroupVerbose ? 1 : 0, card_layout, group_edges);
++  if (_linked_reference_store_group_module_id < 0) {
++    _linked_reference_store_group_slot = -1;
++    return false;
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    int cached_slot = -1;
++    int cached_id = zbb_reference_store_group_install(
++        module.data(), length, key, (int)(intptr_t)&cached_slot, 0,
++        card_layout, group_edges);
++    if (cached_id != _linked_reference_store_group_module_id
++        || cached_slot != _linked_reference_store_group_slot) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_CACHE_REJECT first-id=%d "
++                    "hit-id=%d first-slot=%d hit-slot=%d",
++                    _linked_reference_store_group_module_id, cached_id,
++                    _linked_reference_store_group_slot, cached_slot);
++      const int first_id = _linked_reference_store_group_module_id;
++      const int first_slot = _linked_reference_store_group_slot;
++      if (zbb_reference_store_group_reject_cleanup(
++              key, (int)(intptr_t)&_linked_reference_store_group_slot,
++              first_id, first_slot) != 1
++          || _linked_reference_store_group_slot != -1) {
++        fatal("ZeroWasm reference-store group cache mismatch cleanup failed");
++      }
++      _linked_reference_store_group_module_id = -1;
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedReferenceStoreGroupCacheMutationForTest != nullptr) {
++    const int mutation_old_id = _linked_reference_store_group_module_id;
++    const int mutation_old_slot = _linked_reference_store_group_slot;
++    const int fresh_id = zbb_reference_store_group_cache_mutation(
++        module.data(), length, key,
++        (int)(intptr_t)&_linked_reference_store_group_slot, 0,
++        card_layout, group_edges,
++        ZeroWasmLinkedReferenceStoreGroupCacheMutationForTest);
++    _linked_reference_store_group_module_id = fresh_id;
++    if (fresh_id < 0) {
++      if (zbb_reference_store_group_reject_cleanup(
++              key, (int)(intptr_t)&_linked_reference_store_group_slot,
++              mutation_old_id, mutation_old_slot) != 1
++          || _linked_reference_store_group_slot != -1) {
++        fatal("ZeroWasm reference-store group mutation cleanup failed");
++      }
++      return false;
++    }
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REFERENCE_STORE_GROUP_MODULE_KEY "
++                  "abi=groupedReferenceStore:(Object[],int,Object)->Object "
++                  "wasm=(i32,i32,i32,i32,i32,i32)->i64 funcs=4 exports=1 "
++                  "private=3 table-slots=1 private-slots=0 slot=%d "
++                  "direct-edges=entry>relay,relay>leaf,entry>commit "
++                  "collector=serial raw32=1 length-offset=%d base-offset=%d "
++                  "element-size=%d card-base=%u card-shift=%d clean-card=%d "
++                  "dirty-card=%d bytes=%d",
++                  _linked_reference_store_group_slot, layout.length_offset,
++                  layout.base_offset, layout.element_size,
++                  (unsigned)(uint32_t)layout.card_base, layout.card_shift,
++                  layout.clean_card, layout.dirty_card, length);
++  }
++  return _linked_reference_store_group_module_id >= 0
++      && _linked_reference_store_group_slot >= 0;
++}
++
++EM_JS(int, zbb_reference_store_group_perf_install,
++      (const unsigned char* bytes, int length, int dump_bytes), {
++  if (globalThis.__mcwebZeroReferenceStoreGroupPerf !== undefined) return -1;
++  try {
++    const binary = HEAPU8.slice(bytes, bytes + length);
++    const module = new WebAssembly.Module(binary);
++    const imports = WebAssembly.Module.imports(module);
++    const exports = WebAssembly.Module.exports(module);
++    if (imports.length !== 1 || imports[0].module !== "env"
++        || imports[0].name !== "memory" || imports[0].kind !== "memory"
++        || exports.length !== 3
++        || exports[0].name !== "inlineLoop" || exports[0].kind !== "function"
++        || exports[1].name !== "directLoop" || exports[1].kind !== "function"
++        || exports[2].name !== "indirectLoop" || exports[2].kind !== "function") {
++      return -1;
++    }
++    const instance = new WebAssembly.Instance(module, {env: {memory: wasmMemory}});
++    const wrappers = [instance.exports.inlineLoop, instance.exports.directLoop,
++                      instance.exports.indirectLoop];
++    if (wrappers.some((fn) => typeof fn !== "function")) return -1;
++    globalThis.__mcwebZeroReferenceStoreGroupPerf = Object.freeze({
++      module, instance, wrappers: Object.freeze(wrappers), binary
++    });
++    if (dump_bytes) {
++      const dumpPath = typeof process !== "undefined" && process.env
++          ? process.env.MCWEB_ZERO_REFERENCE_STORE_GROUP_PERF_WASM_DUMP : "";
++      if (!dumpPath || typeof require !== "function") return -1;
++      require("fs").writeFileSync(dumpPath, binary);
++    }
++    return 1;
++  } catch (error) {
++    globalThis.__mcwebZeroReferenceStoreGroupPerf = undefined;
++    if (typeof console !== "undefined") console.error(
++        "[zbp3] PERF_INSTALL_REJECT " + error);
++    return -1;
++  }
++});
++
++EM_JS(jlong, zbb_reference_store_group_perf_call,
++      (int lane, jint n, jint array, jint start_index, jint span_count,
++       jint value_a, jint value_b, jint card_base, jint memory_pages), {
++  const state = globalThis.__mcwebZeroReferenceStoreGroupPerf;
++  if (!state || lane < 0 || lane > 2) return 0n;
++  return state.wrappers[lane](n, array, start_index, span_count,
++                              value_a, value_b, card_base, memory_pages);
++});
++
++EM_JS(int, zbb_reference_store_group_perf_memory_pages, (), {
++  const bytes = wasmMemory && wasmMemory.buffer
++      ? wasmMemory.buffer.byteLength : -1;
++  return Number.isInteger(bytes) && bytes >= 0 && (bytes & 65535) === 0
++      ? bytes / 65536 : -1;
++});
++
++static bool install_reference_store_group_perf(
++    const LinkedRefArrayStoreLayout& layout) {
++  if (_reference_store_group_perf_module_id >= 0) return true;
++  WasmBuf module;
++  const int length = build_reference_store_group_perf_module(module, layout);
++  if (length <= 0) return false;
++  _reference_store_group_perf_module_id = zbb_reference_store_group_perf_install(
++      module.data(), length, ZeroWasmLinkedGroupVerbose ? 1 : 0);
++  if (_reference_store_group_perf_module_id < 0) return false;
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbp3] PERF_MODULE measurement-only=1 production-cache=0 "
++                  "funcs=9 exports=3 private=6 imported-functions=0 "
++                  "private-table=1 table-size=3 element-count=3 "
++                  "shared-table-slots=0 bytes=%d", length);
++  }
++  return true;
++}
++
+ EM_JS(int, zbb_benchmark_install, (const unsigned char* bytes, int length,
+                                    const char* key, int out_slots,
+                                    int dump_bytes), {
+@@ -3628,6 +4835,7 @@ static THREAD_LOCAL uint64_t _linked_ref_array_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_ref_array_resume_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_ref_array_store_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_ref_array_store_resume_sequence = 0;
++static THREAD_LOCAL uint64_t _linked_reference_store_group_sequence = 0;
+ static THREAD_LOCAL uint64_t _linked_entry_diagnostics = 0;
+ static THREAD_LOCAL bool _linked_oop_module = false;
+ static THREAD_LOCAL int _benchmark_module_id = -1;
+@@ -3702,6 +4910,14 @@ static jlong linked_ref_array_store_call(jint array, jint index, jint value,
+       array, index, value, memory_limit_pages, live_card_base, assignable);
+ }
+ 
++static jlong linked_reference_store_group_call(
++    jint array, jint index, jint value, jint memory_limit_pages,
++    jint live_card_base, jint assignable) {
++  _linked_calls++;
++  return ((ZbgSixArg)(intptr_t)_linked_reference_store_group_slot)(
++      array, index, value, memory_limit_pages, live_card_base, assignable);
++}
++
+ static jlong benchmark_table_call2(int slot, jint first, jint second) {
+   _benchmark_table_calls++;
+   return ((ZbgTwoArg)(intptr_t)slot)(first, second);
+@@ -3806,10 +5022,34 @@ static void push_int(intptr_t** tos, jint value) {
+   *tos = top - 1;
+ }
+ 
+-static void push_long(intptr_t** tos, jlong value) {
+-  intptr_t* top = *tos;
+-  *((jlong*)&top[0]) = value;
+-  *tos = top - 2;
++// C3a measurement results use the canonical Zero two-slot long layout.  Keep
++// this isolated from the older experimental helpers: SET_STACK_LONG(value, 1)
++// starts the VMJavaVal64 at top[-1], then the interpreter publishes top-2.
++// The caller has already reserved the exact two-word destination and entered
++// its no-safepoint transaction, so a mismatch is a fatal publication bug and
++// never permission to rerun a committed reference/card store.
++static void reference_store_group_perf_push_long_infallible(
++    interpreterState istate, intptr_t** tos, intptr_t* expected_top,
++    jlong value, JavaThread* expected_thread) {
++  assert(istate != nullptr && tos != nullptr && expected_top != nullptr
++             && expected_thread != nullptr,
++         "prevalidated C3a long publication");
++  if (istate == nullptr || tos == nullptr || *tos != expected_top
++      || expected_top == nullptr || expected_thread == nullptr
++      || istate->thread() != expected_thread
++      || !linked_validate_pre_push(istate, expected_top, 2)) {
++    fatal("ZeroWasm group perf long publication precondition changed");
++  }
++  // Exact Zero SET_STACK_LONG(value, 1) destination.  Do not change this to
++  // &expected_top[0]: that corrupts the frame slot above the two-word result.
++  *((jlong*)&expected_top[-1]) = value;
++  if (istate->thread() != expected_thread) {
++    fatal("ZeroWasm group perf thread changed across long store");
++  }
++  *tos = expected_top - 2;
++  if (*((jlong*)&expected_top[-1]) != value || *tos != expected_top - 2) {
++    fatal("ZeroWasm group perf long stack value/depth mismatch");
++  }
+ }
+ 
+ static void push_oop(intptr_t** tos, oop value) {
+@@ -4025,6 +5265,152 @@ static bool linked_ref_array_store_shape(Method* method, int* aastore_bci,
+   return *aastore_bci == 3 && *load_value_bci == 4 && *return_bci == 5;
+ }
+ 
++static bool linked_reference_store_group_aload0(unsigned char opcode) {
++  return opcode == (unsigned char)Bytecodes::_aload_0
++      || opcode == (unsigned char)Bytecodes::_fast_aload_0
++      || opcode == (unsigned char)Bytecodes::_nofast_aload_0;
++}
++
++static bool linked_reference_store_group_constructor_edge(Method* method) {
++  if (method == nullptr || !method->is_private() || method->is_static()
++      || method->is_native() || method->is_synchronized()
++      || method->has_exception_handler() || method->code_size() != 5
++      || method->verifier_max_stack() != 1 || method->max_locals() != 1
++      || method->size_of_parameters() != 1
++      || !method->name()->equals("<init>")
++      || !method->signature()->equals("()V")) {
++    return false;
++  }
++  const unsigned char* code = (const unsigned char*)method->code_base();
++  if (code[1] != (unsigned char)Bytecodes::_invokespecial
++      || code[4] != (unsigned char)Bytecodes::_return) {
++    return false;
++  }
++  int index = Bytes::get_native_u2((address)(code + 2));
++  ConstantPool* constants = method->constants();
++  if (index < 0 || index >= constants->resolved_method_entries_length()) {
++    return false;
++  }
++  Symbol* owner = constants->klass_ref_at_noresolve(
++      index, Bytecodes::_invokespecial);
++  Symbol* name = constants->name_ref_at(index, Bytecodes::_invokespecial);
++  Symbol* signature = constants->signature_ref_at(
++      index, Bytecodes::_invokespecial);
++  return owner != nullptr && name != nullptr && signature != nullptr
++      && owner->equals("java/lang/Object") && name->equals("<init>")
++      && signature->equals("()V");
++}
++
++struct LinkedReferenceStoreGroupPredicates {
++  bool holder;
++  bool members;
++  bool body;
++  bool edges;
++  bool quickening;
++
++  LinkedReferenceStoreGroupPredicates()
++      : holder(false), members(false), body(false), edges(false),
++        quickening(false) {}
++};
++
++static bool linked_reference_store_group_shape(Method* method,
++                                                int* return_bci,
++                                                LinkedReferenceStoreGroupPredicates* predicates) {
++  static const char* object_signature =
++      "(Ljava/lang/Object;)Ljava/lang/Object;";
++  static const char* store_signature =
++      "([Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;";
++  LinkedReferenceStoreGroupPredicates local;
++  LinkedReferenceStoreGroupPredicates* p = predicates == nullptr ? &local : predicates;
++  if (!reference_store_group_fixture_class(method) || return_bci == nullptr
++      || method->is_native() || method->is_synchronized() || !method->is_static()
++      || !method->is_public() || method->result_type() != T_OBJECT
++      || method->has_exception_handler() || method->code_size() != 10
++      || method->verifier_max_stack() != 3 || method->max_locals() != 3
++      || method->size_of_parameters() != 3
++      || !method->name()->equals("groupedReferenceStore")
++      || !method->signature()->equals(store_signature)) {
++    return false;
++  }
++  InstanceKlass* holder = method->method_holder();
++  if (!holder->is_final() || holder->java_fields_count() != 0
++      || holder->class_initializer() != nullptr
++      || holder->methods()->length() != 5) {
++    return false;
++  }
++  p->holder = true;
++  Method* constructor = linked_group_method(method, "<init>", "()V");
++  Method* leaf = linked_group_method(method, "leaf", object_signature);
++  Method* relay = linked_group_method(method, "relay", object_signature);
++  Method* commit = linked_group_method(method, "commit", store_signature);
++  if (constructor == nullptr || leaf == nullptr || relay == nullptr
++      || commit == nullptr
++      || !constructor->is_private() || constructor->is_static()
++      || constructor->is_native() || constructor->is_synchronized()
++      || constructor->has_exception_handler() || constructor->code_size() != 5
++      || constructor->verifier_max_stack() != 1 || constructor->max_locals() != 1
++      || constructor->size_of_parameters() != 1
++      || !leaf->is_private() || !leaf->is_static() || leaf->is_native()
++      || leaf->is_synchronized() || leaf->has_exception_handler()
++      || leaf->result_type() != T_OBJECT || leaf->code_size() != 2
++      || leaf->verifier_max_stack() != 1 || leaf->max_locals() != 1
++      || leaf->size_of_parameters() != 1
++      || !relay->is_private() || !relay->is_static() || relay->is_native()
++      || relay->is_synchronized() || relay->has_exception_handler()
++      || relay->result_type() != T_OBJECT || relay->code_size() != 5
++      || relay->verifier_max_stack() != 1 || relay->max_locals() != 1
++      || relay->size_of_parameters() != 1
++      || !commit->is_private() || !commit->is_static() || commit->is_native()
++      || commit->is_synchronized() || commit->has_exception_handler()
++      || commit->result_type() != T_OBJECT || commit->code_size() != 6
++      || commit->verifier_max_stack() != 3 || commit->max_locals() != 3
++      || commit->size_of_parameters() != 3) {
++    return false;
++  }
++  p->members = true;
++  const unsigned char* constructor_code =
++      (const unsigned char*)constructor->code_base();
++  const unsigned char* leaf_code = (const unsigned char*)leaf->code_base();
++  const unsigned char* relay_code =
++      (const unsigned char*)relay->code_base();
++  const unsigned char* commit_code =
++      (const unsigned char*)commit->code_base();
++  const unsigned char* entry_code =
++      (const unsigned char*)method->code_base();
++  p->quickening = linked_reference_store_group_aload0(constructor_code[0])
++      && linked_reference_store_group_aload0(leaf_code[0])
++      && linked_reference_store_group_aload0(relay_code[0])
++      && linked_reference_store_group_aload0(commit_code[0])
++      && linked_reference_store_group_aload0(entry_code[0]);
++  p->body = constructor_code[1] == (unsigned char)Bytecodes::_invokespecial
++      && constructor_code[4] == (unsigned char)Bytecodes::_return
++      && leaf_code[1] == (unsigned char)Bytecodes::_areturn
++      && relay_code[1] == (unsigned char)Bytecodes::_invokestatic
++      && relay_code[4] == (unsigned char)Bytecodes::_areturn
++      && commit_code[1] == (unsigned char)Bytecodes::_iload_1
++      && commit_code[2] == (unsigned char)Bytecodes::_aload_2
++      && commit_code[3] == (unsigned char)Bytecodes::_aastore
++      && commit_code[4] == (unsigned char)Bytecodes::_aload_2
++      && commit_code[5] == (unsigned char)Bytecodes::_areturn
++      && entry_code[1] == (unsigned char)Bytecodes::_iload_1
++      && entry_code[2] == (unsigned char)Bytecodes::_aload_2
++      && entry_code[3] == (unsigned char)Bytecodes::_invokestatic
++      && entry_code[6] == (unsigned char)Bytecodes::_invokestatic
++      && entry_code[9] == (unsigned char)Bytecodes::_areturn;
++  p->edges = linked_reference_store_group_constructor_edge(constructor)
++      && invokestatic_target_is(relay, 1, "ZeroReferenceStoreGroupFixture",
++                                "leaf", object_signature)
++      && invokestatic_target_is(method, 3, "ZeroReferenceStoreGroupFixture",
++                                 "relay", object_signature)
++      && invokestatic_target_is(method, 6, "ZeroReferenceStoreGroupFixture",
++                                 "commit", store_signature);
++  if (!p->body || !p->edges || !p->quickening) {
++    return false;
++  }
++  *return_bci = 9;
++  return true;
++}
++
+ static bool linked_ref_array_store_card_probe_shape(Method* method,
+                                                      int* return_bci) {
+   if (!reference_array_store_fixture_class(method) || method->is_native()
+@@ -4051,6 +5437,61 @@ static bool linked_ref_array_store_card_probe_shape(Method* method,
+   return true;
+ }
+ 
++static int reference_store_group_perf_lane(Method* method) {
++  static const unsigned char body[] = {0x09, 0xad}; // lconst_0, lreturn
++  static const char* signature =
++      "(I[Ljava/lang/Object;IILjava/lang/Object;Ljava/lang/Object;)J";
++  if (!reference_store_group_perf_fixture_class(method)
++      || method->is_native() || method->is_synchronized()
++      || !method->is_static() || method->result_type() != T_LONG
++      || !method->signature()->equals(signature)
++      || method->verifier_max_stack() != 2 || method->max_locals() != 6
++      || method->size_of_parameters() != 6 || method->has_exception_handler()
++      || !code_is(method, body, sizeof(body))) {
++    return -1;
++  }
++  if (method->name()->equals("inlineLoop")) return 0;
++  if (method->name()->equals("directLoop")) return 1;
++  if (method->name()->equals("indirectLoop")) return 2;
++  return -1;
++}
++
++static bool reference_store_group_perf_start_shape(Method* method) {
++  static const unsigned char body[] = {0x02, 0xac}; // iconst_m1, ireturn
++  return reference_store_group_perf_fixture_class(method)
++      && method->is_static() && !method->is_native()
++      && !method->is_synchronized() && method->result_type() == T_INT
++      && method->name()->equals("preparedStartIndex")
++      && method->signature()->equals("([Ljava/lang/Object;)I")
++      && method->verifier_max_stack() == 1 && method->max_locals() == 1
++      && method->size_of_parameters() == 1 && !method->has_exception_handler()
++      && code_is(method, body, sizeof(body));
++}
++
++static bool reference_store_group_perf_install_shape(Method* method) {
++  static const unsigned char body[] = {0x03, 0xac}; // iconst_0, ireturn
++  return reference_store_group_perf_fixture_class(method)
++      && method->is_static() && !method->is_native()
++      && !method->is_synchronized() && method->result_type() == T_INT
++      && method->name()->equals("installOnly")
++      && method->signature()->equals("()I")
++      && method->verifier_max_stack() == 1 && method->max_locals() == 0
++      && method->size_of_parameters() == 0 && !method->has_exception_handler()
++      && code_is(method, body, sizeof(body));
++}
++
++static bool reference_store_group_perf_elapsed_shape(Method* method) {
++  static const unsigned char body[] = {0x09, 0xad}; // lconst_0, lreturn
++  return reference_store_group_perf_fixture_class(method)
++      && method->is_static() && !method->is_native()
++      && !method->is_synchronized() && method->result_type() == T_LONG
++      && method->name()->equals("lastElapsedNanos")
++      && method->signature()->equals("()J")
++      && method->verifier_max_stack() == 2 && method->max_locals() == 0
++      && method->size_of_parameters() == 0 && !method->has_exception_handler()
++      && code_is(method, body, sizeof(body));
++}
++
+ // Dedicated root/card evidence setup. This is not the production store
+ // transaction: it accepts only a large, fully null, already-old Object[] and
+ // binds scalar identity/address facts for one widened-bounds-proven interior
+@@ -4060,7 +5501,9 @@ static bool linked_ref_array_store_card_probe_shape(Method* method,
+ static ZeroWasmBaseline::Result run_linked_ref_array_store_card_probe_setup(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+-  if (!UseZeroWasmLinkedRefArrayStore
++  if ((!UseZeroWasmLinkedRefArrayStore
++       && !UseZeroWasmLinkedReferenceStoreGroup
++       && !UseZeroWasmReferenceStoreGroupPerf)
+       || !ZeroWasmLinkedRefArrayStoreCardProbeForTest || istate == nullptr
+       || istate->thread()->has_pending_exception()) {
+     return ZeroWasmBaseline::NotRun;
+@@ -4127,6 +5570,29 @@ static ZeroWasmBaseline::Result run_linked_ref_array_store_card_probe_setup(
+       }
+       array_bits = (uintptr_t)array;
+       if (ready) {
++        if (UseZeroWasmReferenceStoreGroupPerf) {
++          const int perf_span = 64;
++          const uintptr_t element_address = (uintptr_t)array
++              + (uintptr_t)layout.base_offset
++              + (uintptr_t)probe_index * (uintptr_t)layout.element_size;
++          const uintptr_t card_bytes = (uintptr_t)1 << layout.card_shift;
++          const uintptr_t offset = element_address & (card_bytes - 1);
++          int perf_start = probe_index;
++          if (offset + (uintptr_t)perf_span * layout.element_size > card_bytes) {
++            perf_start -= perf_span;
++          }
++          CardTable::CardValue* first_card = linked_ref_array_card_for(
++              layout, array, perf_start);
++          CardTable::CardValue* last_card = linked_ref_array_card_for(
++              layout, array, perf_start + perf_span - 1);
++          if (perf_start < 0 || perf_start + perf_span > array_length
++              || first_card == nullptr
++              || (uintptr_t)first_card != card_address_bits
++              || last_card != first_card) {
++            fatal("ZeroWasm reference-store group perf span unavailable");
++          }
++          _reference_store_group_perf_start_index = perf_start;
++        }
+         _linked_ref_array_store_card_probe_pending = true;
+         _linked_ref_array_store_card_probe_index = probe_index;
+         _linked_ref_array_store_card_probe_array_bits = array_bits;
+@@ -5267,6 +6733,637 @@ static ZeroWasmBaseline::Result run_linked_ref_array_load(
+   return ZeroWasmBaseline::OpcodeResume;
+ }
+ 
++static ZeroWasmBaseline::Result run_reference_store_group_perf(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmReferenceStoreGroupPerf || method == nullptr
++      || istate == nullptr || istate->thread()->has_pending_exception()
++      || !reference_store_group_perf_fixture_class(method)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (reference_store_group_perf_install_shape(method)) {
++    if (code_base == nullptr || pc == nullptr
++        || *pc != code_base || tos == nullptr || *tos == nullptr
++        || !linked_validate_pre_push(istate, *tos, 1)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    LinkedRefArrayStoreLayout install_layout;
++    if (!linked_ref_array_store_layout_for_fixture(&install_layout)
++        || !install_reference_store_group_perf(install_layout)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    JavaThread* expected_thread = istate->thread();
++    {
++      NoSafepointVerifier nsv;
++      if (istate->thread() != expected_thread) {
++        fatal("ZeroWasm group perf install thread changed");
++      }
++      push_int(tos, 1);
++      linked_prepare_state_infallible(istate, tos, pc, code_base + 1, 1);
++      if (istate->thread() != expected_thread) {
++        fatal("ZeroWasm group perf install publication thread changed");
++      }
++    }
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp3] PERF_INSTALL_ONLY installed=1 measurement-only=1");
++    }
++    return ZeroWasmBaseline::Returned;
++  }
++  if (reference_store_group_perf_elapsed_shape(method)) {
++    intptr_t* publication_top = tos == nullptr ? nullptr : *tos;
++    JavaThread* expected_thread = istate->thread();
++    jlong published_elapsed = 0;
++    if (code_base == nullptr || pc == nullptr
++        || *pc != code_base || tos == nullptr || *tos == nullptr
++        || expected_thread == nullptr
++        || !linked_validate_pre_push(istate, publication_top, 2)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    {
++      NoSafepointVerifier nsv;
++      const jlong elapsed = _reference_store_group_perf_last_elapsed_ns;
++      published_elapsed = elapsed;
++      if (elapsed <= 0 || istate->thread() != expected_thread) {
++        fatal("ZeroWasm group perf elapsed publication precondition changed");
++      }
++      _reference_store_group_perf_last_elapsed_ns = 0;
++      reference_store_group_perf_push_long_infallible(
++          istate, tos, publication_top, elapsed, expected_thread);
++      linked_prepare_state_infallible(istate, tos, pc, code_base + 1, 2);
++      if (istate->thread() != expected_thread || istate->stack() != *tos
++          || *tos != publication_top - 2
++          || *((jlong*)&publication_top[-1]) != elapsed
++          || _reference_store_group_perf_last_elapsed_ns != 0) {
++        fatal("ZeroWasm group perf elapsed post-publication state changed");
++      }
++    }
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbp3] PERF_ELAPSED_RETURN elapsed-ns=%lld "
++                    "thread-identity=1 stack-depth=2 stack-value=1 "
++                    "globals-cleared=1 pending=0",
++                    (long long)published_elapsed);
++    }
++    return ZeroWasmBaseline::Returned;
++  }
++  if (reference_store_group_perf_start_shape(method)) {
++    if (!_linked_ref_array_store_card_probe_pending
++        || _reference_store_group_perf_start_index < 0 || locals == nullptr
++        || code_base == nullptr || pc == nullptr || *pc != code_base
++        || tos == nullptr || *tos == nullptr
++        || !linked_validate_pre_push(istate, *tos, 1)) {
++      return ZeroWasmBaseline::NotRun;
++    }
++    {
++      NoSafepointVerifier nsv;
++      oop array = cast_to_oop((void*)locals[0]);
++      if (array == nullptr
++          || (uintptr_t)array != _linked_ref_array_store_card_probe_array_bits) {
++        fatal("ZeroWasm group perf prepared-start root changed");
++      }
++      push_int(tos, _reference_store_group_perf_start_index);
++      linked_prepare_state_infallible(istate, tos, pc, code_base + 1, 1);
++    }
++    return ZeroWasmBaseline::Returned;
++  }
++
++  const int lane = reference_store_group_perf_lane(method);
++  JavaThread* expected_thread = istate->thread();
++  intptr_t* publication_top = tos == nullptr ? nullptr : *tos;
++  if (lane < 0 || locals == nullptr || code_base == nullptr || pc == nullptr
++      || *pc != code_base || tos == nullptr || *tos == nullptr
++      || expected_thread == nullptr
++      || !linked_validate_pre_push(istate, publication_top, 2)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  LinkedRefArrayStoreLayout layout;
++  if (!linked_ref_array_store_layout_for_fixture(&layout)
++      || !_linked_ref_array_store_card_probe_pending
++      || !install_reference_store_group_perf(layout)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  const int pages_before = zbb_reference_store_group_perf_memory_pages();
++  if (pages_before <= 0) return ZeroWasmBaseline::NotRun;
++
++  jlong raw = 0;
++  jlong elapsed_ns = 0;
++  uint64_t expected = 0;
++  unsigned int gc_before = 0;
++  unsigned int gc_after = 0;
++  uint64_t safepoint_before = 0;
++  uint64_t safepoint_after = 0;
++  int pages_after = -1;
++  int n = 0;
++  int start_index = 0;
++  int span_count = 0;
++  uintptr_t array_bits = 0;
++  uintptr_t value_a_bits = 0;
++  uintptr_t value_b_bits = 0;
++  {
++    // The complete measurement transaction is one rooted no-safepoint scope.
++    // Installation, dumping, allocation, logging, and oracle setup are all
++    // excluded from the timed window.
++    NoSafepointVerifier nsv;
++    n = (jint)locals[0];
++    oop array = cast_to_oop((void*)locals[-1]);
++    start_index = (jint)locals[-2];
++    span_count = (jint)locals[-3];
++    oop value_a = cast_to_oop((void*)locals[-4]);
++    oop value_b = cast_to_oop((void*)locals[-5]);
++    if (array != cast_to_oop((void*)locals[-1])
++        || value_a != cast_to_oop((void*)locals[-4])
++        || value_b != cast_to_oop((void*)locals[-5])) {
++      fatal("ZeroWasm group perf rooted locals changed");
++    }
++    if (array == nullptr || value_a == nullptr || value_b == nullptr
++        || array->klass() != Universe::objectArrayKlass()
++        || (uintptr_t)array != _linked_ref_array_store_card_probe_array_bits
++        || objArrayOop(array)->length() != 2048
++        || start_index != _reference_store_group_perf_start_index
++        || span_count != 64 || n <= 0
++        || (span_count & (span_count - 1)) != 0
++        || start_index < 0 || start_index + span_count > 2048) {
++      fatal("ZeroWasm group perf fixture contract changed");
++    }
++    LinkedRefArrayStoreLayout live_layout;
++    if (!linked_ref_array_store_layout_for_fixture(&live_layout)
++        || memcmp(&layout, &live_layout, sizeof(layout)) != 0) {
++      fatal("ZeroWasm group perf layout changed");
++    }
++    bool all_null = true;
++    for (int i = 0; i < 2048; i++) {
++      if (objArrayOop(array)->obj_at(i) != nullptr) {
++        all_null = false;
++        break;
++      }
++    }
++    CardTable::CardValue* card = nullptr;
++    int span_kind = 0;
++    CardTable::CardValue* first_card = linked_ref_array_card_for(
++        layout, array, start_index);
++    CardTable::CardValue* last_card = linked_ref_array_card_for(
++        layout, array, start_index + span_count - 1);
++    if (!all_null || !linked_ref_array_card_span_proven(
++            layout, array, _linked_ref_array_store_card_probe_index, 2048,
++            &card, &span_kind)
++        || card == nullptr || span_kind != 1 || first_card != card
++        || last_card != card
++        || (uintptr_t)card != _linked_ref_array_store_card_probe_address_bits
++        || (int)*card != layout.clean_card) {
++      fatal("ZeroWasm group perf clean interior span proof failed");
++    }
++    BarrierSet* barrier = BarrierSet::barrier_set();
++    CardTableBarrierSet* card_barrier =
++        barrier != nullptr && barrier->is_a(BarrierSet::CardTableBarrierSet)
++            ? static_cast<CardTableBarrierSet*>(barrier) : nullptr;
++    CardTable* card_table = card_barrier == nullptr
++        ? nullptr : card_barrier->card_table();
++    if (card_table == nullptr || card_table->is_in_young(array)
++        || !card_table->is_in_young(value_a)
++        || !card_table->is_in_young(value_b)) {
++      fatal("ZeroWasm group perf old-array/young-values proof failed");
++    }
++
++    array_bits = (uintptr_t)array;
++    value_a_bits = (uintptr_t)value_a;
++    value_b_bits = (uintptr_t)value_b;
++    gc_before = Universe::heap()->total_collections();
++    safepoint_before = SafepointSynchronize::safepoint_id();
++    if (istate->thread() != expected_thread || *tos != publication_top
++        || !linked_validate_pre_push(istate, publication_top, 2)) {
++      fatal("ZeroWasm group perf publication destination changed before Wasm");
++    }
++    const jlong start_ns = os::javaTimeNanos();
++    raw = zbb_reference_store_group_perf_call(
++        lane, n, (jint)(intptr_t)array, start_index, span_count,
++        (jint)(intptr_t)value_a, (jint)(intptr_t)value_b,
++        (jint)(uint32_t)layout.card_base, pages_before);
++    elapsed_ns = os::javaTimeNanos() - start_ns;
++    _reference_store_group_perf_last_elapsed_ns = elapsed_ns;
++    pages_after = zbb_reference_store_group_perf_memory_pages();
++    safepoint_after = SafepointSynchronize::safepoint_id();
++    gc_after = Universe::heap()->total_collections();
++    if (elapsed_ns <= 0 || pages_after != pages_before
++        || gc_after != gc_before || safepoint_after != safepoint_before) {
++      fatal("ZeroWasm group perf timed-window invariant changed");
++    }
++
++    const uint32_t mask = (uint32_t)span_count - 1;
++    for (uint32_t i = 0; i < (uint32_t)n; i++) {
++      const uint32_t relative = i & mask;
++      const uint32_t index = (uint32_t)start_index + relative;
++      const uint32_t value = (i & 1) == 0
++          ? (uint32_t)value_a_bits : (uint32_t)value_b_bits;
++      const uint32_t pre = i < (uint32_t)span_count ? 0 : value;
++      expected += (uint64_t)i + index + pre + value + value;
++    }
++    if ((uint64_t)raw != expected || (int)*card != layout.dirty_card) {
++      fatal("ZeroWasm group perf checksum/card mismatch");
++    }
++    for (int relative = 0; relative < span_count; relative++) {
++      oop expected_value = nullptr;
++      if ((uint32_t)relative < (uint32_t)n) {
++        const uint32_t last = (uint32_t)relative
++            + (((uint32_t)n - 1 - (uint32_t)relative)
++               / (uint32_t)span_count) * (uint32_t)span_count;
++        expected_value = (last & 1) == 0 ? value_a : value_b;
++      }
++      if (objArrayOop(array)->obj_at(start_index + relative) != expected_value) {
++        fatal("ZeroWasm group perf final element map mismatch");
++      }
++    }
++    for (int relative = 0; relative < span_count; relative++) {
++      objArrayOop(array)->obj_at_put(start_index + relative, nullptr);
++    }
++    for (int i = 0; i < 2048; i++) {
++      if (objArrayOop(array)->obj_at(i) != nullptr) {
++        fatal("ZeroWasm group perf canonical clear failed");
++      }
++    }
++    *card = (CardTable::CardValue)layout.clean_card;
++    if ((int)*card != layout.clean_card) {
++      fatal("ZeroWasm group perf diagnostic card restore failed");
++    }
++    _linked_ref_array_store_card_probe_pending = false;
++    _linked_ref_array_store_card_probe_index = -1;
++    _linked_ref_array_store_card_probe_array_bits = 0;
++    _linked_ref_array_store_card_probe_address_bits = 0;
++    _linked_ref_array_store_card_probe_length = -1;
++    _linked_ref_array_store_card_probe_span_kind = 0;
++    _reference_store_group_perf_start_index = -1;
++    if (_linked_ref_array_store_card_probe_pending
++        || _linked_ref_array_store_card_probe_index != -1
++        || _linked_ref_array_store_card_probe_array_bits != 0
++        || _linked_ref_array_store_card_probe_address_bits != 0
++        || _linked_ref_array_store_card_probe_length != -1
++        || _linked_ref_array_store_card_probe_span_kind != 0
++        || _reference_store_group_perf_start_index != -1
++        || _reference_store_group_perf_last_elapsed_ns != elapsed_ns) {
++      fatal("ZeroWasm group perf pending globals cleanup failed");
++    }
++    if (istate->thread() != expected_thread) {
++      fatal("ZeroWasm group perf thread changed before long store");
++    }
++    reference_store_group_perf_push_long_infallible(
++        istate, tos, publication_top, raw, expected_thread);
++    if (istate->thread() != expected_thread) {
++      fatal("ZeroWasm group perf thread changed after long store");
++    }
++    linked_prepare_state_infallible(istate, tos, pc, code_base + 1, 2);
++    if (istate->thread() != expected_thread || istate->stack() != *tos
++        || *tos != publication_top - 2
++        || *((jlong*)&publication_top[-1]) != raw) {
++      fatal("ZeroWasm group perf post-publication state changed");
++    }
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    static const char* lane_names[] = {"inline", "direct", "indirect"};
++    tty->print_cr("[zbp3] PERF_WINDOW lane=%s n=%d start=%d span=%d "
++                  "elapsed-ns=%lld checksum=%llu oracle=%llu "
++                  "array-bits=%u value-a-bits=%u value-b-bits=%u "
++                  "pages-before=%d pages-after=%d gc-before=%u gc-after=%u "
++                  "safepoint-before=%llu safepoint-after=%llu "
++                  "checksum-high32=%u thread-identity=1 stack-depth=2 "
++                  "stack-value=1 pending-cleared=1 card-globals-cleared=1 "
++                  "elapsed-pending=1 "
++                  "fallback=0 trap=0 map=pass card=clean-dirty-clean",
++                  lane_names[lane], n, start_index, span_count,
++                  (long long)elapsed_ns, (unsigned long long)(uint64_t)raw,
++                  (unsigned long long)expected, (unsigned)(uint32_t)array_bits,
++                  (unsigned)(uint32_t)value_a_bits,
++                  (unsigned)(uint32_t)value_b_bits,
++                  pages_before, pages_after, gc_before, gc_after,
++                  (unsigned long long)safepoint_before,
++                  (unsigned long long)safepoint_after,
++                  (unsigned)((uint64_t)raw >> 32));
++  }
++  return ZeroWasmBaseline::Returned;
++}
++
++static ZeroWasmBaseline::Result run_linked_reference_store_group(
++    Method* method, intptr_t* locals, address code_base, address* pc,
++    intptr_t** tos, interpreterState istate) {
++  if (!UseZeroWasmLinkedReferenceStoreGroup || istate == nullptr
++      || istate->thread()->has_pending_exception()
++      || !reference_store_group_fixture_class(method)) {
++    return ZeroWasmBaseline::NotRun;
++  }
++  int return_bci = -1;
++  LinkedReferenceStoreGroupPredicates predicates;
++  if (!linked_reference_store_group_shape(method, &return_bci, &predicates)) {
++    if (ZeroWasmLinkedGroupVerbose && method != nullptr
++        && method->name()->equals("groupedReferenceStore")) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_CLASSIFY holder=%s method=%s "
++                    "descriptor=%s accepted=0 holder-predicate=%d "
++                    "member-predicate=%d body-predicate=%d edge-predicate=%d "
++                    "quickening-predicate=%d",
++                    method->method_holder()->name()->as_C_string(),
++                    method->name()->as_C_string(),
++                    method->signature()->as_C_string(),
++                    predicates.holder ? 1 : 0,
++                    predicates.members ? 1 : 0,
++                    predicates.body ? 1 : 0,
++                    predicates.edges ? 1 : 0,
++                    predicates.quickening ? 1 : 0);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (locals == nullptr || code_base == nullptr || pc == nullptr || *pc == nullptr
++      || *pc != code_base || tos == nullptr || *tos == nullptr
++      || !linked_validate_pre_push(istate, *tos, 1)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_REJECT "
++                    "reason=invalid-entry-frame-before-install");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  const jlong memory_limit_pages =
++      (jlong)ZeroWasmLinkedReferenceStoreGroupMemoryLimitForTest;
++  if (memory_limit_pages < 0 || memory_limit_pages > INT_MAX) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_REJECT "
++                    "reason=invalid-memory-limit pages=%lld",
++                    (long long)memory_limit_pages);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  LinkedRefArrayStoreLayout layout;
++  if (!linked_ref_array_store_layout_for_fixture(&layout)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_REJECT stage=array-layout "
++                    "serial=%d compressed-oops=%d compressed-class=%d "
++                    "compact-headers=%d ptr=%d oop=%d heap-oop-size=%d",
++                    UseSerialGC ? 1 : 0, UseCompressedOops ? 1 : 0,
++                    UseCompressedClassPointers ? 1 : 0,
++                    UseCompactObjectHeaders ? 1 : 0, (int)sizeof(void*),
++                    (int)sizeof(oop), heapOopSize);
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  bool non_object_array = false;
++  {
++    NoSafepointVerifier nsv;
++    oop initial_array = cast_to_oop((void*)locals[0]);
++    non_object_array = initial_array != nullptr
++        && (initial_array->klass() == nullptr
++            || !initial_array->klass()->is_objArray_klass());
++  }
++  if (non_object_array) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_REJECT "
++                    "reason=non-object-array-before-install");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_linked_reference_store_group_module_id < 0
++      && !install_reference_store_group(layout)) {
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_REJECT stage=module-install");
++    }
++    return ZeroWasmBaseline::NotRun;
++  }
++  if (_linked_reference_store_group_module_id < 0
++      || _linked_reference_store_group_slot < 0) {
++    return ZeroWasmBaseline::NotRun;
++  }
++
++  const uint64_t sequence = ++_linked_reference_store_group_sequence;
++  const address original_pc = *pc;
++  intptr_t* const original_tos = *tos;
++  LinkedStatus result;
++  int outcome = 0; // 1=returned, 2=untouched whole-method interpreter fallback
++  uintptr_t array_bits = 0;
++  uintptr_t value_bits = 0;
++  jint index = 0;
++  jint assignable = 1;
++  int array_length = -1;
++  bool null_array = false;
++  bool bounds_ok = true;
++  bool assignability_ok = true;
++  bool card_dirty = false;
++  bool card_probe_active = false;
++  bool card_probe_array_old = false;
++  bool card_probe_child_young = false;
++  bool card_probe_clean_before = false;
++  uintptr_t card_probe_address_bits = 0;
++  CardTable::CardValue* card_probe_card = nullptr;
++  int card_probe_old_byte = -1;
++  int card_probe_span_kind = 0;
++  {
++    // One no-safepoint transaction owns rooted reread, exact subtype proof,
++    // raw ABI call, post-store verification, and infallible areturn state
++    // publication. There is no suspended activation or post-commit fallback.
++    NoSafepointVerifier nsv;
++    oop array = cast_to_oop((void*)locals[0]);
++    index = (jint)locals[-1];
++    oop value = cast_to_oop((void*)locals[-2]);
++    if (array != cast_to_oop((void*)locals[0])
++        || value != cast_to_oop((void*)locals[-2])) {
++      fatal("ZeroWasm reference-store group rooted locals changed");
++    }
++    array_bits = (uintptr_t)array;
++    value_bits = (uintptr_t)value;
++    null_array = array == nullptr;
++    if (array != nullptr) {
++      if (array->klass() == nullptr || !array->klass()->is_objArray_klass()) {
++        fatal("ZeroWasm reference-store group array klass changed");
++      }
++      array_length = objArrayOop(array)->length();
++      bounds_ok = (uint32_t)index < (uint32_t)array_length;
++      if (bounds_ok && value != nullptr) {
++        Klass* rhs = value->klass();
++        Klass* element = ObjArrayKlass::cast(array->klass())->element_klass();
++        assignability_ok = rhs == element || rhs->is_subtype_of(element);
++        assignable = assignability_ok ? 1 : 0;
++      } else if (!bounds_ok) {
++        assignable = 0;
++      }
++    }
++    LinkedRefArrayStoreLayout live_layout;
++    if (!linked_ref_array_store_layout_for_fixture(&live_layout)
++        || live_layout.length_offset != layout.length_offset
++        || live_layout.base_offset != layout.base_offset
++        || live_layout.element_size != layout.element_size
++        || live_layout.card_shift != layout.card_shift
++        || live_layout.clean_card != layout.clean_card
++        || live_layout.dirty_card != layout.dirty_card
++        || live_layout.card_base != layout.card_base) {
++      fatal("ZeroWasm reference-store group layout changed");
++    }
++    oop target_before = nullptr;
++    CardTable::CardValue* card_before_address = nullptr;
++    int card_before = -1;
++    if (!null_array && bounds_ok) {
++      target_before = objArrayOop(array)->obj_at(index);
++      card_before_address = linked_ref_array_card_for(layout, array, index);
++      if (card_before_address != nullptr) card_before = (int)*card_before_address;
++    }
++    if (_linked_ref_array_store_card_probe_pending) {
++      bool all_null_before_store = !null_array && bounds_ok
++          && array_length >= 1024;
++      if (all_null_before_store) {
++        for (int i = 0; i < array_length; i++) {
++          if (objArrayOop(array)->obj_at(i) != nullptr) {
++            all_null_before_store = false;
++            break;
++          }
++        }
++      }
++      CardTable::CardValue* rebound_card = nullptr;
++      int rebound_span_kind = 0;
++      if (!all_null_before_store
++          || (uintptr_t)array != _linked_ref_array_store_card_probe_array_bits
++          || index != _linked_ref_array_store_card_probe_index
++          || array_length != _linked_ref_array_store_card_probe_length
++          || _linked_ref_array_store_card_probe_span_kind != 1
++          || !linked_ref_array_card_span_proven(
++                 layout, array, index, array_length, &rebound_card,
++                 &rebound_span_kind)
++          || rebound_card == nullptr || rebound_span_kind != 1
++          || (uintptr_t)rebound_card
++                 != _linked_ref_array_store_card_probe_address_bits
++          || (int)*rebound_card != layout.clean_card) {
++        fatal("ZeroWasm reference-store group card probe binding changed");
++      }
++      card_probe_active = true;
++      card_probe_card = rebound_card;
++      card_probe_address_bits = (uintptr_t)rebound_card;
++      card_probe_old_byte = (int)*rebound_card;
++      card_probe_span_kind = rebound_span_kind;
++      card_probe_clean_before = true;
++    }
++    result = decode_linked_status(linked_reference_store_group_call(
++        (jint)(intptr_t)array, index, (jint)(intptr_t)value,
++        (jint)memory_limit_pages, (jint)(uint32_t)layout.card_base, assignable));
++    if (result.status == LINKED_RETURN && result.bci == 0) {
++      if (null_array || !bounds_ok || !assignability_ok
++          || memory_limit_pages != 0
++          || (uint32_t)result.value != (uint32_t)value_bits
++          || objArrayOop(array)->obj_at(index) != value) {
++        fatal("ZeroWasm reference-store group invalid direct result");
++      }
++      CardTable::CardValue* card = linked_ref_array_card_for(
++          layout, array, index);
++      card_dirty = card != nullptr && (int)*card == layout.dirty_card;
++      if (!card_dirty) {
++        fatal("ZeroWasm reference-store group card did not become dirty");
++      }
++      if (card_probe_active) {
++        BarrierSet* barrier = BarrierSet::barrier_set();
++        CardTableBarrierSet* card_barrier =
++            barrier != nullptr && barrier->is_a(BarrierSet::CardTableBarrierSet)
++                ? static_cast<CardTableBarrierSet*>(barrier) : nullptr;
++        CardTable* card_table = card_barrier == nullptr
++            ? nullptr : card_barrier->card_table();
++        CardTable::CardValue* proven_card = nullptr;
++        int proven_span_kind = 0;
++        card_probe_array_old = card_table != nullptr
++            && !card_table->is_in_young(array);
++        card_probe_child_young = value != nullptr && card_table != nullptr
++            && card_table->is_in_young(value);
++        if (!card_probe_array_old || !card_probe_child_young
++            || !linked_ref_array_card_span_proven(
++                   layout, array, index, array_length, &proven_card,
++                   &proven_span_kind)
++            || proven_card != card_probe_card
++            || (uintptr_t)proven_card != card_probe_address_bits
++            || card_probe_old_byte != layout.clean_card
++            || proven_span_kind != card_probe_span_kind
++            || (int)*proven_card != layout.dirty_card) {
++          fatal("ZeroWasm reference-store group card/root proof failed");
++        }
++        _linked_ref_array_store_card_probe_pending = false;
++        _linked_ref_array_store_card_probe_index = -1;
++        _linked_ref_array_store_card_probe_array_bits = 0;
++        _linked_ref_array_store_card_probe_address_bits = 0;
++        _linked_ref_array_store_card_probe_length = -1;
++        _linked_ref_array_store_card_probe_span_kind = 0;
++      }
++      linked_publish_ref_store_return_infallible(
++          istate, tos, pc, code_base + return_bci, value);
++      outcome = 1;
++    } else if (result.status == LINKED_REEXECUTE && result.bci == 0) {
++      if (card_probe_active) {
++        if (card_probe_card == nullptr
++            || (uintptr_t)card_probe_card != card_probe_address_bits
++            || (int)*card_probe_card != card_probe_old_byte) {
++          fatal("ZeroWasm reference-store group card probe refusal changed card");
++        }
++        _linked_ref_array_store_card_probe_pending = false;
++        _linked_ref_array_store_card_probe_index = -1;
++        _linked_ref_array_store_card_probe_array_bits = 0;
++        _linked_ref_array_store_card_probe_address_bits = 0;
++        _linked_ref_array_store_card_probe_length = -1;
++        _linked_ref_array_store_card_probe_span_kind = 0;
++      }
++      if (*pc != original_pc || *tos != original_tos
++          || original_pc != code_base) {
++        fatal("ZeroWasm reference-store group fallback changed entry frame");
++      }
++      if (!null_array && bounds_ok) {
++        if (objArrayOop(array)->obj_at(index) != target_before
++            || card_before_address == nullptr
++            || (int)*card_before_address != card_before) {
++          fatal("ZeroWasm reference-store group precommit miss changed memory");
++        }
++      }
++      outcome = 2;
++    } else {
++      fatal("ZeroWasm reference-store group returned unexpected status");
++    }
++  }
++
++  const char* reason = null_array ? "null"
++      : (memory_limit_pages > 0 ? "memory"
++         : (!bounds_ok ? "bounds"
++            : (!assignability_ok ? "assignability" : "memory-or-card")));
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REFERENCE_STORE_GROUP_ENTER seq=%llu "
++                  "method=groupedReferenceStore entry-bci=0 relay-bci=3 "
++                  "commit-bci=6 return-bci=9 "
++                  "array-bits=%u index=%d value-bits=%u length=%d "
++                  "limit-pages=%lld card-base=%u assignable=%d slot=%d",
++                  (unsigned long long)sequence, (unsigned)(uint32_t)array_bits,
++                  index, (unsigned)(uint32_t)value_bits, array_length,
++                  (long long)memory_limit_pages,
++                  (unsigned)(uint32_t)layout.card_base, assignable,
++                  _linked_reference_store_group_slot);
++    tty->print_cr("[zbg] REFERENCE_STORE_GROUP_STATUS seq=%llu status=%d "
++                  "bci=%d result-oop-bits=%u",
++                  (unsigned long long)sequence, result.status, result.bci,
++                  (unsigned)(uint32_t)result.value);
++  }
++  if (outcome == 1) {
++    _linked_returned++;
++    if (ZeroWasmLinkedGroupVerbose) {
++      tty->print_cr("[zbg] REFERENCE_STORE_GROUP_EXIT seq=%llu status=RETURN "
++                    "bci=0 funcs=4 exports=1 private=3 table-slots=1 "
++                    "private-slots=0 internal-direct-calls=3 oop-stores=1 "
++                    "card-stores=1 card-after-dirty=%d",
++                    (unsigned long long)sequence, card_dirty ? 1 : 0);
++      if (card_probe_active) {
++        tty->print_cr("[zbg] REFERENCE_STORE_GROUP_CARD_PROBE seq=%llu "
++                      "array-old=%d child-young=%d card-clean-before=%d "
++                      "card-dirty-after=%d span-kind=%d pending=0",
++                      (unsigned long long)sequence,
++                      card_probe_array_old ? 1 : 0,
++                      card_probe_child_young ? 1 : 0,
++                      card_probe_clean_before ? 1 : 0,
++                      card_dirty ? 1 : 0, card_probe_span_kind);
++      }
++    }
++    return ZeroWasmBaseline::Returned;
++  }
++  if (outcome != 2) {
++    fatal("ZeroWasm reference-store group failed to select an outcome");
++  }
++  if (ZeroWasmLinkedGroupVerbose) {
++    tty->print_cr("[zbg] REFERENCE_STORE_GROUP_EXIT seq=%llu status=NOT_RUN "
++                  "bci=0 reason=%s frame-untouched=1 commit-bci3-resume=0",
++                  (unsigned long long)sequence, reason);
++  }
++  return ZeroWasmBaseline::NotRun;
++}
++
+ static ZeroWasmBaseline::Result run_linked_ref_array_store(
+     Method* method, intptr_t* locals, address code_base, address* pc,
+     intptr_t** tos, interpreterState istate) {
+@@ -6391,12 +8488,46 @@ ZeroWasmBaseline::Result ZeroWasmBaseline::maybe_run(
+   const bool ref_array_collision = UseZeroWasmLinkedRefArrayLoad
+       && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
+           || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedReferenceStoreGroup
+           || UseZeroWasmBaseline || UseZeroWasmJIT);
+   const bool ref_array_store_collision = UseZeroWasmLinkedRefArrayStore
+       && (UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedGroup
+           || UseZeroWasmLinkedIntArray || UseZeroWasmLinkedIntArrayStore
+-          || UseZeroWasmLinkedBenchmark || UseZeroWasmBaseline || UseZeroWasmJIT);
+-  if (ref_array_collision || ref_array_store_collision) return NotRun;
++          || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedReferenceStoreGroup
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  const bool reference_store_group_collision =
++      UseZeroWasmLinkedReferenceStoreGroup
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  const bool reference_store_group_perf_collision =
++      UseZeroWasmReferenceStoreGroupPerf
++      && (UseZeroWasmLinkedGroup || UseZeroWasmLinkedIntArray
++          || UseZeroWasmLinkedIntArrayStore || UseZeroWasmLinkedBenchmark
++          || UseZeroWasmLinkedRefArrayLoad || UseZeroWasmLinkedRefArrayStore
++          || UseZeroWasmLinkedReferenceStoreGroup
++          || UseZeroWasmBaseline || UseZeroWasmJIT);
++  if (ref_array_collision || ref_array_store_collision
++      || reference_store_group_collision
++      || reference_store_group_perf_collision) return NotRun;
++  if (UseZeroWasmReferenceStoreGroupPerf) {
++    Result card_probe = run_linked_ref_array_store_card_probe_setup(
++        method, locals, code_base, pc, tos, istate);
++    if (card_probe != NotRun) return card_probe;
++    Result perf = run_reference_store_group_perf(
++        method, locals, code_base, pc, tos, istate);
++    if (perf != NotRun) return perf;
++  }
++  if (UseZeroWasmLinkedReferenceStoreGroup) {
++    Result card_probe = run_linked_ref_array_store_card_probe_setup(
++        method, locals, code_base, pc, tos, istate);
++    if (card_probe != NotRun) return card_probe;
++    Result group = run_linked_reference_store_group(
++        method, locals, code_base, pc, tos, istate);
++    if (group != NotRun) return group;
++  }
+   if (UseZeroWasmLinkedRefArrayLoad) {
+     Result ref_array = run_linked_ref_array_load(method, locals, code_base,
+                                                   pc, tos, istate);

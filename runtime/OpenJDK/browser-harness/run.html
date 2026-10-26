@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>wasm JVM harness</title>
+<script src="javavm.js"></script>
+<script>
+// run.html?a=<arg>&a=<arg>...: one JVM run; window.__jvm.{lines,status,ms}.
+const args = new URLSearchParams(location.search).getAll('a');
+const state = globalThis.__jvm = { lines: [], errs: [], status: null, ms: 0 };
+const t0 = performance.now();
+let done; const exited = new Promise(r => { done = r; });
+const finish = s => { if (state.status === null) { state.status = s; state.ms = performance.now() - t0; } done(s); };
+createJavaVM({
+  arguments: args,
+  print: t => { state.lines.push(t); },
+  printErr: t => {
+    if (t.startsWith('warning: unsupported syscall')) return;
+    const m = t.match(/program exited \(with status: (-?\d+)\)/);
+    if (m) { finish(Number(m[1])); return; }
+    state.errs.push(t);
+  },
+  onExit: s => finish(s),
+}).catch(e => { state.errs.push(String(e && e.stack || e)); finish(-999); });
+</script>
