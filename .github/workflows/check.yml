@@ -1,0 +1,36 @@
+name: Check relay
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: native/go.sum
+      - name: Check native CLI and build downloads
+        run: |
+          (cd native && go test -race ./...)
+          (cd native && go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...)
+          node native/build.mjs build/cli
+      - run: docker build -t mcwc-relay:test .
+      - name: Check non-root container health
+        run: |
+          docker run -d --name relay-test --read-only --cap-drop ALL --security-opt no-new-privileges -e RELAY_TOKEN=test-only-ci-relay-key-1234567890 mcwc-relay:test
+          trap 'docker rm -f relay-test' EXIT
+          for attempt in 1 2 3 4 5; do
+            if docker exec relay-test node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then exit 0; fi
+            sleep 1
+          done
+          exit 1

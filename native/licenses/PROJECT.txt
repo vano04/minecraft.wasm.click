@@ -1,0 +1,5 @@
+minecraft.wasm.click relay is licensed under GPL-3.0-only.
+Corresponding source: https://github.com/vano04/minecraft.wasm.click/tree/relay
+Source archive: https://github.com/vano04/minecraft.wasm.click/archive/refs/heads/relay.tar.gz
+The relay branch contains native/, its pinned module graph and build tools.
+Run mcwc-relay --licenses to print third-party notices bundled into this executable.

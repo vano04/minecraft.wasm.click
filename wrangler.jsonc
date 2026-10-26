@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mcwc-relay",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-24",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://minecraft.wasm.click"
+  },
+  "observability": {
+    "enabled": false
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RELAY_CONNECTIONS",
+        "class_name": "RelayConnection"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-relay-connections",
+      "new_sqlite_classes": [
+        "RelayConnection"
+      ]
+    }
+  ]
+}

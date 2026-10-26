@@ -1,0 +1,14 @@
+services:
+  relay:
+    build: .
+    environment:
+      RELAY_TOKEN: ${RELAY_TOKEN:?Set RELAY_TOKEN in .env}
+      ALLOWED_ORIGINS: https://minecraft.wasm.click
+    ports: ["127.0.0.1:8080:8080"]
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 256m
