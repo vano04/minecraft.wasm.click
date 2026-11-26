@@ -36,7 +36,12 @@ test('public routes render JSON import, keep 404 styling and restrict static fil
   const entry=await request('/');assert.equal(entry.status,200);
   const body=await entry.text();assert.match(body,/IMPORT ACCOUNT JSON/);assert.doesNotMatch(body,/microsoft\/start|Unlock testing/);
   assert.equal(entry.headers.get('content-security-policy').includes("script-src 'self'"),true);
-  for(const path of ['/privacy','/privacy/'])assert.match(await(await request(path)).text(),/Privacy fixture/);
+  for(const path of ['/privacy','/privacy/']) {
+    const privacyRes=await request(path);
+    assert.equal(privacyRes.headers.get('cache-control'),'no-cache');
+    assert.match(await privacyRes.text(),/Privacy fixture/);
+  }
+  assert.equal((await request('/site.css')).headers.get('cache-control'),'no-cache');
   for(const path of ['/missing','/.env','/server/json-auth.mjs','/package.json','/play/../../package.json']){
     const response=await request(path);assert.equal(response.status,404,path);assert.match(await response.text(),/Page not found/);
   }
@@ -65,7 +70,9 @@ test('only a verified imported session can load runtime files, and logout revoke
   assert.equal(page.status,200);const markup=await page.text();assert.match(markup,/FixturePlayer/);assert.ok(!markup.includes(token));
   const entry=await request('/',{headers:{Cookie:cookie},redirect:'manual'});assert.equal(entry.status,303);assert.equal(entry.headers.get('location'),'/play/');
   assert.equal((await request('/mcweb/auth/logout',{method:'POST',headers:{Cookie:cookie}})).status,403);
-  assert.equal((await request('/mcweb/auth/logout',{method:'POST',headers:{Cookie:cookie,Origin:origin}})).status,200);
+  const logoutRes=await request('/mcweb/auth/logout',{method:'POST',headers:{Cookie:cookie,Origin:origin}});
+  assert.equal(logoutRes.status,200);
+  assert.equal(logoutRes.headers.get('clear-site-data'),'"cookies", "cache"');
   assert.equal((await request('/play/javavm.js',{headers:{Cookie:cookie}})).status,401);
 }));
 

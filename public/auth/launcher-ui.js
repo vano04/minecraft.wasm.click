@@ -29,18 +29,90 @@
     document.exitPointerLock?.();
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   };
-  const account = document.getElementById('account-menu');
-  document.addEventListener('click', event => {
-    if (account && !account.contains(event.target)) account.open = false;
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && account?.open) {
-      account.open = false;
-      account.querySelector('summary').focus();
+
+  function createElement(tag, attributes = {}, children = []) {
+    const node = document.createElement(tag);
+    for (const [name, value] of Object.entries(attributes)) {
+      if (value === undefined || value === false || value === null) continue;
+      if (value === true) node.setAttribute(name, '');
+      else if (name === 'textContent') node.textContent = value;
+      else node.setAttribute(name, value);
     }
-  });
+    for (const child of children) {
+      if (child !== undefined && child !== null) node.append(child);
+    }
+    return node;
+  }
+
+  function enableLightDismiss(dialog) {
+    if (!dialog || ('closedBy' in (globalThis.HTMLDialogElement?.prototype || {}))) return;
+    let pointerDownOutside = false;
+    const isOutside = event => {
+      const rect = dialog.getBoundingClientRect();
+      return event.clientX < rect.left || event.clientX > rect.right
+        || event.clientY < rect.top || event.clientY > rect.bottom;
+    };
+    dialog.addEventListener('pointerdown', event => {
+      pointerDownOutside = event.target === dialog && isOutside(event);
+    });
+    dialog.addEventListener('pointerup', event => {
+      if (pointerDownOutside && event.target === dialog && isOutside(event)) dialog.close();
+      pointerDownOutside = false;
+    });
+  }
+
+  if (!('commandForElement' in (globalThis.HTMLButtonElement?.prototype || {}))) {
+    document.querySelectorAll?.('button[commandfor][command]').forEach(button => {
+      button.addEventListener('click', () => {
+        const target = document.getElementById(button.getAttribute('commandfor'));
+        const command = button.getAttribute('command');
+        if (!target) return;
+        if (command === 'show-modal' && !target.open) target.showModal?.();
+        else if (command === 'close' && target.open) target.close?.();
+        else if (command === 'toggle-popover') target.togglePopover?.();
+      });
+    });
+  }
+
+  const account = document.getElementById('account-menu');
+  const accountTrigger = document.getElementById('account-menu-trigger');
+  if (account && accountTrigger) {
+    const positionPopover = () => {
+      if (globalThis.CSS?.supports?.('position-area: block-end')) return;
+      const rect = accountTrigger.getBoundingClientRect();
+      account.style.top = Math.round(rect.bottom + 6) + 'px';
+      account.style.right = Math.max(16, Math.round(globalThis.innerWidth - rect.right)) + 'px';
+    };
+    account.addEventListener('toggle', event => {
+      const open = event.newState === 'open';
+      accountTrigger.setAttribute('aria-expanded', String(open));
+      if (open) {
+        positionPopover();
+        account.querySelector('button')?.focus?.();
+      }
+    });
+    const focusGroup = account.querySelector('[focusgroup]');
+    if (focusGroup && !('focusgroup' in (globalThis.HTMLElement?.prototype || {}))) {
+      focusGroup.setAttribute('role', 'menu');
+      const items = [...focusGroup.querySelectorAll('button, a')];
+      items.forEach(item => item.setAttribute('role', 'menuitem'));
+      focusGroup.addEventListener('keydown', event => {
+        const index = items.indexOf(document.activeElement);
+        if (index < 0 || !items.length) return;
+        let next = index;
+        if (event.key === 'ArrowDown') next = (index + 1) % items.length;
+        else if (event.key === 'ArrowUp') next = (index - 1 + items.length) % items.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = items.length - 1;
+        else return;
+        event.preventDefault();
+        items[next].focus();
+      });
+    }
+  }
+
   const settings = document.getElementById('launcher-settings');
-  document.getElementById('settings-button')?.addEventListener('click', () => settings.showModal());
+  enableLightDismiss(settings);
   if (settings) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => mountLibrary(settings), { once: true });
     else mountLibrary(settings);
@@ -49,38 +121,112 @@
   function mountLibrary(settingsDialog) {
     const library = globalThis.mcWebGameLibrary;
     if (!library) return;
-    const panel = document.createElement('section');
-    panel.className = 'game-library';
-    panel.innerHTML = '<h3>Worlds and resource packs</h3><p>Files stay in this browser. Export a backup before clearing website data. Import Java Edition worlds and resource packs as ZIP files (up to 512 MiB).</p>'
-      + '<div data-library-kind="world" class="library-group" tabindex="0" aria-label="World ZIP import drop area"><h4>Worlds</h4><p>Exit the game and reload this page before importing, exporting or deleting worlds.</p><button type="button" class="pixel-button" data-import>Import world ZIP</button><input type="file" accept=".zip,application/zip" multiple hidden><ul data-items aria-label="Saved worlds"></ul></div>'
-      + '<div data-library-kind="pack" class="library-group" tabindex="0" aria-label="Resource pack ZIP import drop area"><h4>Resource packs</h4><p>Choose a ZIP, drag it here, or paste a copied ZIP file. New packs appear after you reopen Minecraft’s Resource Packs screen.</p><button type="button" class="pixel-button" data-import>Import resource pack ZIP</button><input type="file" accept=".zip,application/zip" multiple hidden><ul data-items aria-label="Installed resource packs"></ul></div>'
-      + '<p class="library-status" role="status" aria-live="polite"></p>';
+
+    function createLibraryGroup(kind, headingLevel, headingText, descriptionText, buttonText, dropLabel, listLabel) {
+      return createElement('div', { 'data-library-kind': kind, class: 'library-group', tabindex: '0', 'aria-label': dropLabel }, [
+        createElement(headingLevel, { textContent: headingText }),
+        createElement('p', { textContent: descriptionText }),
+        createElement('button', { type: 'button', class: 'pixel-button', 'data-import': true, textContent: buttonText }),
+        createElement('input', { type: 'file', accept: '.zip,application/zip', multiple: true, hidden: true }),
+        createElement('ul', { 'data-items': true, 'aria-label': listLabel }),
+      ]);
+    }
+
+    const worldGroup = createLibraryGroup(
+      'world',
+      'h4',
+      'Worlds',
+      'Exit the game and reload this page before importing, exporting or deleting worlds.',
+      'Import world ZIP',
+      'World ZIP import drop area',
+      'Saved worlds',
+    );
+    const packGroup = createLibraryGroup(
+      'pack',
+      'h4',
+      'Resource packs',
+      'Choose a ZIP, drag it here, or paste a copied ZIP file. New packs appear after you reopen Minecraft’s Resource Packs screen.',
+      'Import resource pack ZIP',
+      'Resource pack ZIP import drop area',
+      'Installed resource packs',
+    );
+    const settingsProgress = createElement('progress', { class: 'library-progress', hidden: true });
+    const settingsStatus = createElement('p', { class: 'library-status', role: 'status', 'aria-live': 'polite' });
+    const panel = createElement('section', { class: 'game-library' }, [
+      createElement('h3', { textContent: 'Worlds and resource packs' }),
+      createElement('p', { textContent: 'Files stay in this browser. Export a backup before clearing website data. Import Java Edition worlds and resource packs as ZIP files (up to 512 MiB).' }),
+      worldGroup,
+      packGroup,
+      settingsProgress,
+      settingsStatus,
+    ]);
     settingsDialog.querySelector('.settings-account')?.before(panel);
     if (!panel.isConnected) settingsDialog.append(panel);
-    const packDialog = document.createElement('dialog');
-    packDialog.id = 'game-files';
-    packDialog.className = 'launcher-dialog';
-    packDialog.setAttribute('aria-labelledby', 'game-files-title');
-    packDialog.innerHTML = '<div class="dialog-heading"><h2 id="game-files-title">Resource packs</h2><form method="dialog"><button class="pixel-button" aria-label="Close resource packs">Done</button></form></div><p>Choose a texture or resource pack ZIP. You can also drop or paste a ZIP file here.</p>';
-    const inGamePanel = panel.querySelector('[data-library-kind="pack"]').cloneNode(true);
-    packDialog.append(inGamePanel);
-    const inGameStatus = document.createElement('p');
-    inGameStatus.className = 'library-status';
-    inGameStatus.setAttribute('role', 'status');
-    inGameStatus.setAttribute('aria-live', 'polite');
-    packDialog.append(inGameStatus);
+
+    const inGamePanel = createLibraryGroup(
+      'pack',
+      'h3',
+      'Resource packs',
+      'Choose a ZIP, drag it here, or paste a copied ZIP file. New packs appear after you reopen Minecraft’s Resource Packs screen.',
+      'Import resource pack ZIP',
+      'Resource pack ZIP import drop area',
+      'Installed resource packs',
+    );
+    const inGameProgress = createElement('progress', { class: 'library-progress', hidden: true });
+    const inGameStatus = createElement('p', { class: 'library-status', role: 'status', 'aria-live': 'polite' });
+    const packDialog = createElement('dialog', {
+      id: 'game-files',
+      class: 'launcher-dialog',
+      closedby: 'any',
+      'aria-labelledby': 'game-files-title',
+    }, [
+      createElement('div', { class: 'dialog-heading' }, [
+        createElement('h2', { id: 'game-files-title', textContent: 'Resource packs' }),
+        createElement('form', { method: 'dialog' }, [
+          createElement('button', { class: 'pixel-button', 'aria-label': 'Close resource packs', textContent: 'Done' }),
+        ]),
+      ]),
+      createElement('p', { textContent: 'Choose a texture or resource pack ZIP. You can also drop or paste a ZIP file here.' }),
+      inGamePanel,
+      inGameProgress,
+      inGameStatus,
+    ]);
+    enableLightDismiss(packDialog);
     document.body.append(packDialog);
     for (const type of ['keydown', 'keyup', 'mouseup']) packDialog.addEventListener(type, event => event.stopPropagation());
-    const saveStatus = document.createElement('p');
-    saveStatus.className = 'player-save-status';
-    saveStatus.setAttribute('role', 'status');
+
+    const confirmMessage = createElement('p', { id: 'confirm-delete-message' });
+    const confirmCancel = createElement('button', { type: 'button', class: 'pixel-button', value: 'cancel', textContent: 'Cancel' });
+    const confirmSubmit = createElement('button', { type: 'submit', class: 'pixel-button pixel-button-red', value: 'confirm', textContent: 'Delete' });
+    const confirmDialog = createElement('dialog', {
+      id: 'confirm-delete',
+      class: 'launcher-dialog',
+      closedby: 'any',
+      'aria-labelledby': 'confirm-delete-title',
+      'aria-describedby': 'confirm-delete-message',
+    }, [
+      createElement('h2', { id: 'confirm-delete-title', textContent: 'Delete saved item' }),
+      confirmMessage,
+      createElement('form', { method: 'dialog', class: 'confirm-actions' }, [confirmCancel, confirmSubmit]),
+    ]);
+    enableLightDismiss(confirmDialog);
+    confirmCancel.addEventListener('click', () => confirmDialog.close('cancel'));
+    document.body.append(confirmDialog);
+    function askDeleteConfirmation(itemName) {
+      return new Promise(resolve => {
+        confirmMessage.textContent = 'Delete “' + itemName + '” from this browser? Export a backup first if you want to keep it.';
+        confirmDialog.addEventListener('close', () => resolve(confirmDialog.returnValue === 'confirm'), { once: true });
+        confirmDialog.showModal();
+      });
+    }
+
+    const saveStatus = createElement('p', { class: 'player-save-status', role: 'status' });
     panel.prepend(saveStatus);
     const gameSaveStatus = saveStatus.cloneNode();
     gameSaveStatus.id = 'game-save-status';
     const stage = document.getElementById('mcweb-game-stage');
     stage?.append(gameSaveStatus);
-    const retrySave = document.createElement('button');
-    retrySave.type = 'button'; retrySave.className = 'text-button'; retrySave.textContent = 'Retry saving'; retrySave.hidden = true;
+    const retrySave = createElement('button', { type: 'button', class: 'text-button', textContent: 'Retry saving', hidden: true });
     saveStatus.after(retrySave);
     const retry = async () => {
       retrySave.disabled = true;
@@ -102,15 +248,15 @@
       saveStatus.classList.toggle('saving-error', Boolean(error));
       gameSaveStatus.textContent = error ? 'Saving failed: ' + error + ' Keep this page open. ' : '';
       if (error) {
-        const gameRetry = document.createElement('button'); gameRetry.type = 'button';
-        gameRetry.className = 'text-button'; gameRetry.textContent = 'Retry saving'; gameRetry.addEventListener('click', retry);
+        const gameRetry = createElement('button', { type: 'button', class: 'text-button', textContent: 'Retry saving' });
+        gameRetry.addEventListener('click', retry);
         gameSaveStatus.append(gameRetry);
       }
-
       gameSaveStatus.hidden = !error;
     }
     globalThis.addEventListener('mcweb-storage-status', event => { showStorageStatus(event); controls(); });
     showStorageStatus();
+
     let busy = false;
     let download = null;
     function releaseDownload() {
@@ -120,10 +266,16 @@
       download.link.remove();
       download = null;
     }
-    const message = text => { releaseDownload(); panel.querySelector('.library-status').textContent = text; inGameStatus.textContent = text; };
+    const setProgress = (done, total) => {
+      for (const bar of [settingsProgress, inGameProgress]) {
+        if (!total) { bar.hidden = true; bar.removeAttribute('value'); bar.removeAttribute('max'); }
+        else { bar.hidden = false; bar.max = total; bar.value = done; }
+      }
+    };
+    const message = text => { releaseDownload(); setProgress(0, 0); settingsStatus.textContent = text; inGameStatus.textContent = text; };
     globalThis.addEventListener('pagehide', releaseDownload);
     const size = bytes => bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MiB' : Math.ceil(bytes / 1024) + ' KiB';
-    const groups = [...panel.querySelectorAll('[data-library-kind]'), inGamePanel];
+    const groups = [worldGroup, packGroup, inGamePanel];
     function controls() {
       const running = globalThis.mcWebGameStorage?.status().running;
       for (const group of groups) {
@@ -131,6 +283,16 @@
         group.querySelector('[data-import]').disabled = busy || (world && running);
         for (const button of group.querySelectorAll('[data-action]')) button.disabled = busy || (running && (world || button.dataset.action === 'delete'));
       }
+    }
+    function updateOverflowFocus(group) {
+      const check = () => {
+        for (const itemName of group.querySelectorAll('.library-item-name')) {
+          if (itemName.scrollWidth > itemName.clientWidth) itemName.tabIndex = 0;
+          else itemName.removeAttribute('tabindex');
+        }
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(check);
+      else check();
     }
     async function refresh() {
       try {
@@ -142,38 +304,40 @@
           const list = group.querySelector('[data-items]');
           list.replaceChildren();
           if (!items.length) {
-            const empty = document.createElement('li'); empty.className = 'library-empty';
-            empty.textContent = kind === 'world' ? 'No saved worlds yet.' : 'No imported packs yet.'; list.append(empty);
+            list.append(createElement('li', { class: 'library-empty', textContent: kind === 'world' ? 'No saved worlds yet.' : 'No imported packs yet.' }));
           }
           for (const item of items) {
-            const row = document.createElement('li');
-            const label = document.createElement('span');
-            const itemSize = document.createElement('span');
-            itemSize.className = 'library-item-size';
-            itemSize.textContent = size(item.bytes) + ' ·';
-            const itemName = document.createElement('span');
-            itemName.className = 'library-item-name';
-            itemName.textContent = item.name;
-            itemName.title = item.name;
-            itemName.tabIndex = 0;
-            label.append(itemSize, itemName);
+            const row = createElement('li');
+            const label = createElement('span', {}, [
+              createElement('span', { class: 'library-item-size', textContent: size(item.bytes) + ' ·' }),
+              createElement('span', { class: 'library-item-name', title: item.name, textContent: item.name }),
+            ]);
             row.append(label);
             for (const action of ['export', 'delete']) {
-              const button = document.createElement('button');
-              button.type = 'button'; button.className = 'text-button'; button.dataset.action = action;
-              button.textContent = action === 'export' ? 'Export ZIP' : 'Delete';
+              const button = createElement('button', {
+                type: 'button',
+                class: 'text-button',
+                'data-action': action,
+                textContent: action === 'export' ? 'Export ZIP' : 'Delete',
+              });
               button.setAttribute('aria-label', button.textContent + ' ' + item.name);
               button.addEventListener('click', () => {
-                if (action === 'delete' && !confirm('Delete “' + item.name + '” from this browser? Export a backup first if you want to keep it.')) return;
                 perform(async () => {
-                  if (action === 'delete') { await library.remove(kind, item.name); message('Deleted “' + item.name + '”.'); }
-                  else {
+                  if (action === 'delete') {
+                    if (!(await askDeleteConfirmation(item.name))) return;
+                    await library.remove(kind, item.name);
+                    message('Deleted “' + item.name + '”.');
+                  } else {
                     message('Preparing “' + item.name + '”…');
                     const blob = await library.exportZip(kind, item.name);
-                    const url = URL.createObjectURL(blob), link = document.createElement('a');
-                    link.href = url; link.download = item.name + '.zip'; link.textContent = 'Save ' + item.name + '.zip';
-                    link.className = 'library-download';
-                    const target = packDialog.open ? inGameStatus : panel.querySelector('.library-status');
+                    const url = URL.createObjectURL(blob);
+                    const link = createElement('a', {
+                      href: url,
+                      download: item.name + '.zip',
+                      textContent: 'Save ' + item.name + '.zip',
+                      class: 'library-download',
+                    });
+                    const target = packDialog.open ? inGameStatus : settingsStatus;
                     target.textContent = 'Backup ready. '; target.append(link);
                     link.click();
                     download = { url, link, timer: setTimeout(releaseDownload, 60000) };
@@ -184,6 +348,7 @@
             }
             list.append(row);
           }
+          updateOverflowFocus(group);
         }
         controls();
       } catch (error) { message(error.message || String(error)); }
@@ -192,14 +357,24 @@
       if (busy) return;
       busy = true; controls();
       try { await action(); } catch (error) { message(error.message || String(error)); }
-      finally { busy = false; await refresh(); }
+      finally { setProgress(0, 0); busy = false; await refresh(); }
     }
     function importFiles(kind, files) {
       if (!files.length) { message('Copy or choose a ZIP file to import.'); return; }
       perform(async () => {
         for (const file of files) {
           message('Checking “' + file.name + '”…');
-          const result = await library.importZip(kind, file, (done, total) => message('Unpacking “' + file.name + '”: ' + done + ' / ' + total));
+          let lastAnnounced = 0;
+          const result = await library.importZip(kind, file, (done, total) => {
+            setProgress(done, total);
+            const now = Date.now();
+            if (done === total || now - lastAnnounced >= 400) {
+              lastAnnounced = now;
+              const text = 'Unpacking “' + file.name + '”: ' + done + ' / ' + total;
+              settingsStatus.textContent = text;
+              inGameStatus.textContent = text;
+            }
+          });
           message('Imported “' + result.name + '” (' + size(result.bytes) + ').' + (kind === 'pack' && globalThis.mcWebGameStorage?.status().running ? ' Reopen Minecraft’s Resource Packs screen to select it.' : ''));
         }
       });
@@ -237,14 +412,27 @@
   }
 
   const notice = document.getElementById('launcher-notice');
+  const purchase = document.getElementById('entitlement-notice');
+  enableLightDismiss(notice);
+  enableLightDismiss(purchase);
+  const showPurchase = () => {
+    if (!purchase || purchase.open) return;
+    if (notice?.open) notice.addEventListener('close', showPurchase, { once: true });
+    else purchase.showModal();
+  };
+  globalThis.addEventListener('minecraft-entitlement-required', showPurchase);
   if (!notice) return;
   const read = document.getElementById('notice-read');
-  const continueButton = document.getElementById('notice-continue');
+  const noticeForm = document.getElementById('launcher-notice-form') || notice.querySelector('form');
+  const noticeError = document.getElementById('notice-error');
   const key = 'minecraft.wasm.click.launcherNotice.2026-10-24-project2';
-  const openNotice = () => {
+  const prepareNotice = () => {
     read.checked = false;
-    continueButton.disabled = true;
-    notice.showModal();
+    if (noticeError) noticeError.hidden = true;
+  };
+  const openNotice = () => {
+    prepareNotice();
+    if (!notice.open) notice.showModal();
   };
   const rememberRead = () => {
     try { localStorage.setItem(key, 'read'); } catch {}
@@ -253,16 +441,43 @@
         + (location.protocol === 'https:' ? '; Secure' : '');
     } catch {}
   };
+  let acknowledged = false, signInPending = false;
+  const publicIntroduction = document.body.hasAttribute('data-public-introduction');
+  const loginButton = document.getElementById('login-button');
   read.addEventListener('change', () => {
-    continueButton.disabled = !read.checked;
-    if (read.checked) rememberRead();
+    if (read.checked) {
+      if (noticeError) noticeError.hidden = true;
+      rememberRead();
+    }
   });
-  notice.querySelector('form').addEventListener('submit', rememberRead);
-  document.querySelectorAll('[data-open-notice]').forEach(button => {
-    button.addEventListener('click', openNotice);
+  noticeForm?.addEventListener('submit', event => {
+    if (!read.checked) {
+      event.preventDefault();
+      if (noticeError) noticeError.hidden = false;
+      read.focus();
+      return;
+    }
+    if (noticeError) noticeError.hidden = true;
+    rememberRead();
+    acknowledged = true;
+    if (signInPending) {
+      signInPending = false;
+      loginButton.click();
+    }
   });
-  let acknowledged = false;
+  document.querySelectorAll?.('[data-open-notice]').forEach(button => {
+    button.addEventListener('click', prepareNotice);
+  });
   try { acknowledged = localStorage.getItem(key) === 'read'; } catch {}
   try { acknowledged ||= document.cookie.split(';').some(value => value.trim() === 'minecraft_launcher_notice=read'); } catch {}
-  if (!acknowledged) openNotice();
+  if (publicIntroduction) {
+    loginButton.addEventListener('click', event => {
+      if (acknowledged) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      signInPending = true;
+      openNotice();
+    }, { capture: true });
+    notice.addEventListener('close', () => { signInPending = false; });
+  } else if (!acknowledged) openNotice();
 })();

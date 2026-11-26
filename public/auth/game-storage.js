@@ -147,8 +147,7 @@ globalThis.mcWebGameStorage = (() => {
     await management;
     if (prepared) return;
     if (!navigator.locks?.request) throw new Error("This browser cannot safely lock player storage. Update your browser before playing.");
-    let acquired, rejected;
-    const result = new Promise((resolve, reject) => { acquired = resolve; rejected = reject; });
+    const { promise: result, resolve: acquired, reject: rejected } = Promise.withResolvers();
     // Hold this lock until the document closes, including JVM startup failures.
     // Releasing it while Java threads can still write would let a second game
     // overwrite the same world from a stale filesystem snapshot.
@@ -369,7 +368,7 @@ globalThis.mcWebGameStorage = (() => {
           } finally { observing--; }
         }
       } catch (error) {
-        if (durable) throw new Error("Resource pack saved in browser storage; reload this page to activate it. " + (error?.message || error));
+        if (durable) throw new Error("Resource pack saved in browser storage; reload this page to activate it. " + (error?.message || error), { cause: error });
         throw error;
       } finally {
         if (staging) {

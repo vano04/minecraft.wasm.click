@@ -126,13 +126,11 @@ globalThis.mcWebNet = globalThis.mcWebNet || (() => {
         return launcherIdentity;
       }
     }
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 200);
     try {
       const response = await fetch(relayHttpUrl("/identity"), {
         mode: "cors",
         cache: "no-store",
-        signal: controller.signal,
+        signal: AbortSignal.timeout(200),
       });
       if (!response.ok) return null;
       const value = await response.json();
@@ -150,8 +148,6 @@ globalThis.mcWebNet = globalThis.mcWebNet || (() => {
     } catch {
       // Offline prototyping uses Minecraft's ordinary offline User.
       return null;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

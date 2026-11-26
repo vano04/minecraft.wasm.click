@@ -60,6 +60,10 @@ globalThis.mcWebGameLibrary = (() => {
     if (length !== expected) throw new Error('The ZIP contains a truncated compressed file.');
     return result;
   }
+  const yieldToMain = () => typeof scheduler?.yield === 'function'
+    ? scheduler.yield()
+    : new Promise(resolve => setTimeout(resolve, 0));
+
   async function unzip(input, onProgress = () => {}) {
     if (!Number.isSafeInteger(input.size) || input.size > MAX_BYTES) throw new Error('ZIP files must be smaller than 512 MiB.');
     if (typeof input.slice !== 'function') throw new Error('Choose a ZIP file from this device.');
@@ -132,6 +136,7 @@ globalThis.mcWebGameLibrary = (() => {
       if (content.length !== entry.size || crc32(content) !== entry.crc) throw new Error('The ZIP contains a damaged file: ' + entry.path);
       files.push({ path: entry.path, bytes: content });
       onProgress(index + 1, entries.length);
+      if ((index & 7) === 7) await yieldToMain();
     }
     return files;
   }
@@ -182,31 +187,55 @@ globalThis.mcWebGameLibrary = (() => {
     await store.importFiles(files.map(row => ({ path: prefix + row.path, bytes: row.bytes })));
     return { name, files: files.length, bytes: files.reduce((total, row) => total + row.bytes.length, 0) };
   }
-  function zip(files) {
+  function prepareZip(files) {
     if (files.length >= MAX_FILES) throw new Error('Too many files for a standard ZIP.');
     const archiveBytes = files.reduce((total, row) => total + row.bytes.length + 76 + encoder.encode(row.path).length * 2, 22);
     if (archiveBytes > MAX_BYTES) throw new Error('This ZIP exceeds the 512 MiB export limit.');
+  }
+  function packZipEntry(file, offset) {
+    if (!validPath(file.path)) throw new Error('Unsafe export path.');
+    const name = encoder.encode(file.path), bytes = file.bytes;
+    const header = new Uint8Array(30 + name.length), view = new DataView(header.buffer);
+    const crc = crc32(bytes);
+    view.setUint32(0, 0x04034b50, true); view.setUint16(4, 20, true); view.setUint16(6, 0x800, true);
+    view.setUint32(14, crc, true); view.setUint32(18, bytes.length, true); view.setUint32(22, bytes.length, true);
+    view.setUint16(26, name.length, true); header.set(name, 30);
+    const record = new Uint8Array(46 + name.length), cv = new DataView(record.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x800, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, bytes.length, true); cv.setUint32(24, bytes.length, true);
+    cv.setUint16(28, name.length, true); cv.setUint32(42, offset, true); record.set(name, 46);
+    return { header, bytes, record, nextOffset: offset + header.length + bytes.length };
+  }
+  function finishZip(count, local, central, offset) {
+    const end = new Uint8Array(22), ev = new DataView(end.buffer);
+    ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, count, true); ev.setUint16(10, count, true);
+    ev.setUint32(12, central.reduce((total, row) => total + row.length, 0), true); ev.setUint32(16, offset, true);
+    return new Blob([...local, ...central, end], { type: 'application/zip' });
+  }
+  function zip(files) {
+    prepareZip(files);
     const local = [], central = [];
     let offset = 0;
     for (const file of files) {
-      if (!validPath(file.path)) throw new Error('Unsafe export path.');
-      const name = encoder.encode(file.path), bytes = file.bytes;
-      const header = new Uint8Array(30 + name.length), view = new DataView(header.buffer);
-      const crc = crc32(bytes);
-      view.setUint32(0, 0x04034b50, true); view.setUint16(4, 20, true); view.setUint16(6, 0x800, true);
-      view.setUint32(14, crc, true); view.setUint32(18, bytes.length, true); view.setUint32(22, bytes.length, true);
-      view.setUint16(26, name.length, true); header.set(name, 30);
-      local.push(header, bytes);
-      const record = new Uint8Array(46 + name.length), cv = new DataView(record.buffer);
-      cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x800, true);
-      cv.setUint32(16, crc, true); cv.setUint32(20, bytes.length, true); cv.setUint32(24, bytes.length, true);
-      cv.setUint16(28, name.length, true); cv.setUint32(42, offset, true); record.set(name, 46);
-      central.push(record); offset += header.length + bytes.length;
+      const entry = packZipEntry(file, offset);
+      local.push(entry.header, entry.bytes);
+      central.push(entry.record);
+      offset = entry.nextOffset;
     }
-    const end = new Uint8Array(22), ev = new DataView(end.buffer);
-    ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
-    ev.setUint32(12, central.reduce((total, row) => total + row.length, 0), true); ev.setUint32(16, offset, true);
-    return new Blob([...local, ...central, end], { type: 'application/zip' });
+    return finishZip(files.length, local, central, offset);
+  }
+  async function zipAsync(files) {
+    prepareZip(files);
+    const local = [], central = [];
+    let offset = 0;
+    for (const [index, file] of files.entries()) {
+      const entry = packZipEntry(file, offset);
+      local.push(entry.header, entry.bytes);
+      central.push(entry.record);
+      offset = entry.nextOffset;
+      if ((index & 7) === 7) await yieldToMain();
+    }
+    return finishZip(files.length, local, central, offset);
   }
   async function exportZip(kind, name) {
     const store = await storage();
@@ -218,7 +247,7 @@ globalThis.mcWebGameLibrary = (() => {
     const files = selected.filter(row => row.path !== prefix + 'session.lock')
       .map(row => ({ path: row.path.slice(prefix.length), bytes: row.bytes }));
     if (!files.length) throw new Error('This item no longer exists.');
-    return zip(files);
+    return zipAsync(files);
   }
   async function remove(kind, name) {
     const store = await storage();
