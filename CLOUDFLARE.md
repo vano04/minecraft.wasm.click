@@ -52,7 +52,7 @@ A configured Worker returns:
 
 The address without /healthz returns 403. That is expected. The relay accepts WebSocket connections with the owner token and the minecraft.wasm.click Origin.
 
-Each authenticated connection runs in a separate Durable Object. Incoming WebSocket messages renew its CPU budget. An active TCP or pack stream keeps its object awake; the relay does not store traffic, tokens or account data in the object.
+Each authenticated connection runs in a separate Durable Object using Cloudflare's outbound TCP `connect()` API (`cloudflare:sockets`) behind the browser's `wss://` WebSocket upgrade. Incoming WebSocket messages renew its CPU budget. An active TCP or pack stream keeps its object awake; the relay does not store traffic, tokens or account data in the object. `wrangler.jsonc` keeps `observability.redact_query_string: true` so the `?token=` query parameter is not written in plain invocation logs if you enable observability later.
 
 The Worker supports both Minecraft TCP at `/tcp/` and server resource-pack downloads at `/pack/`. The launcher selects the pack route when a direct HTTPS download is blocked by CORS. Both routes require the owner token and allowed Origin. Pack hosts receive no Microsoft credentials or cookies.
 
@@ -95,8 +95,9 @@ The token permits TCP connections through your Worker. Microsoft account tokens 
 
 ## Limits and troubleshooting
 
-- Cloudflare Worker and Durable Object request/duration quotas apply. SQLite-backed Durable Objects are available on the Free plan. Active connections do not hibernate, so they consume object duration even while a player stands still. This does not provide unlimited multiplayer capacity.
-- Cloudflare blocks TCP connections to private/local addresses and Cloudflare IP ranges. Use the local CLI for a LAN Minecraft server.
+- Cloudflare Worker and Durable Object request/duration quotas apply. SQLite-backed Durable Objects are available on the Free plan (100,000 Workers requests/day, 100,000 Durable Object requests/day, 13,000 GB-s/day duration, 10 ms CPU per request; Paid plan adds higher quotas and longer CPU limits). Active connections do not hibernate while streaming gameplay bytes, so they consume object duration even while a player stands still. This does not provide unlimited multiplayer capacity, which is why the launcher requires each player to bring their own relay rather than sharing one central Worker.
+- Cloudflare's inbound TCP Workers (`connect()` handler) require Enterprise Spectrum and do not work on `workers.dev` or Free zones; this Worker already uses the right architecture (WebSocket `wss://` upgrade + outbound `cloudflare:sockets`).
+- Cloudflare blocks TCP connections to private/local addresses and Cloudflare IP ranges, and some public Minecraft servers with anti-VPN rules may block shared Cloudflare egress IPs. Use the local CLI for LAN servers or Docker on a VPS if a destination blocks Cloudflare IPs.
 - A 403 response to a relay connection means the token, path or browser Origin is wrong. Copy the full connection-file URL again and use it on minecraft.wasm.click.
 - If deployment says you are not signed in, run npm run cloudflare:login, then deploy again.
 - A new workers.dev address may take a short time to respond. The deploy command retries its health check. If it still fails, open /healthz again before redeploying.

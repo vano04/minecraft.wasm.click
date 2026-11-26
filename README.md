@@ -48,7 +48,7 @@ npm run cloudflare:deploy
 
 The deploy command creates a token, uploads it as a Cloudflare secret, and checks the Worker. It saves your private connection URL in `.mcwc/cloudflare/mcwc-relay-connection.txt`. Copy that file's contents into minecraft.wasm.click Settings > Self-hosted relay URL, then choose Use self-hosted URL. Keep the `.mcwc` folder when updating so your URL continues to work.
 
-No Go build, Docker or domain is needed. Deployment creates a SQLite-backed Durable Object class automatically. Each authenticated TCP or pack connection gets its own object; active streams stay in memory and do not write traffic or account data to storage. Cloudflare Worker and Durable Object request/duration quotas apply, including on the Free plan. See [the Cloudflare guide](CLOUDFLARE.md) for setup steps, updates and troubleshooting.
+No Go build, Docker or domain is needed. Deployment creates a SQLite-backed Durable Object class using Cloudflare's outbound TCP `connect()` API (`cloudflare:sockets`) behind the browser's `wss://` WebSocket upgrade (`wrangler.jsonc` keeps `observability.redact_query_string: true`). Each authenticated TCP or pack connection gets its own object; active streams stay in memory and do not write traffic or account data to storage. Cloudflare Worker and Durable Object quotas apply (Free plan: 100,000 Workers/DO requests per day, 13,000 GB-s/day duration, 10 ms CPU/request), and some servers may block shared Cloudflare egress IPs. See [the Cloudflare guide](CLOUDFLARE.md) for setup steps, limits, updates and troubleshooting.
 
 ## Docker on your existing server
 

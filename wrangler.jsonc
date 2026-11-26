@@ -12,7 +12,8 @@
     "ALLOWED_ORIGINS": "https://minecraft.wasm.click"
   },
   "observability": {
-    "enabled": false
+    "enabled": false,
+    "redact_query_string": true
   },
   "durable_objects": {
     "bindings": [
