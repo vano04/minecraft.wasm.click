@@ -6,8 +6,8 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET' || request.mode !== 'navigate' || url.origin !== self.location.origin
       || !['/', '/play', '/play/'].includes(url.pathname)) return;
   event.respondWith(fetch(request).catch(() => new Response(`<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>minecraft.wasm.click · Offline</title><style>body{font:18px system-ui;margin:0;background:#f7f7f4;color:#222;display:grid;min-height:100vh;place-items:center}main{max-width:32rem;padding:2rem}a{color:#a12027}</style></head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark">
+<title>minecraft.wasm.click · Offline</title><style>:root{color-scheme:light dark}body{font:1.125rem/1.5 system-ui;margin:0;background:light-dark(#f7f7f4,#181916);color:light-dark(#171816,#eeeeea);display:grid;min-height:100dvh;place-items:center}main{max-width:32rem;padding:2rem}a{color:light-dark(#8e1613,#ff8a85)}</style></head>
 <body><main><h1>You are offline</h1><p>Connect to the internet to sign in and play. Your saved worlds remain in this browser's storage.</p><a href="/">Try again</a><p>minecraft.wasm.click is an independent project, not approved by or associated with Mojang or Microsoft. <a href="/contact/">Contact</a> · <a href="https://github.com/vano04/minecraft.wasm.click" target="_blank" rel="noopener noreferrer">GitHub</a></p></main></body></html>`, {
     status: 503,
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',

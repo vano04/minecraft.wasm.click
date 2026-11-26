@@ -16,7 +16,7 @@ const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=u
   '.png': 'image/png', '.txt': 'text/plain; charset=utf-8', '.wasm': 'application/wasm', '.gz': 'application/gzip' };
 const policy = "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; connect-src 'self'; worker-src 'self'";
 const runtimePolicy = "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' blob: 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: wss:; media-src 'self' blob: https://resources.download.minecraft.net; worker-src 'self' blob:; manifest-src 'self'";
-const notFound = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/site.css"><link rel="icon" href="/mcweb-icon.svg"><title>Page not found | minecraft.wasm.click</title></head><body><main class="launcher not-found-page"><div class="launcher-panel"><div class="launcher-view"><p class="kicker">minecraft.wasm.click</p><p class="not-found-code" aria-label="Error 404">404</p><h1>Page not found</h1><p class="launcher-copy">This page may have moved, or the link may be incorrect.</p><a class="pixel-button pixel-button-red" href="/">BACK TO HOME</a></div></div><footer class="not-found-footer"><nav class="privacy-links" aria-label="Site links"><a href="/privacy/">Privacy</a><a href="/contact/">Contact</a><a href="/notices/">Licenses and source</a></nav><p class="privacy-disclaimer">NOT AN OFFICIAL MINECRAFT PRODUCT OR SERVICE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p></footer></main></body></html>`;
+const notFound = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><link rel="stylesheet" href="/site.css"><link rel="icon" href="/mcweb-icon.svg"><title>Page not found | minecraft.wasm.click</title></head><body><div class="launcher not-found-page"><main class="launcher-panel"><div class="launcher-view"><p class="kicker">minecraft.wasm.click</p><p class="not-found-code" aria-label="Error 404">404</p><h1>Page not found</h1><p class="launcher-copy">This page may have moved, or the link may be incorrect.</p><a class="pixel-button pixel-button-red" href="/">BACK TO HOME</a></div></main><footer class="not-found-footer"><nav class="privacy-links" aria-label="Site links"><a href="/privacy/">Privacy</a><a href="/contact/">Contact</a><a href="/notices/">Licenses and source</a></nav><p class="privacy-disclaimer">NOT AN OFFICIAL MINECRAFT PRODUCT OR SERVICE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p></footer></div></body></html>`;
 
 export function publicOrigin(value) {
   const url = new URL(value);
@@ -66,7 +66,7 @@ export function createApp({ origin = 'http://localhost:8080', site = resolve(roo
     const path = resolve(site, name);
     if (!path.startsWith(resolve(site) + '/') || !(await lstat(path).catch(() => null))?.isFile()) return false;
     const info = await lstat(path);
-    response.writeHead(200, { ...headers(request, runtime), 'Content-Type': mime[extname(path)] || 'application/octet-stream',
+    response.writeHead(200, { ...headers(request, runtime), ...(runtime ? {} : { 'Cache-Control': 'no-cache' }), 'Content-Type': mime[extname(path)] || 'application/octet-stream',
       'Content-Length': info.size });
     if (request.method === 'HEAD') response.end();
     else await pipeline(createReadStream(path), response);
@@ -103,7 +103,10 @@ export function createApp({ origin = 'http://localhost:8080', site = resolve(roo
         if (request.method !== 'POST') return json(request, response, 405, { error: 'Use POST' }, { Allow: 'POST' });
         if (request.headers.origin !== origin) return json(request, response, 403, { error: 'Request rejected' });
         auth.revoke(auth.sessionId(request));
-        return json(request, response, 200, { authenticated: false }, { 'Set-Cookie': auth.clearCookie() });
+        return json(request, response, 200, { authenticated: false }, {
+          'Clear-Site-Data': '"cookies", "cache"',
+          'Set-Cookie': auth.clearCookie(),
+        });
       }
       if (path === '/mcweb/config.json') {
         if (request.method !== 'GET') return json(request, response, 405, { error: 'Use GET' }, { Allow: 'GET' });
